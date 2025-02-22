@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "openpuc-scrapers"
+version = "0.1.0"
+description = "Web scrapers for open-access PUC data"
+authors = ["Charles Dawson <charles.dwsn@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+requests = "^2.32.3"
+beautifulsoup4 = "^4.13.3"
+pydantic = "^2.10.6"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+pytest-cov = "^6.0.0"
+mypy = "^1.15.0"
+sphinx = { version = "^8.2.1", markers = "python_version >= '3.11'" }
+sphinx-rtd-theme = "^3.0.2"
+ruff = "^0.9.7"
+nox = "^2025.2.9"
+pre-commit = "^4.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
