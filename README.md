@@ -13,39 +13,67 @@ So far, `openpuc_scrapers` has coverage for the following state commissions.
 
 TODO easy peasy installation using pip
 
-## Installation (for development)
+## Contributing
 
-To install and set up the project using Poetry, follow these steps:
+We welcome contributions to **OpenPUC Scrapers**! Follow these steps to set up your development environment and submit contributions.
 
-1. **Clone the repository**:
-    First, clone the repository to your local machine:
-    ```bash
-    git clone https://github.com/Open-PUCs/scrapers.git
-    cd scrapers
-    ```
+### 1. Fork and Clone the Repository
+First, fork the repository on GitHub and then clone your fork:
+```bash
+git clone https://github.com/your-username/scrapers.git
+cd scrapers
+```
 
-2. **Install Poetry**:
-    If you don’t have Poetry installed, you can install it by running the following command:
-    ```bash
-    curl -sSL https://install.python-poetry.org | python3 -
-    ```
+### 2. Set Up the Environment
+Ensure you have **Poetry** installed:
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+Then, install dependencies (Python 3.11 for development is recommended):
+```bash
+poetry env use python3.11
+poetry install
+```
 
-3. **Ensure Python 3.11 is installed**:
-    This is required for certain development dependencies
-    ```bash
-    poetry env use python 3.11
-    ```
+### 3. Install Pre-Commit Hooks
+Run the following to install **pre-commit hooks**:
+```bash
+pre-commit install
+```
+To test all hooks manually:
+```bash
+pre-commit run --all-files
+```
 
-3. **Install dependencies**:
-    Install all the required dependencies for the project using Poetry:
-    ```bash
-    poetry install
-    ```
+### 4. Run Tests and Linting
+Before submitting changes, ensure all tests pass and code follows standards:
+```bash
+nox -s tests
+nox -s mypy
+nox -s lint
+```
+or just run `nox` to run all checks.
 
-4. **Activate the virtual environment**:
-    After installing the dependencies, activate the virtual environment:
-    ```bash
-    poetry shell
-    ```
+### 5. Create a Feature Branch
+Follow a descriptive naming convention:
+```bash
+git checkout -b feature/add-new-scraper
+```
 
-    This will activate the project's virtual environment, and you can start working on the package.
+### 6. Commit and Push
+Format your commit messages properly:
+```bash
+git commit -m "Add scraper for [state PUC]"
+git push origin feature/add-new-scraper
+```
+
+### 7. Submit a Pull Request
+- Open a **Pull Request (PR)** on GitHub.  
+- Link any relevant **issues**.  
+- Wait for a **code review** and address any feedback.  
+
+### 8. Join the Discussion
+If you have ideas or issues, start a discussion in the **Issues** tab!  
+
+Thanks for contributing! 🚀
+
