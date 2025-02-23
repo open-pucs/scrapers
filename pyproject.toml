@@ -17,11 +17,14 @@ pydantic = "^2.10.6"
 pytest = "^8.3.4"
 pytest-cov = "^6.0.0"
 mypy = "^1.15.0"
-sphinx = { version = "^8.2.1", markers = "python_version >= '3.11'" }
-sphinx-rtd-theme = "^3.0.2"
 ruff = "^0.9.7"
 nox = "^2025.2.9"
 pre-commit = "^4.1.0"
+types-requests = "^2.32.0.20241016"
+
+[tool.poetry.group.docs.dependencies]
+sphinx = { version = "^8.2.1", markers = "python_version >= '3.11'" }
+sphinx-rtd-theme = "^3.0.2"
 
 [build-system]
 requires = ["poetry-core"]
