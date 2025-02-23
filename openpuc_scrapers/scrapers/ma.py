@@ -10,13 +10,106 @@ from ..models import Case, Filing, Attachment
 class MassachusettsDPU(AbstractScraper):
     """Interface for interacting with and parsing Massachusetts DPU data."""
 
+    INDUSTRIES = [
+        "CONS ADJ",
+        "Dig Safe",
+        "EFSB",
+        "Electric",
+        "FERC",
+        "Gas",
+        "PIPELINE",
+        "RATES",
+        "RULEMAKING",
+        "Siting/DTE",
+        "Transportation",
+        "Water",
+    ]
+
     def get_all_cases(self) -> list[Case]:
         """Retrieve a list of all available cases.
 
         Returns:
             list[Case]: A list of all cases.
         """
-        raise NotImplementedError
+        cases = []
+        for industry in self.INDUSTRIES:
+            cases.extend(self._get_all_cases_for_industry(industry))
+
+        return cases
+
+    def _get_all_cases_for_industry(self, industry: str) -> list[Case]:
+        """Retrieve a list of all available cases for a specific industry.
+
+        Args:
+            industry (str): The industry to retrieve cases for.
+
+        Returns:
+            list[Case]: A list of all cases for the specified industry.
+        """
+        # Query the website for the case list
+        request_url = self._get_case_list_url(industry)
+        response = requests.get(request_url)
+        response.raise_for_status()
+
+        # Parse the webpage
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        return self._parse_case_list(soup)
+
+    def _get_case_list_url(self, industry: str):
+        """Get the URL for a case.
+
+        Args:
+            case_number (str): The case number.
+
+        Returns:
+            str: The URL for the case.
+        """
+        return f"https://eeaonline.eea.state.ma.us/DPU/Fileroom//Dockets/GetByIndustry/?type={industry}"
+
+    def _parse_case_list(self, soup: BeautifulSoup) -> list[Case]:
+        """Parse the case list from the webpage.
+
+        Args:
+            soup (BeautifulSoup): The parsed webpage.
+
+        Returns:
+            - A list of cases.
+        """
+        cases: list[Case] = []
+        table = soup.find("table", class_="DocketList")
+        if not table:
+            return cases
+
+        # Skip header row
+        for row in table.find_all("tr")[1:]:  # type: ignore
+            cells = row.find_all("td")
+            if len(cells) < 7:
+                continue
+
+            # Extract date if present
+            date_str = cells[6].get_text(strip=True)
+            opened_date = None
+            if date_str:
+                try:
+                    opened_date = datetime.strptime(date_str, "%m/%d/%Y").date()
+                except ValueError:
+                    opened_date = None
+
+            case = Case(
+                case_number=cells[0].get_text(strip=True),
+                case_type=cells[1].get_text(strip=True) or None,
+                industry=cells[2].get_text(strip=True) or None,
+                petitioner=cells[4].get_text(strip=True) or None,
+                description=" ".join(cells[5].get_text(strip=True).split()) or None,
+                opened_date=opened_date,
+                closed_date=None,  # Not provided in the table
+                hearing_officer=None,  # Not provided in the table
+                filings=[],  # Empty list as specified
+            )
+            cases.append(case)
+
+        return cases
 
     def get_case_details(self, case: Case) -> Case:
         """Retrieve details for a specific case, including filings and attachments.
@@ -34,7 +127,7 @@ class MassachusettsDPU(AbstractScraper):
             requests.HTTPError: If the request to the website fails.
         """
         # Query the website for the case details
-        request_url = self._get_case_url(case.case_number)
+        request_url = self._get_case_details_url(case.case_number)
         response = requests.get(request_url)
         response.raise_for_status()
 
@@ -49,7 +142,7 @@ class MassachusettsDPU(AbstractScraper):
 
         return case
 
-    def _get_case_url(self, case_number: str):
+    def _get_case_details_url(self, case_number: str):
         """Get the URL for a case.
 
         Args:
