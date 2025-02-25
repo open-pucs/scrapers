@@ -31,6 +31,10 @@ So far, `openpuc_scrapers` has coverage for the following state commissions.
 | State | PUC                                  | Status |
 |-------|--------------------------------------|--------|
 | MA    | [Department of Public Utilities](https://eeaonline.eea.state.ma.us/DPU/Fileroom) | ✅ Available    |
+| NY    | [Department of Public Service](https://documents.dps.ny.gov/public/common/search.html) | 🚧 Coming soon    |
+| CA    | [Public Utilities Commission](https://apps.cpuc.ca.gov/apex/f?p=401:1:0) | 🚧 Coming soon    |
+| MI    | [Public Service Commission](https://mi-psc.my.site.com/s/) | 🚧 Coming soon    |
+| IL    | [Commerce Commission](https://www.icc.illinois.gov/) | 🚧 Coming soon    |
 
 </div>
 
