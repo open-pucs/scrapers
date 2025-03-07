@@ -206,6 +206,38 @@ def extractRows(driver, case) -> List[NYPUCFileData]:
     return filing_data
 
 
+defaultDriver = webdriver.Chrome()
+
+
+def extractDocket(nypuc_docket_id: Union[str, NYPUCDocketInfo]) -> List[NYPUCFileData]:
+    def waitForLoad(driver):
+        max_wait = 60
+        print("waiting for page to load")
+        for i in range(max_wait):
+            overlay = driver.find_element(By.ID, "GridPlaceHolder_upUpdatePanelGrd")
+            display = overlay.get_attribute("style")
+            if display == "display: none;":
+                print("Page Loaded")
+                return True
+            time.sleep(1)
+
+        print("pageload took waaaay too long")
+        return False
+
+    if isinstance(nypuc_docket_id, NYPUCDocketInfo):
+        nypuc_docket_id = nypuc_docket_id.docket_id
+
+    url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={nypuc_docket_id}"
+
+    defaultDriver.get(url)
+    waitForLoad(defaultDriver)
+    try:
+        rowData = extractRows(defaultDriver, case=nypuc_docket_id)
+    except Exception as e:
+        raise e
+    return rowData
+
+
 # Example usage:
 if __name__ == "__main__":
     # Scrape all dockets
