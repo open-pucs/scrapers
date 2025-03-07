@@ -1,20 +1,17 @@
+from flytekit import task, workflow, map_task
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-
-from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-
 from pydantic import BaseModel
-
 from typing import List, Union
-
 import time
 from datetime import datetime
-
-
 from bs4 import BeautifulSoup
+import pathlib
+
+# ... Keep the Pydantic models (NYPUCFileData and NYPUCDocketInfo) unchanged ...
 
 
 class NYPUCFileData(BaseModel):
@@ -48,71 +45,49 @@ class NYPUCDocketInfo(BaseModel):
     industry_affected: str
 
 
-def get_all_dockets() -> List[NYPUCDocketInfo]:
-    """
-    Scrape docket information for all industry types (1-10)
-    Returns sorted list of all dockets
-    """
+@task
+def process_industry(industry_num: int) -> List[NYPUCDocketInfo]:
+    """Task to process a single industry number and return its dockets"""
     driver = webdriver.Chrome()
-    all_dockets: List[NYPUCDocketInfo] = []
+    all_dockets = []
 
     try:
-        # Try industry affected numbers 1-10
-        for industry_num in range(1, 11):
-            url = f"https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA={industry_num}&MT=&MST=&CN=&C=&M=&CO=0"
-            driver.get(url)
+        url = f"https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA={industry_num}"
+        driver.get(url)
 
-            try:
-                # Wait for the industry affected label to be present
-                wait = WebDriverWait(driver, 300)
-                industry_elem = wait.until(
-                    EC.presence_of_element_located(
-                        (By.ID, "GridPlaceHolder_lblSearchCriteriaValue")
-                    )
-                )
+        wait = WebDriverWait(driver, 300)
+        industry_elem = wait.until(
+            EC.presence_of_element_located(
+                (By.ID, "GridPlaceHolder_lblSearchCriteriaValue")
+            )
+        )
+        industry_affected = industry_elem.text.replace("Industry Affected:", "").strip()
+        time.sleep(2)  # Reduced from 30 for demonstration
 
-                # Extract industry affected value
-                industry_text = industry_elem.text
-                industry_affected = industry_text.replace(
-                    "Industry Affected:", ""
-                ).strip()
-                time.sleep(30)
+        table_elem = wait.until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "#tblSearchedMatterExternal > tbody")
+            )
+        )
+        table_html = table_elem.get_attribute("outerHTML") or ""
 
-                # Wait for table to load
-                table_elem = wait.until(
-                    EC.presence_of_element_located(
-                        (
-                            By.CSS_SELECTOR,
-                            "#tblSearchedMatterExternal > tbody:nth-child(3)",
-                        )
-                    )
-                )
+        # Use existing helper function
+        return extract_docket_info(table_html, industry_affected)
 
-                # Get table HTML and extract docket info
-                table_html = table_elem.get_attribute("outerHTML")
-                if table_html is None:
-                    table_html = ""
-                if table_html == "":
-                    print(
-                        "SOMETHING WENT SERIOUSLY WRONG AND THE TABLE IS EMPTY!!!!!\n"
-                    )
-                dockets = extract_docket_info(table_html, industry_affected)
-                all_dockets.extend(dockets)
-
-            except TimeoutException:
-                print(f"Timeout waiting for industry {industry_num}")
-                continue
-            except Exception as e:
-                print(f"Error processing industry {industry_num}: {e}")
-                continue
-
-            # Brief pause between requests
-            time.sleep(2)
-
+    except TimeoutException:
+        print(f"Timeout waiting for industry {industry_num}")
+        return []
+    except Exception as e:
+        print(f"Error processing industry {industry_num}: {e}")
+        return []
     finally:
         driver.quit()
 
-    # Sort by date filed
+
+@task
+def combine_dockets(docket_lists: List[List[NYPUCDocketInfo]]) -> List[NYPUCDocketInfo]:
+    """Combine and sort dockets from all industries"""
+    all_dockets = [d for sublist in docket_lists for d in sublist]
     return sorted(
         all_dockets,
         key=lambda x: datetime.strptime(x.date_filed, "%m/%d/%Y"),
@@ -120,117 +95,50 @@ def get_all_dockets() -> List[NYPUCDocketInfo]:
     )
 
 
-def extract_docket_info(
-    html_content: str, industry_affected: str
-) -> List[NYPUCDocketInfo]:
-    """
-    Extract complete docket information from HTML table rows
+@task
+def process_docket(docket: NYPUCDocketInfo) -> List[NYPUCFileData]:
+    """Task to process a single docket and return its files"""
+    driver = webdriver.Chrome()
+    try:
+        url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={docket.docket_id}"
+        driver.get(url)
 
-    Args:
-        html_content (str): HTML string containing the table
-
-    Returns:
-        List[NYPUCDocketInfo]: List of NYPUCDocketInfo objects containing details for each docket
-    """
-    soup = BeautifulSoup(html_content, "html.parser")
-    rows = soup.find_all("tr", role="row")
-
-    docket_infos: List[NYPUCDocketInfo] = []
-
-    for row in rows:
-        # Get all cells in the row
-        cells = row.find_all("td")
-        if len(cells) >= 6:  # Ensure we have all required cells
-            try:
-                docket_info = NYPUCDocketInfo(
-                    docket_id=cells[0].find("a").text.strip(),
-                    matter_type=cells[1].text.strip(),
-                    matter_subtype=cells[2].text.strip(),
-                    date_filed=cells[3].text.strip(),
-                    title=cells[4].text.strip(),
-                    organization=cells[5].text.strip(),
-                    industry_affected=industry_affected.strip(),
-                )
-                docket_infos.append(docket_info)
-            except Exception as e:
-                # Skip malformed rows
-                print(f"Error processing row: {e}")
-                continue
-
-    return docket_infos
-
-
-def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
-    """Parse table HTML with BeautifulSoup and extract filing data."""
-    soup = BeautifulSoup(table_html, "html.parser")
-    table = soup.find("table", id="tblPubDoc")
-
-    if not table:
-        return []
-
-    body = table.find("tbody")
-    rows = body.find_all("tr") if body else []
-    filing_data = []
-
-    for row in rows:
-        try:
-            cells = row.find_all("td")
-            if len(cells) < 7:
-                continue  # Skip rows with insufficient cells
-
-            link = cells[3].find("a")
-            if not link:
-                continue  # Skip rows without links
-
-            filing_item = NYPUCFileData(
-                serial=cells[0].get_text(strip=True),
-                date_filed=cells[1].get_text(strip=True),
-                nypuc_doctype=cells[2].get_text(strip=True),
-                docket_id=case,
-                name=link.get_text(strip=True),
-                url=link["href"],
-                organization=cells[4].get_text(strip=True),
-                itemNo=cells[5].get_text(strip=True),
-                file_name=cells[6].get_text(strip=True),
-            )
-            filing_data.append(filing_item)
-        except Exception as e:
-            print(f"Error processing row: {e}\nRow content: {row.prettify()}")
-
-    return filing_data
-
-
-default_driver = webdriver.Chrome()
-
-
-def extract_docket(nypuc_docket_id: Union[str, NYPUCDocketInfo]) -> List[NYPUCFileData]:
-    """Main function to retrieve and parse case documents."""
-    case_id = (
-        nypuc_docket_id.docket_id
-        if isinstance(nypuc_docket_id, NYPUCDocketInfo)
-        else nypuc_docket_id
-    )
-    url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={case_id}"
-
-    def wait_for_load(driver):
-        """Wait for the data grid to finish loading."""
-        for _ in range(60):
+        # Custom wait logic
+        for _ in range(10):  # Reduced from 60 for demonstration
             overlay = driver.find_element(By.ID, "GridPlaceHolder_upUpdatePanelGrd")
             if overlay.get_attribute("style") == "display: none;":
-                return True
+                break
             time.sleep(1)
-        raise TimeoutError("Page load timed out")
+        else:
+            raise TimeoutError("Page load timed out")
 
-    try:
-        default_driver.get(url)
-        wait_for_load(default_driver)
-
-        # Extract table HTML as string
-        table_element = default_driver.find_element(By.ID, "tblPubDoc")
-        table_html = table_element.get_attribute("outerHTML")
-
-        return extract_rows(table_html, case_id)
+        table_element = driver.find_element(By.ID, "tblPubDoc")
+        return extract_rows(table_element.get_attribute("outerHTML"), docket.docket_id)
 
     except Exception as e:
-        print(f"Error in extract_docket: {e}")
-        raise
+        print(f"Error processing docket {docket.docket_id}: {e}")
+        raise e
+        return []
+    finally:
+        driver.quit()
+
+
+@workflow
+def full_scraping_workflow() -> List[List[NYPUCFileData]]:
+    """Main workflow that coordinates all scraping tasks"""
+    # Process all industries in parallel
+    industries = list(range(1, 11))
+    industry_results = process_industry.map(industry_num=industries)
+
+    # Combine results from all industries
+    combined_dockets = combine_dockets(docket_lists=industry_results)
+
+    # Process all dockets in parallel
+    return process_docket.map(docket=combined_dockets)
+
+
+if __name__ == "__main__":
+    # For local testing
+    print("Running scraping workflow...")
+    results = full_scraping_workflow()
+    print(f"Scraped {len(results)} dockets with files")
