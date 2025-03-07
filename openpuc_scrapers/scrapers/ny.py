@@ -15,7 +15,6 @@ from datetime import datetime
 
 
 from bs4 import BeautifulSoup
-import json
 
 
 class NYPUCFileData(BaseModel):
@@ -161,101 +160,77 @@ def extract_docket_info(
     return docket_infos
 
 
-def extractRows(driver, case) -> List[NYPUCFileData]:
-    table = driver.find_element(By.ID, "tblPubDoc")
-    body = table.find_element(By.TAG_NAME, "tbody")
-    rows = body.find_elements(By.TAG_NAME, "tr")
-    filing_data: List[NYPUCFileData] = []
+def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
+    """Parse table HTML with BeautifulSoup and extract filing data."""
+    soup = BeautifulSoup(table_html, "html.parser")
+    table = soup.find("table", id="tblPubDoc")
+
+    if not table:
+        return []
+
+    body = table.find("tbody")
+    rows = body.find_all("tr") if body else []
+    filing_data = []
+
     for row in rows:
-        filing_item = None
         try:
-            # print(row)
-            cells = row.find_elements(By.TAG_NAME, "td")
-            linkcell = cells[3]
-            link = linkcell.find_element(By.TAG_NAME, "a")
-            # print(f"link: {link}")
-            name = link.text
-            href = link.get_attribute("href")
-            # print(f"href: {href}")
-            # skip if the filing has already been indexed
-            # if graph.pages[href].visited:
-            #     continue
+            cells = row.find_all("td")
+            if len(cells) < 7:
+                continue  # Skip rows with insufficient cells
+
+            link = cells[3].find("a")
+            if not link:
+                continue  # Skip rows without links
 
             filing_item = NYPUCFileData(
-                serial=cells[0].text,
-                date_filed=cells[1].text,
-                nypuc_doctype=cells[2].text,
+                serial=cells[0].get_text(strip=True),
+                date_filed=cells[1].get_text(strip=True),
+                nypuc_doctype=cells[2].get_text(strip=True),
                 docket_id=case,
-                name=name,
-                url=href,
-                organization=cells[4].text,
-                itemNo=cells[5].text,
-                file_name=cells[6].text,
+                name=link.get_text(strip=True),
+                url=link["href"],
+                organization=cells[4].get_text(strip=True),
+                itemNo=cells[5].get_text(strip=True),
+                file_name=cells[6].get_text(strip=True),
             )
             filing_data.append(filing_item)
         except Exception as e:
-            print(
-                "Encountered a fatal error while processing a row: ",
-                row,
-                "\nencountering error: ",
-                e,
-            )
-    # print(f"Found filings:\n {filings}")
-    # return filings
-    # filings = {"case": case, "filings": filing_data}
+            print(f"Error processing row: {e}\nRow content: {row.prettify()}")
+
     return filing_data
 
 
-defaultDriver = webdriver.Chrome()
+default_driver = webdriver.Chrome()
 
 
-def extractDocket(nypuc_docket_id: Union[str, NYPUCDocketInfo]) -> List[NYPUCFileData]:
-    def waitForLoad(driver):
-        max_wait = 60
-        print("waiting for page to load")
-        for i in range(max_wait):
+def extract_docket(nypuc_docket_id: Union[str, NYPUCDocketInfo]) -> List[NYPUCFileData]:
+    """Main function to retrieve and parse case documents."""
+    case_id = (
+        nypuc_docket_id.docket_id
+        if isinstance(nypuc_docket_id, NYPUCDocketInfo)
+        else nypuc_docket_id
+    )
+    url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={case_id}"
+
+    def wait_for_load(driver):
+        """Wait for the data grid to finish loading."""
+        for _ in range(60):
             overlay = driver.find_element(By.ID, "GridPlaceHolder_upUpdatePanelGrd")
-            display = overlay.get_attribute("style")
-            if display == "display: none;":
-                print("Page Loaded")
+            if overlay.get_attribute("style") == "display: none;":
                 return True
             time.sleep(1)
+        raise TimeoutError("Page load timed out")
 
-        print("pageload took waaaay too long")
-        return False
-
-    if isinstance(nypuc_docket_id, NYPUCDocketInfo):
-        nypuc_docket_id = nypuc_docket_id.docket_id
-
-    url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={nypuc_docket_id}"
-
-    defaultDriver.get(url)
-    waitForLoad(defaultDriver)
     try:
-        rowData = extractRows(defaultDriver, case=nypuc_docket_id)
+        default_driver.get(url)
+        wait_for_load(default_driver)
+
+        # Extract table HTML as string
+        table_element = default_driver.find_element(By.ID, "tblPubDoc")
+        table_html = table_element.get_attribute("outerHTML")
+
+        return extract_rows(table_html, case_id)
+
     except Exception as e:
-        raise e
-    return rowData
-
-
-# Example usage:
-if __name__ == "__main__":
-    # Scrape all dockets
-    all_dockets = get_all_dockets()
-
-    # Save to JSON file
-
-    # Print summary
-    print(f"Retrieved {len(all_dockets)} total dockets")
-    print(f"Date range: {all_dockets[-1].date_filed} to {all_dockets[0].date_filed}")
-
-    # Print industry breakdown
-    industry_counts = {}
-    for docket in all_dockets:
-        industry_counts[docket.industry_affected] = (
-            industry_counts.get(docket.industry_affected, 0) + 1
-        )
-
-    print("\nDockets by industry:")
-    for industry, count in sorted(industry_counts.items()):
-        print(f"{industry}: {count}")
+        print(f"Error in extract_docket: {e}")
+        raise
