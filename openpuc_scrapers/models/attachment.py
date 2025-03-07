@@ -15,4 +15,3 @@ class Attachment(BaseModel):
     name: str
     url: HttpUrl
     document_type: Optional[str] = None
-    full_text: Optional[str] = None
