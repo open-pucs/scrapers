@@ -8,7 +8,7 @@ from selenium.webdriver.common.by import By
 
 from pydantic import BaseModel
 
-from typing import List
+from typing import List, Union
 
 import time
 from datetime import datetime
@@ -16,6 +16,27 @@ from datetime import datetime
 
 from bs4 import BeautifulSoup
 import json
+
+
+class NYPUCFileData(BaseModel):
+    serial: str
+    date_filed: str
+    nypuc_doctype: str
+    name: str
+    url: str
+    organization: str
+    itemNo: str
+    file_name: str
+    docket_id: str
+
+    def __str__(self):
+        return f"\n(\n\tSerial: {self.serial}\n\tDate Filed: {self.date_filed}\
+        \n\tNY PUC Doc Type: {self.nypuc_doctype}\n\tName: {self.name}\n\tURL: \
+        {self.url}\nOrganization: {self.organization}\n\tItem No: {self.itemNo}\n\
+        \tFile Name: {self.file_name}\n)\n"
+
+    def __repr__(self):
+        return self.__str__()
 
 
 class NYPUCDocketInfo(BaseModel):
@@ -100,13 +121,6 @@ def get_all_dockets() -> List[NYPUCDocketInfo]:
     )
 
 
-def save_dockets_to_json(dockets: List[NYPUCDocketInfo], output_file: str) -> None:
-    """Save docket list to JSON file"""
-    docket_dicts = [d.model_dump() for d in dockets]
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(docket_dicts, f, indent=2)
-
-
 def extract_docket_info(
     html_content: str, industry_affected: str
 ) -> List[NYPUCDocketInfo]:
@@ -147,13 +161,57 @@ def extract_docket_info(
     return docket_infos
 
 
+def extractRows(driver, case) -> List[NYPUCFileData]:
+    table = driver.find_element(By.ID, "tblPubDoc")
+    body = table.find_element(By.TAG_NAME, "tbody")
+    rows = body.find_elements(By.TAG_NAME, "tr")
+    filing_data: List[NYPUCFileData] = []
+    for row in rows:
+        filing_item = None
+        try:
+            # print(row)
+            cells = row.find_elements(By.TAG_NAME, "td")
+            linkcell = cells[3]
+            link = linkcell.find_element(By.TAG_NAME, "a")
+            # print(f"link: {link}")
+            name = link.text
+            href = link.get_attribute("href")
+            # print(f"href: {href}")
+            # skip if the filing has already been indexed
+            # if graph.pages[href].visited:
+            #     continue
+
+            filing_item = NYPUCFileData(
+                serial=cells[0].text,
+                date_filed=cells[1].text,
+                nypuc_doctype=cells[2].text,
+                docket_id=case,
+                name=name,
+                url=href,
+                organization=cells[4].text,
+                itemNo=cells[5].text,
+                file_name=cells[6].text,
+            )
+            filing_data.append(filing_item)
+        except Exception as e:
+            print(
+                "Encountered a fatal error while processing a row: ",
+                row,
+                "\nencountering error: ",
+                e,
+            )
+    # print(f"Found filings:\n {filings}")
+    # return filings
+    # filings = {"case": case, "filings": filing_data}
+    return filing_data
+
+
 # Example usage:
 if __name__ == "__main__":
     # Scrape all dockets
     all_dockets = get_all_dockets()
 
     # Save to JSON file
-    save_dockets_to_json(all_dockets, "all_dockets.json")
 
     # Print summary
     print(f"Retrieved {len(all_dockets)} total dockets")
