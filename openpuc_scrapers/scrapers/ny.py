@@ -5,7 +5,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from pydantic import BaseModel
-from typing import List, Union
+from typing import List, Tuple, Union
 import time
 from datetime import datetime
 from bs4 import BeautifulSoup
@@ -96,7 +96,7 @@ def combine_dockets(docket_lists: List[List[NYPUCDocketInfo]]) -> List[NYPUCDock
 
 
 @task
-def process_docket(docket: NYPUCDocketInfo) -> List[NYPUCFileData]:
+def process_docket(docket: NYPUCDocketInfo) -> List[Tuple[str, str]]:
     """Task to process a single docket and return its files"""
     driver = webdriver.Chrome()
     try:
@@ -113,7 +113,7 @@ def process_docket(docket: NYPUCDocketInfo) -> List[NYPUCFileData]:
             raise TimeoutError("Page load timed out")
 
         table_element = driver.find_element(By.ID, "tblPubDoc")
-        return extract_rows(table_element.get_attribute("outerHTML"), docket.docket_id)
+        return (table_element.get_attribute("outerHTML"), docket.docket_id)
 
     except Exception as e:
         print(f"Error processing docket {docket.docket_id}: {e}")
@@ -134,7 +134,96 @@ def full_scraping_workflow() -> List[List[NYPUCFileData]]:
     combined_dockets = combine_dockets(docket_lists=industry_results)
 
     # Process all dockets in parallel
-    return process_docket.map(docket=combined_dockets)
+    result_filedata: List[List[NYPUCFileData]] = []
+    for docket in combined_dockets:
+        html, case = process_docket(docket)
+        results = extract_rows(html, case)
+        result_filedata.append(results)
+        print(f"Processed Doc rows for {case}")
+
+    return result_filedata
+
+
+@task
+def extract_docket_info(
+    html_content: str, industry_affected: str
+) -> List[NYPUCDocketInfo]:
+    """
+    Extract complete docket information from HTML table rows
+
+    Args:
+        html_content (str): HTML string containing the table
+
+    Returns:
+        List[NYPUCDocketInfo]: List of NYPUCDocketInfo objects containing details for each docket
+    """
+    soup = BeautifulSoup(html_content, "html.parser")
+    rows = soup.find_all("tr", role="row")
+
+    docket_infos: List[NYPUCDocketInfo] = []
+
+    for row in rows:
+        # Get all cells in the row
+        cells = row.find_all("td")
+        if len(cells) >= 6:  # Ensure we have all required cells
+            try:
+                docket_info = NYPUCDocketInfo(
+                    docket_id=cells[0].find("a").text.strip(),
+                    matter_type=cells[1].text.strip(),
+                    matter_subtype=cells[2].text.strip(),
+                    date_filed=cells[3].text.strip(),
+                    title=cells[4].text.strip(),
+                    organization=cells[5].text.strip(),
+                    industry_affected=industry_affected.strip(),
+                )
+                docket_infos.append(docket_info)
+            except Exception as e:
+                # Skip malformed rows
+                print(f"Error processing row: {e}")
+                continue
+
+    return docket_infos
+
+
+@task
+def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
+    """Parse table HTML with BeautifulSoup and extract filing data."""
+    soup = BeautifulSoup(table_html, "html.parser")
+    table = soup.find("table", id="tblPubDoc")
+
+    if not table:
+        return []
+
+    body = table.find("tbody")
+    rows = body.find_all("tr") if body else []
+    filing_data = []
+
+    for row in rows:
+        try:
+            cells = row.find_all("td")
+            if len(cells) < 7:
+                continue  # Skip rows with insufficient cells
+
+            link = cells[3].find("a")
+            if not link:
+                continue  # Skip rows without links
+
+            filing_item = NYPUCFileData(
+                serial=cells[0].get_text(strip=True),
+                date_filed=cells[1].get_text(strip=True),
+                nypuc_doctype=cells[2].get_text(strip=True),
+                docket_id=case,
+                name=link.get_text(strip=True),
+                url=link["href"],
+                organization=cells[4].get_text(strip=True),
+                itemNo=cells[5].get_text(strip=True),
+                file_name=cells[6].get_text(strip=True),
+            )
+            filing_data.append(filing_item)
+        except Exception as e:
+            print(f"Error processing row: {e}\nRow content: {row.prettify()}")
+
+    return filing_data
 
 
 if __name__ == "__main__":
