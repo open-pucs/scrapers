@@ -96,7 +96,7 @@ def combine_dockets(docket_lists: List[List[NYPUCDocketInfo]]) -> List[NYPUCDock
 
 
 @task
-def process_docket(docket: NYPUCDocketInfo) -> List[Tuple[str, str]]:
+def process_docket(docket: NYPUCDocketInfo) -> str:
     """Task to process a single docket and return its files"""
     driver = webdriver.Chrome()
     try:
@@ -113,12 +113,11 @@ def process_docket(docket: NYPUCDocketInfo) -> List[Tuple[str, str]]:
             raise TimeoutError("Page load timed out")
 
         table_element = driver.find_element(By.ID, "tblPubDoc")
-        return (table_element.get_attribute("outerHTML"), docket.docket_id)
+        return table_element.get_attribute("outerHTML")
 
     except Exception as e:
         print(f"Error processing docket {docket.docket_id}: {e}")
         raise e
-        return []
     finally:
         driver.quit()
 
@@ -128,25 +127,26 @@ def full_scraping_workflow() -> List[List[NYPUCFileData]]:
     """Main workflow that coordinates all scraping tasks"""
     # Process all industries in parallel
     industries = list(range(1, 11))
-    industry_results = process_industry.map(industry_num=industries)
+    industry_results = list(map(process_industry, industries))
 
     # Combine results from all industries
     combined_dockets = combine_dockets(docket_lists=industry_results)
 
-    # Process all dockets in parallel
     result_filedata: List[List[NYPUCFileData]] = []
     for docket in combined_dockets:
-        html, case = process_docket(docket)
-        results = extract_rows(html, case)
+        # Flyte Task that downloads the html
+        html = process_docket(docket)
+        # Flyte Task that extracts the data from the html
+        results = extract_rows(html, docket)
         result_filedata.append(results)
-        print(f"Processed Doc rows for {case}")
+        print(f"Processed Doc rows for {docket.docket_id}")
 
     return result_filedata
 
 
 @task
 def extract_docket_info(
-    html_content: str, industry_affected: str
+    html_content: str, docket_info: NYPUCDocketInfo
 ) -> List[NYPUCDocketInfo]:
     """
     Extract complete docket information from HTML table rows
@@ -161,6 +161,7 @@ def extract_docket_info(
     rows = soup.find_all("tr", role="row")
 
     docket_infos: List[NYPUCDocketInfo] = []
+    industry_affected = docket_info.industry_affected.strip()
 
     for row in rows:
         # Get all cells in the row
