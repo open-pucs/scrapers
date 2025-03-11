@@ -7,10 +7,11 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.13"
 requests = "^2.32.3"
 beautifulsoup4 = "^4.13.3"
 pydantic = "^2.10.6"
+aiohttp = "^3.11.13"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -29,3 +30,7 @@ sphinx-rtd-theme = "^3.0.2"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
