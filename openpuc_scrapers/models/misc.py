@@ -13,34 +13,29 @@ class RequestData(BaseModel):
 async def post_objects_to_endpoint(
     requests: List[RequestData], max_simul_requests: int
 ) -> List[dict]:
-    semaphore = asyncio.Semaphore(max_simul_requests)  #
+    semaphore = asyncio.Semaphore(max_simul_requests)
 
     async with aiohttp.ClientSession() as session:
 
         async def post_single(request: RequestData) -> dict:
             async with semaphore:  # Acquire semaphore before making request
-                try:
-                    async with session.post(
-                        request.url,
-                        json=request.data.to_dict(),  # Convert Filing object to dict
-                        headers={"Content-Type": "application/json"},
-                    ) as response:
-                        response.raise_for_status()  # Raise exception for bad status codes
-                        print(
-                            "Successfully uploaded file with response:", response.status
-                        )
-                        return await response.json()
-                except Exception as e:
-                    print(f"Error uploading data: {str(e)}")
-                    return {"error": str(e), "data": str(request.data)}
+                async with session.post(
+                    request.url,
+                    json=request.data.to_dict(),  # Convert Filing object to dict
+                    headers={"Content-Type": "application/json"},
+                ) as response:
+                    response.raise_for_status()  # Raise exception for bad status codes
+                    print("Successfully uploaded file with response:", response.status)
+                    return await response.json()
 
         tasks = [post_single(request) for request in requests]
-        responses = await asyncio.gather(*tasks, return_exceptions=True)
-        for response in responses:
-            if isinstance(response, BaseException):
-                raise response
-
-        return responses
+        try:
+            # Will raise the first exception encountered
+            responses = await asyncio.gather(*tasks)
+            return responses  # type: List[dict]
+        except Exception as e:
+            print(f"Error during batch upload: {str(e)}")
+            raise  # Re-raise the exception
 
 
 async def upload_schemas_to_kessler(files: List[Filing], api_url: str):
