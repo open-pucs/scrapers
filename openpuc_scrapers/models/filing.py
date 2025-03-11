@@ -1,6 +1,6 @@
+from typing import List
 from pydantic import BaseModel
 from datetime import date
-from typing import Optional
 
 from .attachment import Attachment
 
@@ -21,4 +21,4 @@ class Filing(BaseModel):
     party_name: str
     filing_type: str
     description: str
-    attachments: Optional[list[Attachment]] = None
+    attachments: List[Attachment] = []
