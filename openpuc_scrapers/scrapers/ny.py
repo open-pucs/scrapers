@@ -1,17 +1,14 @@
-from flytekit import task, workflow, map_task
+from flytekit import task, workflow
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from pydantic import BaseModel
-from typing import List, Tuple, Union
+from typing import List
 import time
 from datetime import datetime
 from bs4 import BeautifulSoup
-import pathlib
-
-# ... Keep the Pydantic models (NYPUCFileData and NYPUCDocketInfo) unchanged ...
 
 
 class NYPUCFileData(BaseModel):
