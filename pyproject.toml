@@ -11,6 +11,7 @@ python = "^3.13"
 requests = "^2.32.3"
 beautifulsoup4 = "^4.13.3"
 pydantic = "^2.10.6"
+aiohttp = "^3.11.13"
 
 
 [tool.poetry.group.dev.dependencies]
