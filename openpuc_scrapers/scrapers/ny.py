@@ -11,25 +11,21 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 
 
+class NYPUCAttachmentData(BaseModel):
+    name: str
+    url: str
+    file_name: str
+
+
 class NYPUCFileData(BaseModel):
+    attachements: List[NYPUCAttachmentData]
     serial: str
     date_filed: str
     nypuc_doctype: str
     name: str
-    url: str
     organization: str
     itemNo: str
-    file_name: str
     docket_id: str
-
-    def __str__(self):
-        return f"\n(\n\tSerial: {self.serial}\n\tDate Filed: {self.date_filed}\
-        \n\tNY PUC Doc Type: {self.nypuc_doctype}\n\tName: {self.name}\n\tURL: \
-        {self.url}\nOrganization: {self.organization}\n\tItem No: {self.itemNo}\n\
-        \tFile Name: {self.file_name}\n)\n"
-
-    def __repr__(self):
-        return self.__str__()
 
 
 class NYPUCDocketInfo(BaseModel):
@@ -242,7 +238,24 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
         except Exception as e:
             print(f"Error processing row: {e}\nRow content: {row.prettify()}")
 
-    return filing_data
+    deduped_data = deduplicate_individual_attachments_into_files(filing_data)
+    return deduped_data
+
+
+def deduplicate_individual_attachments_into_files(
+    raw_files: List[NYPUCFileData],
+) -> List[NYPUCFileData]:
+    dict_nypuc = {}
+
+    def make_dedupe_string(file: NYPUCFileData) -> str:
+        return f"itemnum-{file.itemNo}-caseid-{file.docket_id}"
+
+    for file in raw_files:
+        dedupestr = make_dedupe_string(file)
+        if dict_nypuc.get(dedupestr) is not None:
+            dict_nypuc[dedupestr].attachements.append(file.attachements)
+    return_vals = dict_nypuc.values()
+    return list(return_vals)
 
 
 if __name__ == "__main__":
