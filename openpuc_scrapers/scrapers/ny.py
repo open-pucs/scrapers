@@ -1,7 +1,7 @@
 from flytekit import task, workflow
 from openpuc_scrapers.models.attachment import Attachment
-from openpuc_scrapers.models.filing import Filing
-from openpuc_scrapers.models.misc import CastableToFiling, send_castables_to_kessler
+from openpuc_scrapers.models.filing import Filing, IntoFiling
+from openpuc_scrapers.models.misc import send_castables_to_kessler
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
@@ -20,7 +20,7 @@ class NYPUCAttachmentData(BaseModel):
     file_name: str
 
 
-class NYPUCFileData(BaseModel, CastableToFiling):
+class NYPUCFileData(BaseModel, IntoFiling):
     attachements: List[NYPUCAttachmentData]
     serial: str
     date_filed: str
@@ -30,7 +30,7 @@ class NYPUCFileData(BaseModel, CastableToFiling):
     itemNo: str
     docket_id: str
 
-    def cast_to_filing(self) -> Filing:
+    def into_filing(self) -> Filing:
         """Convert NYPUCFileData to a generic Filing object."""
         # Convert string date to date object
         filed_date_obj = datetime.strptime(self.date_filed, "%m/%d/%Y").date()

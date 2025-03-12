@@ -2,17 +2,11 @@ from abc import ABC, abstractmethod
 from typing import Any, List
 import asyncio
 import aiohttp
-from openpuc_scrapers.models.filing import Filing
+from openpuc_scrapers.models.filing import Filing, IntoFiling
 from pydantic import BaseModel
 
 
-class CastableToFiling(ABC):
-    @abstractmethod
-    def cast_to_filing(self) -> Filing:
-        pass
-
-
-async def send_castables_to_kessler(castable_filings: List[CastableToFiling]) -> None:
+async def send_castables_to_kessler(castable_filings: List[IntoFiling]) -> None:
     filing_list = list(map(lambda x: x.cast_to_filing(), castable_filings))
     await upload_schemas_to_kessler(filing_list, "https://api.kessler.xyz/")
 
