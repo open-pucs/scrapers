@@ -224,12 +224,14 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
                 continue  # Skip rows without links
 
             filing_item = NYPUCFileData(
+                attachment=NYPUCAttachmentData(
+                    name=link.get_text(strip=True),
+                    url=link["href"],
+                ),
                 serial=cells[0].get_text(strip=True),
                 date_filed=cells[1].get_text(strip=True),
                 nypuc_doctype=cells[2].get_text(strip=True),
                 docket_id=case,
-                name=link.get_text(strip=True),
-                url=link["href"],
                 organization=cells[4].get_text(strip=True),
                 itemNo=cells[5].get_text(strip=True),
                 file_name=cells[6].get_text(strip=True),
