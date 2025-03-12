@@ -1,4 +1,7 @@
 from flytekit import task, workflow
+from openpuc_scrapers.models.attachment import Attachment
+from openpuc_scrapers.models.filing import Filing
+from openpuc_scrapers.models.misc import CastableToFiling, send_castables_to_kessler
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
@@ -7,7 +10,7 @@ from selenium.webdriver.common.by import By
 from pydantic import BaseModel
 from typing import List
 import time
-from datetime import datetime
+from datetime import date, datetime
 from bs4 import BeautifulSoup
 
 
@@ -17,7 +20,7 @@ class NYPUCAttachmentData(BaseModel):
     file_name: str
 
 
-class NYPUCFileData(BaseModel):
+class NYPUCFileData(BaseModel, CastableToFiling):
     attachements: List[NYPUCAttachmentData]
     serial: str
     date_filed: str
@@ -26,6 +29,26 @@ class NYPUCFileData(BaseModel):
     organization: str
     itemNo: str
     docket_id: str
+
+    def cast_to_filing(self) -> Filing:
+        """Convert NYPUCFileData to a generic Filing object."""
+        # Convert string date to date object
+        filed_date_obj = datetime.strptime(self.date_filed, "%m/%d/%Y").date()
+
+        # Convert NYPUCAttachmentData to generic Attachment objects
+        attachments = [
+            Attachment(name=att.name, url=att.url, file_name=att.file_name)
+            for att in self.attachements
+        ]
+
+        return Filing(
+            case_number=self.docket_id,
+            filed_date=filed_date_obj,
+            party_name=self.organization,
+            filing_type=self.nypuc_doctype,
+            description=self.name,
+            attachments=attachments,
+        )
 
 
 class NYPUCDocketInfo(BaseModel):
@@ -116,7 +139,7 @@ def process_docket(docket: NYPUCDocketInfo) -> str:
 
 
 @workflow
-def full_scraping_workflow() -> List[List[NYPUCFileData]]:
+async def full_scraping_workflow() -> List[List[NYPUCFileData]]:
     """Main workflow that coordinates all scraping tasks"""
     # Process all industries in parallel
     industries = list(range(1, 11))
@@ -154,6 +177,8 @@ def test_small_workflow() -> List[NYPUCFileData]:
     # Flyte Task that extracts the data from the html
     results = extract_rows(html, docket)
     print(f"Processed Doc rows for {docket.docket_id}")
+
+    send_castables_to_kessler(results)
 
     return results
 

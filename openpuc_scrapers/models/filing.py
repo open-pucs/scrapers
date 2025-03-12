@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, Dict, List
 from pydantic import BaseModel
 from datetime import date
 
@@ -22,3 +22,4 @@ class Filing(BaseModel):
     filing_type: str
     description: str
     attachments: List[Attachment] = []
+    extra_metadata: Dict[str, Any]
