@@ -22,14 +22,5 @@ class GenericFiling(BaseModel):
     party_name: str
     filing_type: str
     description: str
-    attachments: List[Attachment] = []
-    extra_metadata: Dict[str, Any]
-
-    def into_filing(self):
-        return self
-
-
-class IntoFiling(ABC):
-    @abstractmethod
-    def cast_to_filing(self) -> Filing:
-        pass
+    attachments: List[GenericAttachment] = []
+    extra_metadata: Dict[str, Any] = {}

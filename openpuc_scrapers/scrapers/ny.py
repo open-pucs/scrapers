@@ -1,5 +1,5 @@
 from flytekit import task, workflow
-from openpuc_scrapers.models.attachment import Attachment
+from openpuc_scrapers.models.attachment import Attachment, GenericAttachment
 from openpuc_scrapers.models.filing import Filing, IntoFiling
 from openpuc_scrapers.models.misc import send_castables_to_kessler
 from selenium.webdriver.support.ui import WebDriverWait
@@ -8,7 +8,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from pydantic import BaseModel, HttpUrl
-from typing import List
+from typing import Any, Dict, List, Tuple
 import time
 from datetime import date, datetime
 from bs4 import BeautifulSoup
@@ -45,7 +45,7 @@ class NYPUCDocketInfo(BaseModel):
     industry_affected: str
 
 
-def process_industry(industry_num: int) -> List[NYPUCDocketInfo]:
+def process_industry(industry_num: int) -> Dict[str, Any]:
     """Task to process a single industry number and return its dockets"""
     driver = webdriver.Chrome()
     all_dockets = []
@@ -71,14 +71,14 @@ def process_industry(industry_num: int) -> List[NYPUCDocketInfo]:
         table_html = table_elem.get_attribute("outerHTML") or ""
 
         # Use existing helper function
-        return extract_docket_info(table_html, industry_affected)
+        return {"html": table_html, "industry": industry_affected}
 
-    except TimeoutException:
+    except TimeoutException as e:
         print(f"Timeout waiting for industry {industry_num}")
-        return []
+        raise e
     except Exception as e:
         print(f"Error processing industry {industry_num}: {e}")
-        return []
+        raise e
     finally:
         driver.quit()
 
@@ -119,9 +119,7 @@ def process_docket(docket: NYPUCDocketInfo) -> str:
         driver.quit()
 
 
-def extract_docket_info(
-    html_content: str, docket_info: NYPUCDocketInfo
-) -> List[NYPUCDocketInfo]:
+def extract_docket_info(intermediate: Dict[str, Any]) -> List[NYPUCDocketInfo]:
     """
     Extract complete docket information from HTML table rows
 
@@ -131,11 +129,11 @@ def extract_docket_info(
     Returns:
         List[NYPUCDocketInfo]: List of NYPUCDocketInfo objects containing details for each docket
     """
+    html_content = intermediate["html"]
     soup = BeautifulSoup(html_content, "html.parser")
     rows = soup.find_all("tr", role="row")
 
     docket_infos: List[NYPUCDocketInfo] = []
-    industry_affected = docket_info.industry_affected.strip()
 
     for row in rows:
         # Get all cells in the row
@@ -149,7 +147,7 @@ def extract_docket_info(
                     date_filed=cells[3].text.strip(),
                     title=cells[4].text.strip(),
                     organization=cells[5].text.strip(),
-                    industry_affected=industry_affected.strip(),
+                    industry_affected=intermediate["industry"].strip(),
                 )
                 docket_infos.append(docket_info)
             except Exception as e:
@@ -186,6 +184,7 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
                 attachment=NYPUCAttachmentData(
                     name=link.get_text(strip=True),
                     url=link["href"],
+                    file_name=cells[6].get_text(strip=True),
                 ),
                 serial=cells[0].get_text(strip=True),
                 date_filed=cells[1].get_text(strip=True),
@@ -193,7 +192,6 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
                 docket_id=case,
                 organization=cells[4].get_text(strip=True),
                 itemNo=cells[5].get_text(strip=True),
-                file_name=cells[6].get_text(strip=True),
             )
             filing_data.append(filing_item)
         except Exception as e:
@@ -222,20 +220,27 @@ def deduplicate_individual_attachments_into_files(
 class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
     """Concrete implementation of GenericScraper for NYPUC"""
 
-    def universal_caselist_intermediate(self) -> Any:
+    def universal_caselist_intermediate(self) -> Dict[str, Any]:
         """Return industry numbers to process"""
-        return list(range(1, 21))  # Example range of industry numbers
+        nums = list(range(1, 21))  # Example range of industry numbers
+        docket_intermediate_lists = [
+            process_industry(industry_num) for industry_num in nums
+        ]
+        return {"industry_intermediates": docket_intermediate_lists}
 
     def universal_caselist_from_intermediate(
         self, intermediate: Any
     ) -> List[NYPUCDocketInfo]:
-        """Process all industries and combine results"""
-        docket_lists = [process_industry(industry_num) for industry_num in intermediate]
-        return combine_dockets(docket_lists)
+        intermediate_list = intermediate["industry_intermediates"]
+        caselist: List[NYPUCDocketInfo] = []
+        for industry_intermediate in intermediate_list:
+            docket_info = extract_docket_info(industry_intermediate)
+            caselist.extend(docket_info)
+        return caselist
 
     def filing_data_intermediate(self, data: NYPUCDocketInfo) -> Any:
         """Get HTML content for a docket's filings"""
-        return (data.docket_id, process_docket(data))
+        return {"docket_id": data.docket_id, "html": process_docket(data)}
 
     def filing_data_from_intermediate(self, intermediate: Any) -> List[NYPUCFileData]:
         """Convert docket HTML to filing data"""
@@ -257,48 +262,44 @@ class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
             if datetime.strptime(d.date_filed, "%m/%d/%Y").date() > after_date
         ]
 
-    def into_generic_case_data(self, state_data: NYPUCDocketInfo) -> GenericCaseData:
+    def into_generic_case_data(self, state_data: NYPUCDocketInfo) -> GenericCase:
         """Convert to generic case format"""
         return GenericCase(
-            case_id=state_data.docket_id,
-            title=state_data.title,
-            filing_date=datetime.strptime(state_data.date_filed, "%m/%d/%Y").date(),
-            category=f"{state_data.matter_type} - {state_data.matter_subtype}",
-            description=f"Industry: {state_data.industry_affected}",
-            parties=[state_data.organization],
+            case_number=state_data.docket_id,
+            case_type=f"{state_data.matter_type} - {state_data.matter_subtype}",
+            description=state_data.title,
+            industry=state_data.industry_affected,
+            petitioner=state_data.organization,
+            opened_date=datetime.strptime(state_data.date_filed, "%m/%d/%Y").date(),
+            extra_metadata={
+                "matter_type": state_data.matter_type,
+                "matter_subtype": state_data.matter_subtype,
+            },
         )
 
-    def into_generic_filing_data(self, state_data: NYPUCFileData) -> GenericFilingData:
-        """Convert to generic filing format"""
+    def into_generic_filing_data(self, state_data: NYPUCFileData) -> GenericFiling:
+        """Convert NYPUCFileData to a generic Filing object."""
+
+        # Convert string date to date object
+
+        filed_date_obj = datetime.strptime(self.date_filed, "%m/%d/%Y").date()
+
+        # Convert NYPUCAttachmentData to generic Attachment objects
+
+        attachments = [
+            GenericAttachment(name=att.name, url=HttpUrl(att.url))
+            for att in self.attachements
+        ]
+
         return GenericFiling(
-            document_id=state_data.serial,
-            case_id=state_data.docket_id,
-            filing_date=datetime.strptime(state_data.date_filed, "%m/%d/%Y").date(),
-            document_type=state_data.nypuc_doctype,
-            file_name=state_data.file_name,
-            download_url=state_data.url,
+            # case_number=self.docket_id,
+            filed_date=filed_date_obj,
+            party_name=self.organization,
+            filing_type=self.nypuc_doctype,
+            description=self.name,
+            attachments=attachments,
+            extra_metadata={},
         )
-
-
-def full_scraping_workflow() -> List[List[NYPUCFileData]]:
-    """Main workflow that coordinates all scraping tasks"""
-    # Process all industries in parallel
-    industries = list(range(1, 11))
-    industry_results = list(map(process_industry, industries))
-
-    # Combine results from all industries
-    combined_dockets = combine_dockets(docket_lists=industry_results)
-
-    result_filedata: List[List[NYPUCFileData]] = []
-    for docket in combined_dockets:
-        # Flyte Task that downloads the html
-        html = process_docket(docket)
-        # Flyte Task that extracts the data from the html
-        results = extract_rows(html, docket)
-        result_filedata.append(results)
-        print(f"Processed Doc rows for {docket.docket_id}")
-
-    return result_filedata
 
 
 def test_small_workflow() -> List[NYPUCFileData]:
@@ -319,10 +320,3 @@ def test_small_workflow() -> List[NYPUCFileData]:
     print(f"Processed Doc rows for {docket.docket_id}")
 
     return results
-
-
-if __name__ == "__main__":
-    # For local testing
-    print("Running scraping workflow...")
-    results = full_scraping_workflow()
-    print(f"Scraped {len(results)} dockets with files")
