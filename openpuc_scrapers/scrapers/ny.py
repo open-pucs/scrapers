@@ -7,7 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from typing import List
 import time
 from datetime import date, datetime
@@ -37,7 +37,7 @@ class NYPUCFileData(BaseModel, IntoFiling):
 
         # Convert NYPUCAttachmentData to generic Attachment objects
         attachments = [
-            Attachment(name=att.name, url=att.url) for att in self.attachements
+            Attachment(name=att.name, url=HttpUrl(att.url)) for att in self.attachements
         ]
 
         return Filing(
