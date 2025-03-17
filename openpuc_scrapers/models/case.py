@@ -29,4 +29,4 @@ class Case(BaseModel):
     opened_date: Optional[date] = None
     closed_date: Optional[date] = None
     filings: Optional[list[Filing]] = None
-    extra_metadata: Dict[str, Any]
+    extra_metadata: Dict[str, Any] = {}

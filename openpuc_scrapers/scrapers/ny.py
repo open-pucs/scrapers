@@ -37,17 +37,17 @@ class NYPUCFileData(BaseModel, IntoFiling):
 
         # Convert NYPUCAttachmentData to generic Attachment objects
         attachments = [
-            Attachment(name=att.name, url=att.url, file_name=att.file_name)
-            for att in self.attachements
+            Attachment(name=att.name, url=att.url) for att in self.attachements
         ]
 
         return Filing(
-            case_number=self.docket_id,
+            # case_number=self.docket_id,
             filed_date=filed_date_obj,
             party_name=self.organization,
             filing_type=self.nypuc_doctype,
             description=self.name,
             attachments=attachments,
+            extra_metadata={},
         )
 
 

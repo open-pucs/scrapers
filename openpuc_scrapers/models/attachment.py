@@ -15,4 +15,4 @@ class Attachment(BaseModel):
     name: str
     url: HttpUrl
     document_type: Optional[str] = None
-    extra_metadata: Dict[str, Any]
+    extra_metadata: Dict[str, Any] = {}
