@@ -93,10 +93,14 @@ def save_to_disk(path: str, content: str) -> None:
 # isnt working due to the higher order types sadly
 # def save_json(path: str, data: BaseModel | List[BaseModel]) -> None:
 def save_json(path: str, data: Any) -> None:
+    if isinstance(data, dict):
+        json_data = data
+    if isinstance(data, BaseModel):
+        json_data = data.model_dump()
     if isinstance(data, list):
         json_data = [item.model_dump() for item in data]
     else:
-        json_data = data.model_dump()
+        raise Exception("Data is not a list, dict, or BaseModel")
     json_str = json.dumps(json_data, indent=2)
     save_to_disk(path, json_str)
 
@@ -115,11 +119,11 @@ def process_cases(
         save_json(case_path, case)
 
         # Process filings
-        filings_html = scraper.filing_data_intermediate(case)
+        filings_intermediate = scraper.filing_data_intermediate(case)
         filings_path = f"{base_path}/filings/case_{idx}.html"
-        save_to_disk(filings_path, filings_html)
+        save_json(filings_path, filings_intermediate)
 
-        filings = scraper.filing_data_from_intermediate(filings_html)
+        filings = scraper.filing_data_from_intermediate(filings_intermediate)
         filings_json_path = f"{base_path}/filings/case_{idx}.json"
         save_json(filings_json_path, filings)
 
@@ -137,12 +141,12 @@ def get_all_new_cases(
     base_path = f"data/{timestamp}"
 
     # Get and save case list
-    caselist_html = scraper.universal_caselist_intermediate()
+    caselist_intermediate = scraper.universal_caselist_intermediate()
     caselist_path = f"{base_path}/caselist.html"
-    save_to_disk(caselist_path, caselist_html)
+    save_json(caselist_path, caselist_intermediate)
 
     # Process cases
-    state_cases = scraper.universal_caselist_from_intermediate(caselist_html)
+    state_cases = scraper.universal_caselist_from_intermediate(caselist_intermediate)
     return process_cases(scraper, state_cases, base_path)
 
 
@@ -153,13 +157,13 @@ def get_new_cases_since_date(
     base_path = f"data/{timestamp}"
 
     # Get and save updated cases
-    updated_html = scraper.updated_cases_since_date_intermediate(after_date)
+    updated_intermediate = scraper.updated_cases_since_date_intermediate(after_date)
     updated_path = f"{base_path}/updated_cases.html"
-    save_to_disk(updated_path, updated_html)
+    save_json(updated_path, updated_intermediate)
 
     # Process updated cases
     state_cases = scraper.updated_cases_since_date_from_intermediate(
-        updated_html, after_date
+        updated_intermediate, after_date
     )
     return process_cases(scraper, state_cases, base_path)
 
