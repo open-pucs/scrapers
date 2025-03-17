@@ -1,4 +1,5 @@
-from typing import List
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List
 from pydantic import BaseModel
 from datetime import date
 
@@ -22,3 +23,13 @@ class Filing(BaseModel):
     filing_type: str
     description: str
     attachments: List[Attachment] = []
+    extra_metadata: Dict[str, Any]
+
+    def into_filing(self):
+        return self
+
+
+class IntoFiling(ABC):
+    @abstractmethod
+    def cast_to_filing(self) -> Filing:
+        pass

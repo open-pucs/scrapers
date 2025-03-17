@@ -1,35 +1,54 @@
 from flytekit import task, workflow
+from openpuc_scrapers.models.attachment import Attachment
+from openpuc_scrapers.models.filing import Filing, IntoFiling
+from openpuc_scrapers.models.misc import send_castables_to_kessler
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from typing import List
 import time
-from datetime import datetime
+from datetime import date, datetime
 from bs4 import BeautifulSoup
 
 
-class NYPUCFileData(BaseModel):
+class NYPUCAttachmentData(BaseModel):
+    name: str
+    url: str
+    file_name: str
+
+
+class NYPUCFileData(BaseModel, IntoFiling):
+    attachements: List[NYPUCAttachmentData]
     serial: str
     date_filed: str
     nypuc_doctype: str
     name: str
-    url: str
     organization: str
     itemNo: str
-    file_name: str
     docket_id: str
 
-    def __str__(self):
-        return f"\n(\n\tSerial: {self.serial}\n\tDate Filed: {self.date_filed}\
-        \n\tNY PUC Doc Type: {self.nypuc_doctype}\n\tName: {self.name}\n\tURL: \
-        {self.url}\nOrganization: {self.organization}\n\tItem No: {self.itemNo}\n\
-        \tFile Name: {self.file_name}\n)\n"
+    def into_filing(self) -> Filing:
+        """Convert NYPUCFileData to a generic Filing object."""
+        # Convert string date to date object
+        filed_date_obj = datetime.strptime(self.date_filed, "%m/%d/%Y").date()
 
-    def __repr__(self):
-        return self.__str__()
+        # Convert NYPUCAttachmentData to generic Attachment objects
+        attachments = [
+            Attachment(name=att.name, url=HttpUrl(att.url)) for att in self.attachements
+        ]
+
+        return Filing(
+            # case_number=self.docket_id,
+            filed_date=filed_date_obj,
+            party_name=self.organization,
+            filing_type=self.nypuc_doctype,
+            description=self.name,
+            attachments=attachments,
+            extra_metadata={},
+        )
 
 
 class NYPUCDocketInfo(BaseModel):
@@ -120,7 +139,7 @@ def process_docket(docket: NYPUCDocketInfo) -> str:
 
 
 @workflow
-def full_scraping_workflow() -> List[List[NYPUCFileData]]:
+async def full_scraping_workflow() -> List[List[NYPUCFileData]]:
     """Main workflow that coordinates all scraping tasks"""
     # Process all industries in parallel
     industries = list(range(1, 11))
@@ -158,6 +177,8 @@ def test_small_workflow() -> List[NYPUCFileData]:
     # Flyte Task that extracts the data from the html
     results = extract_rows(html, docket)
     print(f"Processed Doc rows for {docket.docket_id}")
+
+    send_castables_to_kessler(results)
 
     return results
 
@@ -228,12 +249,14 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
                 continue  # Skip rows without links
 
             filing_item = NYPUCFileData(
+                attachment=NYPUCAttachmentData(
+                    name=link.get_text(strip=True),
+                    url=link["href"],
+                ),
                 serial=cells[0].get_text(strip=True),
                 date_filed=cells[1].get_text(strip=True),
                 nypuc_doctype=cells[2].get_text(strip=True),
                 docket_id=case,
-                name=link.get_text(strip=True),
-                url=link["href"],
                 organization=cells[4].get_text(strip=True),
                 itemNo=cells[5].get_text(strip=True),
                 file_name=cells[6].get_text(strip=True),
@@ -242,7 +265,24 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
         except Exception as e:
             print(f"Error processing row: {e}\nRow content: {row.prettify()}")
 
-    return filing_data
+    deduped_data = deduplicate_individual_attachments_into_files(filing_data)
+    return deduped_data
+
+
+def deduplicate_individual_attachments_into_files(
+    raw_files: List[NYPUCFileData],
+) -> List[NYPUCFileData]:
+    dict_nypuc = {}
+
+    def make_dedupe_string(file: NYPUCFileData) -> str:
+        return f"itemnum-{file.itemNo}-caseid-{file.docket_id}"
+
+    for file in raw_files:
+        dedupestr = make_dedupe_string(file)
+        if dict_nypuc.get(dedupestr) is not None:
+            dict_nypuc[dedupestr].attachements.append(file.attachements)
+    return_vals = dict_nypuc.values()
+    return list(return_vals)
 
 
 if __name__ == "__main__":

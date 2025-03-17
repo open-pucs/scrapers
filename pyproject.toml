@@ -1,35 +1,18 @@
-[tool.poetry]
+[project]
 name = "openpuc-scrapers"
 version = "0.1.0"
 description = "Web scrapers for open-access PUC data"
-authors = ["Charles Dawson <charles.dwsn@gmail.com>"]
-license = "MIT"
 readme = "README.md"
-
-[tool.poetry.dependencies]
-python = "^3.13"
-requests = "^2.32.3"
-beautifulsoup4 = "^4.13.3"
-pydantic = "^2.10.6"
-aiohttp = "^3.11.13"
-
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.3.4"
-pytest-cov = "^6.0.0"
-mypy = "^1.15.0"
-ruff = "^0.9.7"
-nox = "^2025.2.9"
-pre-commit = "^4.1.0"
-types-requests = "^2.32.0.20241016"
-
-[tool.poetry.group.docs.dependencies]
-sphinx = { version = "^8.2.1", markers = "python_version >= '3.11'" }
-sphinx-rtd-theme = "^3.0.2"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+authors = ["Charles Dawson <charles.dwsn@gmail.com>"]
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.11.14",
+    "beautifulsoup4>=4.13.3",
+    "flytekit>=1.15.3",
+    "pydantic>=2.10.6",
+    "requests>=2.32.3",
+    "selenium>=4.29.0",
+]
 
 [tool.pyright]
 venvPath = "."

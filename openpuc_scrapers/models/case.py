@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Any, Dict, Optional
 from datetime import date
 
 from .filing import Filing
@@ -29,3 +29,4 @@ class Case(BaseModel):
     opened_date: Optional[date] = None
     closed_date: Optional[date] = None
     filings: Optional[list[Filing]] = None
+    extra_metadata: Dict[str, Any] = {}
