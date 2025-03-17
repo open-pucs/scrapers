@@ -229,7 +229,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
         return {"industry_intermediates": docket_intermediate_lists}
 
     def universal_caselist_from_intermediate(
-        self, intermediate: Any
+        self, intermediate: Dict[str, Any]
     ) -> List[NYPUCDocketInfo]:
         intermediate_list = intermediate["industry_intermediates"]
         caselist: List[NYPUCDocketInfo] = []
@@ -238,29 +238,24 @@ class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
             caselist.extend(docket_info)
         return caselist
 
-    def filing_data_intermediate(self, data: NYPUCDocketInfo) -> Any:
+    def filing_data_intermediate(self, data: NYPUCDocketInfo) -> Dict[str, Any]:
         """Get HTML content for a docket's filings"""
         return {"docket_id": data.docket_id, "html": process_docket(data)}
 
-    def filing_data_from_intermediate(self, intermediate: Any) -> List[NYPUCFileData]:
+    def filing_data_from_intermediate(
+        self, intermediate: Dict[str, Any]
+    ) -> List[NYPUCFileData]:
         """Convert docket HTML to filing data"""
         docket_id, html = intermediate
         return extract_rows(html, docket_id)
 
-    def updated_cases_since_date_intermediate(self, after_date: date) -> Any:
-        """Use same intermediate as universal caselist"""
-        return self.universal_caselist_intermediate()
+    def updated_cases_since_date_intermediate(self, after_date: date) -> Dict[str, Any]:
+        raise Exception("Not Impelemented")
 
     def updated_cases_since_date_from_intermediate(
         self, intermediate: Any, after_date: date
     ) -> List[NYPUCDocketInfo]:
-        """Filter cases filed after given date"""
-        all_dockets = self.universal_caselist_from_intermediate(intermediate)
-        return [
-            d
-            for d in all_dockets
-            if datetime.strptime(d.date_filed, "%m/%d/%Y").date() > after_date
-        ]
+        raise Exception("Not Impelemented")
 
     def into_generic_case_data(self, state_data: NYPUCDocketInfo) -> GenericCase:
         """Convert to generic case format"""

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import json
 from pathlib import Path
-from typing import Any, Generic, TypeVar, List, Type
+from typing import Any, Dict, Generic, TypeVar, List, Type
 from datetime import date, datetime, timezone
 from pydantic import BaseModel
 
@@ -13,40 +13,58 @@ StateCaseData = TypeVar("StateCaseData", bound=BaseModel)
 StateFilingData = TypeVar("StateFilingData", bound=BaseModel)
 
 
+"""
+With this implementation the intermediate objects are designed to be easily json serializeable with type Dict[str,Any]
+
+And this code should type check everything including StateCaseData, StateFilingData, and the conversion to generics from there, when it comes to the intermediates you still need to guarentee that the intermediate vaugely typed objects line up like so 
+
+
+(universal_caselist_intermediate) output is parsable by (universal_caselist_from_intermediate)
+
+(filing_data_intermediate) output is parsable by (filing_data_from_intermediate)
+
+and 
+
+(updated_cases_since_date_intermediate) output is parsable by (updated_cases_since_date_from_intermediate)
+"""
+
+
 class GenericScraper(ABC, Generic[StateCaseData, StateFilingData]):
     # Universal case list methods
     @abstractmethod
-    def universal_caselist_intermediate(self) -> Any:
+    def universal_caselist_intermediate(self) -> Dict[str, Any]:
         """Return intermediate representation of case list"""
         pass
 
     @abstractmethod
     def universal_caselist_from_intermediate(
-        self, intermediate: Any
+        self, intermediate: Dict[str, Any]
     ) -> List[StateCaseData]:
         """Convert intermediate to state-specific case data objects"""
         pass
 
     # GenericFiling data methods
     @abstractmethod
-    def filing_data_intermediate(self, data: StateCaseData) -> Any:
+    def filing_data_intermediate(self, data: StateCaseData) -> Dict[str, Any]:
         """Serialize case data to intermediate format"""
         pass
 
     @abstractmethod
-    def filing_data_from_intermediate(self, intermediate: Any) -> List[StateFilingData]:
+    def filing_data_from_intermediate(
+        self, intermediate: Dict[str, Any]
+    ) -> List[StateFilingData]:
         """Convert intermediate to state-specific filing data objects"""
         pass
 
     # Updated cases methods
     @abstractmethod
-    def updated_cases_since_date_intermediate(self, after_date: date) -> Any:
+    def updated_cases_since_date_intermediate(self, after_date: date) -> Dict[str, Any]:
         """Get intermediate for cases updated after given date"""
         pass
 
     @abstractmethod
     def updated_cases_since_date_from_intermediate(
-        self, intermediate: str, after_date: date
+        self, intermediate: Dict[str, Any], after_date: date
     ) -> List[StateCaseData]:
         """Convert intermediate to updated case data objects"""
         pass
