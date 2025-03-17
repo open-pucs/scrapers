@@ -21,4 +21,4 @@ class GenericFiling(BaseModel):
     party_name: str
     filing_type: str
     description: str
-    attachments: List[Attachment] = []
+    attachments: List[GenericAttachment] = []

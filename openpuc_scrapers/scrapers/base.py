@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import List
 
 from ..models.case import GenericCase
 
@@ -10,7 +11,7 @@ class AbstractScraper(ABC):
     with state Public Utility Commission (PUC) websites and retrieve case information.
 
     Methods:
-        get_all_cases() -> list[Case]:
+        get_all_cases() -> List[GenericCase]:
             Retrieve a list of all available cases.
         get_case_details(case: GenericCase) -> GenericCase:
             Retrieve detailed information for a specific case, including filings and
@@ -18,11 +19,11 @@ class AbstractScraper(ABC):
     """
 
     @abstractmethod
-    def get_all_cases(self) -> list[Case]:
+    def get_all_cases(self) -> List[GenericCase]:
         """Retrieve a list of all available cases.
 
         Returns:
-            list[Case]: A list of all cases.
+            List[GenericCase]: A list of all cases.
         """
         pass
 

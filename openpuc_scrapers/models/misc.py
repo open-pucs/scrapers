@@ -38,7 +38,7 @@ async def post_objects_to_endpoint(
             raise  # Re-raise the exception
 
 
-async def upload_schemas_to_kessler(files: List[Filing], api_url: str):
+async def upload_schemas_to_kessler(files: List[GenericFiling], api_url: str):
     file_post_url = api_url + "ingest_v1/add-task/ingest"
     requests = [RequestData(url=file_post_url, data=file) for file in files]
     await post_objects_to_endpoint(requests, 30)

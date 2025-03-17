@@ -10,6 +10,8 @@ import time
 from datetime import date, datetime
 from bs4 import BeautifulSoup
 
+from openpuc_scrapers.models.case import GenericCase
+from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.generic_scraper import GenericScraper
 
 
@@ -230,7 +232,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
 
     def into_generic_case_data(self, state_data: NYPUCDocketInfo) -> GenericCaseData:
         """Convert to generic case format"""
-        return GenericCaseData(
+        return GenericCase(
             case_id=state_data.docket_id,
             title=state_data.title,
             filing_date=datetime.strptime(state_data.date_filed, "%m/%d/%Y").date(),
@@ -241,7 +243,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
 
     def into_generic_filing_data(self, state_data: NYPUCFileData) -> GenericFilingData:
         """Convert to generic filing format"""
-        return GenericFilingData(
+        return GenericFiling(
             document_id=state_data.serial,
             case_id=state_data.docket_id,
             filing_date=datetime.strptime(state_data.date_filed, "%m/%d/%Y").date(),

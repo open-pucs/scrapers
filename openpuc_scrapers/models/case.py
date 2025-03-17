@@ -28,4 +28,4 @@ class GenericCase(BaseModel):
     hearing_officer: Optional[str] = None
     opened_date: Optional[date] = None
     closed_date: Optional[date] = None
-    filings: Optional[list[Filing]] = None
+    filings: Optional[list[GenericFiling]] = None

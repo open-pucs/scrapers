@@ -1,3 +1,4 @@
+from typing import List
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -25,11 +26,11 @@ class MassachusettsDPU(AbstractScraper):
         "Water",
     ]
 
-    def get_all_cases(self) -> list[Case]:
+    def get_all_cases(self) -> List[GenericCase]:
         """Retrieve a list of all available cases.
 
         Returns:
-            list[Case]: A list of all cases.
+            List[GenericCase]: A list of all cases.
         """
         cases = []
         for industry in self.INDUSTRIES:
@@ -37,14 +38,14 @@ class MassachusettsDPU(AbstractScraper):
 
         return cases
 
-    def _get_all_cases_for_industry(self, industry: str) -> list[Case]:
+    def _get_all_cases_for_industry(self, industry: str) -> List[GenericCase]:
         """Retrieve a list of all available cases for a specific industry.
 
         Args:
             industry (str): The industry to retrieve cases for.
 
         Returns:
-            list[Case]: A list of all cases for the specified industry.
+            List[GenericCase]: A list of all cases for the specified industry.
         """
         # Query the website for the case list
         request_url = self._get_case_list_url(industry)
@@ -67,7 +68,7 @@ class MassachusettsDPU(AbstractScraper):
         """
         return f"https://eeaonline.eea.state.ma.us/DPU/Fileroom//Dockets/GetByIndustry/?type={industry}"
 
-    def _parse_case_list(self, soup: BeautifulSoup) -> list[Case]:
+    def _parse_case_list(self, soup: BeautifulSoup) -> List[GenericCase]:
         """Parse the case list from the webpage.
 
         Args:
@@ -76,7 +77,7 @@ class MassachusettsDPU(AbstractScraper):
         Returns:
             - A list of cases.
         """
-        cases: list[Case] = []
+        cases: List[GenericCase] = []
         table = soup.find("table", class_="DocketList")
         if not table:
             return cases
@@ -153,7 +154,9 @@ class MassachusettsDPU(AbstractScraper):
         """
         return f"https://eeaonline.eea.state.ma.us/DPU/Fileroom/dockets/get/?number={case_number}&edit=false"
 
-    def _parse_case_details(self, soup: BeautifulSoup, case: GenericCase) -> GenericCase:
+    def _parse_case_details(
+        self, soup: BeautifulSoup, case: GenericCase
+    ) -> GenericCase:
         """Parse the case details from the webpage and update the case object.
 
         Modifies the case object in place with the details from the parsed webpage.
