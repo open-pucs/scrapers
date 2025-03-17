@@ -5,10 +5,12 @@ from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from pydantic import BaseModel
-from typing import List
+from typing import Any, List
 import time
-from datetime import datetime
+from datetime import date, datetime
 from bs4 import BeautifulSoup
+
+from openpuc_scrapers.models.generic_scraper import GenericScraper
 
 
 class NYPUCFileData(BaseModel):
@@ -22,15 +24,6 @@ class NYPUCFileData(BaseModel):
     file_name: str
     docket_id: str
 
-    def __str__(self):
-        return f"\n(\n\tSerial: {self.serial}\n\tDate Filed: {self.date_filed}\
-        \n\tNY PUC Doc Type: {self.nypuc_doctype}\n\tName: {self.name}\n\tURL: \
-        {self.url}\nOrganization: {self.organization}\n\tItem No: {self.itemNo}\n\
-        \tFile Name: {self.file_name}\n)\n"
-
-    def __repr__(self):
-        return self.__str__()
-
 
 class NYPUCDocketInfo(BaseModel):
     docket_id: str  # 24-C-0663
@@ -42,7 +35,6 @@ class NYPUCDocketInfo(BaseModel):
     industry_affected: str
 
 
-@task
 def process_industry(industry_num: int) -> List[NYPUCDocketInfo]:
     """Task to process a single industry number and return its dockets"""
     driver = webdriver.Chrome()
@@ -81,7 +73,6 @@ def process_industry(industry_num: int) -> List[NYPUCDocketInfo]:
         driver.quit()
 
 
-@task
 def combine_dockets(docket_lists: List[List[NYPUCDocketInfo]]) -> List[NYPUCDocketInfo]:
     """Combine and sort dockets from all industries"""
     all_dockets = [d for sublist in docket_lists for d in sublist]
@@ -92,7 +83,6 @@ def combine_dockets(docket_lists: List[List[NYPUCDocketInfo]]) -> List[NYPUCDock
     )
 
 
-@task
 def process_docket(docket: NYPUCDocketInfo) -> str:
     """Task to process a single docket and return its files"""
     driver = webdriver.Chrome()
@@ -119,50 +109,6 @@ def process_docket(docket: NYPUCDocketInfo) -> str:
         driver.quit()
 
 
-@workflow
-def full_scraping_workflow() -> List[List[NYPUCFileData]]:
-    """Main workflow that coordinates all scraping tasks"""
-    # Process all industries in parallel
-    industries = list(range(1, 11))
-    industry_results = list(map(process_industry, industries))
-
-    # Combine results from all industries
-    combined_dockets = combine_dockets(docket_lists=industry_results)
-
-    result_filedata: List[List[NYPUCFileData]] = []
-    for docket in combined_dockets:
-        # Flyte Task that downloads the html
-        html = process_docket(docket)
-        # Flyte Task that extracts the data from the html
-        results = extract_rows(html, docket)
-        result_filedata.append(results)
-        print(f"Processed Doc rows for {docket.docket_id}")
-
-    return result_filedata
-
-
-@workflow
-def test_small_workflow() -> List[NYPUCFileData]:
-    """Main workflow that coordinates all scraping tasks"""
-    docket = NYPUCDocketInfo(
-        docket_id="18-G-0736",
-        matter_type="Complaint",
-        matter_subtype="Formal Non-Consumer Related",
-        title="Complaint and Formal Dispute Resolution Request For Expedited Resolution of East Coast Power & Gas, LLC Regarding Annual Reconciliation Charges of KeySpan Gas East Corporation d/b/a National Grid for January - April 2018",
-        organization="East Coast Power & Gas, LLC",
-        date_filed="12/05/2018",
-        industry_affected="Gas",  # This field wasn't provided in the comments
-    )
-    # Flyte Task that downloads the html
-    html = process_docket(docket)
-    # Flyte Task that extracts the data from the html
-    results = extract_rows(html, docket)
-    print(f"Processed Doc rows for {docket.docket_id}")
-
-    return results
-
-
-@task
 def extract_docket_info(
     html_content: str, docket_info: NYPUCDocketInfo
 ) -> List[NYPUCDocketInfo]:
@@ -204,7 +150,6 @@ def extract_docket_info(
     return docket_infos
 
 
-@task
 def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
     """Parse table HTML with BeautifulSoup and extract filing data."""
     soup = BeautifulSoup(table_html, "html.parser")
@@ -243,6 +188,108 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
             print(f"Error processing row: {e}\nRow content: {row.prettify()}")
 
     return filing_data
+
+
+class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
+    """Concrete implementation of GenericScraper for NYPUC"""
+
+    def universal_caselist_intermediate(self) -> Any:
+        """Return industry numbers to process"""
+        return list(range(1, 21))  # Example range of industry numbers
+
+    def universal_caselist_from_intermediate(
+        self, intermediate: Any
+    ) -> List[NYPUCDocketInfo]:
+        """Process all industries and combine results"""
+        docket_lists = [process_industry(industry_num) for industry_num in intermediate]
+        return combine_dockets(docket_lists)
+
+    def filing_data_intermediate(self, data: NYPUCDocketInfo) -> Any:
+        """Get HTML content for a docket's filings"""
+        return (data.docket_id, process_docket(data))
+
+    def filing_data_from_intermediate(self, intermediate: Any) -> List[NYPUCFileData]:
+        """Convert docket HTML to filing data"""
+        docket_id, html = intermediate
+        return extract_rows(html, docket_id)
+
+    def updated_cases_since_date_intermediate(self, after_date: date) -> Any:
+        """Use same intermediate as universal caselist"""
+        return self.universal_caselist_intermediate()
+
+    def updated_cases_since_date_from_intermediate(
+        self, intermediate: Any, after_date: date
+    ) -> List[NYPUCDocketInfo]:
+        """Filter cases filed after given date"""
+        all_dockets = self.universal_caselist_from_intermediate(intermediate)
+        return [
+            d
+            for d in all_dockets
+            if datetime.strptime(d.date_filed, "%m/%d/%Y").date() > after_date
+        ]
+
+    def into_generic_case_data(self, state_data: NYPUCDocketInfo) -> GenericCaseData:
+        """Convert to generic case format"""
+        return GenericCaseData(
+            case_id=state_data.docket_id,
+            title=state_data.title,
+            filing_date=datetime.strptime(state_data.date_filed, "%m/%d/%Y").date(),
+            category=f"{state_data.matter_type} - {state_data.matter_subtype}",
+            description=f"Industry: {state_data.industry_affected}",
+            parties=[state_data.organization],
+        )
+
+    def into_generic_filing_data(self, state_data: NYPUCFileData) -> GenericFilingData:
+        """Convert to generic filing format"""
+        return GenericFilingData(
+            document_id=state_data.serial,
+            case_id=state_data.docket_id,
+            filing_date=datetime.strptime(state_data.date_filed, "%m/%d/%Y").date(),
+            document_type=state_data.nypuc_doctype,
+            file_name=state_data.file_name,
+            download_url=state_data.url,
+        )
+
+
+def full_scraping_workflow() -> List[List[NYPUCFileData]]:
+    """Main workflow that coordinates all scraping tasks"""
+    # Process all industries in parallel
+    industries = list(range(1, 11))
+    industry_results = list(map(process_industry, industries))
+
+    # Combine results from all industries
+    combined_dockets = combine_dockets(docket_lists=industry_results)
+
+    result_filedata: List[List[NYPUCFileData]] = []
+    for docket in combined_dockets:
+        # Flyte Task that downloads the html
+        html = process_docket(docket)
+        # Flyte Task that extracts the data from the html
+        results = extract_rows(html, docket)
+        result_filedata.append(results)
+        print(f"Processed Doc rows for {docket.docket_id}")
+
+    return result_filedata
+
+
+def test_small_workflow() -> List[NYPUCFileData]:
+    """Main workflow that coordinates all scraping tasks"""
+    docket = NYPUCDocketInfo(
+        docket_id="18-G-0736",
+        matter_type="Complaint",
+        matter_subtype="Formal Non-Consumer Related",
+        title="Complaint and Formal Dispute Resolution Request For Expedited Resolution of East Coast Power & Gas, LLC Regarding Annual Reconciliation Charges of KeySpan Gas East Corporation d/b/a National Grid for January - April 2018",
+        organization="East Coast Power & Gas, LLC",
+        date_filed="12/05/2018",
+        industry_affected="Gas",  # This field wasn't provided in the comments
+    )
+    # Flyte Task that downloads the html
+    html = process_docket(docket)
+    # Flyte Task that extracts the data from the html
+    results = extract_rows(html, docket.docket_id)
+    print(f"Processed Doc rows for {docket.docket_id}")
+
+    return results
 
 
 if __name__ == "__main__":
