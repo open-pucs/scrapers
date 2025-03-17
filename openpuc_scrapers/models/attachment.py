@@ -2,7 +2,7 @@ from pydantic import BaseModel, HttpUrl
 from typing import Optional
 
 
-class Attachment(BaseModel):
+class GenericAttachment(BaseModel):
     """Model representing an attachment associated with a filing.
 
     Attributes:

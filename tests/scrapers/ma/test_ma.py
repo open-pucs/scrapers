@@ -6,14 +6,14 @@ import os
 import requests
 
 from openpuc_scrapers.scrapers import MassachusettsDPU
-from openpuc_scrapers.models import Case
+from openpuc_scrapers.models import GenericCase
 
 
 class TestMassachusettsDPU(unittest.TestCase):
     def setUp(self):
         """Prepare the initial test setup."""
         # Create a sample case object
-        self.case = Case(case_number="20-75")
+        self.case = GenericCase(case_number="20-75")
 
         # Read the desired response HTML file into the test suite
         case_detail_filepath = os.path.join(

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ..models.case import Case
+from ..models.case import GenericCase
 
 
 class AbstractScraper(ABC):
@@ -12,7 +12,7 @@ class AbstractScraper(ABC):
     Methods:
         get_all_cases() -> list[Case]:
             Retrieve a list of all available cases.
-        get_case_details(case: Case) -> Case:
+        get_case_details(case: GenericCase) -> GenericCase:
             Retrieve detailed information for a specific case, including filings and
             attachments.
     """
@@ -27,7 +27,7 @@ class AbstractScraper(ABC):
         pass
 
     @abstractmethod
-    def get_case_details(self, case: Case) -> Case:
+    def get_case_details(self, case: GenericCase) -> GenericCase:
         """Retrieve details for a specific case, including filings and attachments.
 
         Modifies the case object in place with the details retrieved from the website.

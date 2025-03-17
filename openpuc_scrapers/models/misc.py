@@ -1,7 +1,7 @@
 from typing import Any, List
 import asyncio
 import aiohttp
-from openpuc_scrapers.models.filing import Filing
+from openpuc_scrapers.models.filing import GenericFiling
 from pydantic import BaseModel
 
 
@@ -21,7 +21,7 @@ async def post_objects_to_endpoint(
             async with semaphore:  # Acquire semaphore before making request
                 async with session.post(
                     request.url,
-                    json=request.data.to_dict(),  # Convert Filing object to dict
+                    json=request.data.to_dict(),  # Convert GenericFiling object to dict
                     headers={"Content-Type": "application/json"},
                 ) as response:
                     response.raise_for_status()  # Raise exception for bad status codes

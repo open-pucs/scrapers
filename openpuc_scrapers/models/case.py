@@ -2,10 +2,10 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import date
 
-from .filing import Filing
+from .filing import GenericFiling
 
 
-class Case(BaseModel):
+class GenericCase(BaseModel):
     """Model representing case data.
 
     Attributes:

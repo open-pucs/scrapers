@@ -4,7 +4,7 @@ from datetime import datetime
 import unicodedata
 
 from .base import AbstractScraper
-from ..models import Case, Filing, Attachment
+from ..models import GenericCase, GenericFiling, GenericAttachment
 
 
 class MassachusettsDPU(AbstractScraper):
@@ -96,7 +96,7 @@ class MassachusettsDPU(AbstractScraper):
                 except ValueError:
                     opened_date = None
 
-            case = Case(
+            case = GenericCase(
                 case_number=cells[0].get_text(strip=True),
                 case_type=cells[1].get_text(strip=True) or None,
                 industry=cells[2].get_text(strip=True) or None,
@@ -111,7 +111,7 @@ class MassachusettsDPU(AbstractScraper):
 
         return cases
 
-    def get_case_details(self, case: Case) -> Case:
+    def get_case_details(self, case: GenericCase) -> GenericCase:
         """Retrieve details for a specific case, including filings and attachments.
 
         Modifies the case object in place with the details retrieved from the website.
@@ -153,7 +153,7 @@ class MassachusettsDPU(AbstractScraper):
         """
         return f"https://eeaonline.eea.state.ma.us/DPU/Fileroom/dockets/get/?number={case_number}&edit=false"
 
-    def _parse_case_details(self, soup: BeautifulSoup, case: Case) -> Case:
+    def _parse_case_details(self, soup: BeautifulSoup, case: GenericCase) -> GenericCase:
         """Parse the case details from the webpage and update the case object.
 
         Modifies the case object in place with the details from the parsed webpage.
@@ -188,7 +188,7 @@ class MassachusettsDPU(AbstractScraper):
 
         return case
 
-    def _parse_filings(self, soup: BeautifulSoup, case: Case) -> list[Filing]:
+    def _parse_filings(self, soup: BeautifulSoup, case: GenericCase) -> list[Filing]:
         """Parse the filings from the webpage.
 
         Args:
@@ -227,7 +227,7 @@ class MassachusettsDPU(AbstractScraper):
             description = description.replace("’", "'")
 
             # Create the filing if it doesn't already exist
-            filing = Filing(
+            filing = GenericFiling(
                 filed_date=filed_date,
                 party_name=filer,
                 filing_type=filing_type,
@@ -248,7 +248,7 @@ class MassachusettsDPU(AbstractScraper):
             filing.attachments = []
             for attachment in attachment_data:
                 filing.attachments.append(
-                    Attachment(
+                    GenericAttachment(
                         name=attachment["name"],
                         url=attachment["url"],
                     )

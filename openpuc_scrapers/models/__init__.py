@@ -1,5 +1,5 @@
-from .case import Case
-from .filing import Filing
-from .attachment import Attachment
+from .case import GenericCase
+from .filing import GenericFiling
+from .attachment import GenericAttachment
 
 __all__ = ["Case", "Filing", "Attachment"]

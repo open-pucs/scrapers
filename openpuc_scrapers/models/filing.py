@@ -2,10 +2,10 @@ from typing import List
 from pydantic import BaseModel
 from datetime import date
 
-from .attachment import Attachment
+from .attachment import GenericAttachment
 
 
-class Filing(BaseModel):
+class GenericFiling(BaseModel):
     """Model representing filing data within a case.
 
     Attributes:
