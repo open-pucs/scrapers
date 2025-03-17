@@ -1,11 +1,14 @@
 from flytekit import task, workflow
+from openpuc_scrapers.models.attachment import Attachment
+from openpuc_scrapers.models.filing import Filing, IntoFiling
+from openpuc_scrapers.models.misc import send_castables_to_kessler
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from pydantic import BaseModel
-from typing import Any, List
+from pydantic import BaseModel, HttpUrl
+from typing import List
 import time
 from datetime import date, datetime
 from bs4 import BeautifulSoup
@@ -15,15 +18,20 @@ from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.generic_scraper import GenericScraper
 
 
-class NYPUCFileData(BaseModel):
+class NYPUCAttachmentData(BaseModel):
+    name: str
+    url: str
+    file_name: str
+
+
+class NYPUCFileData(BaseModel, IntoFiling):
+    attachements: List[NYPUCAttachmentData]
     serial: str
     date_filed: str
     nypuc_doctype: str
     name: str
-    url: str
     organization: str
     itemNo: str
-    file_name: str
     docket_id: str
 
 
@@ -175,12 +183,14 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
                 continue  # Skip rows without links
 
             filing_item = NYPUCFileData(
+                attachment=NYPUCAttachmentData(
+                    name=link.get_text(strip=True),
+                    url=link["href"],
+                ),
                 serial=cells[0].get_text(strip=True),
                 date_filed=cells[1].get_text(strip=True),
                 nypuc_doctype=cells[2].get_text(strip=True),
                 docket_id=case,
-                name=link.get_text(strip=True),
-                url=link["href"],
                 organization=cells[4].get_text(strip=True),
                 itemNo=cells[5].get_text(strip=True),
                 file_name=cells[6].get_text(strip=True),
@@ -189,7 +199,24 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFileData]:
         except Exception as e:
             print(f"Error processing row: {e}\nRow content: {row.prettify()}")
 
-    return filing_data
+    deduped_data = deduplicate_individual_attachments_into_files(filing_data)
+    return deduped_data
+
+
+def deduplicate_individual_attachments_into_files(
+    raw_files: List[NYPUCFileData],
+) -> List[NYPUCFileData]:
+    dict_nypuc = {}
+
+    def make_dedupe_string(file: NYPUCFileData) -> str:
+        return f"itemnum-{file.itemNo}-caseid-{file.docket_id}"
+
+    for file in raw_files:
+        dedupestr = make_dedupe_string(file)
+        if dict_nypuc.get(dedupestr) is not None:
+            dict_nypuc[dedupestr].attachements.append(file.attachements)
+    return_vals = dict_nypuc.values()
+    return list(return_vals)
 
 
 class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
