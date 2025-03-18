@@ -1,14 +1,7 @@
-from abc import ABC, abstractmethod
 from typing import Any, List
 import asyncio
 import aiohttp
-from openpuc_scrapers.models.filing import GenericFiling
 from pydantic import BaseModel
-
-
-async def send_castables_to_kessler(castable_filings: List[IntoFiling]) -> None:
-    filing_list = list(map(lambda x: x.cast_to_filing(), castable_filings))
-    await upload_schemas_to_kessler(filing_list, "https://api.kessler.xyz/")
 
 
 class RequestData(BaseModel):
@@ -16,7 +9,7 @@ class RequestData(BaseModel):
     data: Any
 
 
-async def post_objects_to_endpoint(
+async def post_multiple_objects_to_endpoints(
     requests: List[RequestData], max_simul_requests: int
 ) -> List[dict]:
     semaphore = asyncio.Semaphore(max_simul_requests)
@@ -42,9 +35,3 @@ async def post_objects_to_endpoint(
         except Exception as e:
             print(f"Error during batch upload: {str(e)}")
             raise  # Re-raise the exception
-
-
-async def upload_schemas_to_kessler(files: List[GenericFiling], api_url: str):
-    file_post_url = api_url + "ingest_v1/add-task/ingest"
-    requests = [RequestData(url=file_post_url, data=file) for file in files]
-    await post_objects_to_endpoint(requests, 30)

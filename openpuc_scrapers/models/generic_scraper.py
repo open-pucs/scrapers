@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from openpuc_scrapers.models.filing import GenericFiling as GenericFilingData
 from openpuc_scrapers.models.case import GenericCase as GenericCaseData
+from openpuc_scrapers.models.misc import RequestData, post_objects_to_endpoint
 
 # this is cursed yoooo
 StateCaseData = TypeVar("StateCaseData", bound=BaseModel)
@@ -168,4 +169,20 @@ def get_new_cases_since_date(
     return process_cases(scraper, state_cases, base_path)
 
 
-...
+async def scrape_and_send_cases_to_endpoint(
+    scraper: GenericScraper,
+    post_endpoint: str,
+    max_request_size: int = 1000,
+    max_simul_requests: int = 10,
+):
+    cases = get_all_new_cases(scraper)
+    request_data_list = []
+
+    for i in range(0, len(cases), max_request_size):
+        chunk = cases[i : i + max_request_size]
+        request = RequestData(url=post_endpoint, data=chunk)
+        request_data_list.append(request)
+
+    await post_objects_to_endpoint(
+        request_data_list, max_simul_requests=max_simul_requests
+    )

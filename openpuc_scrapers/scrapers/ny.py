@@ -275,11 +275,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
     def into_generic_filing_data(self, state_data: NYPUCFileData) -> GenericFiling:
         """Convert NYPUCFileData to a generic Filing object."""
 
-        # Convert string date to date object
-
         filed_date_obj = datetime.strptime(state_data.date_filed, "%m/%d/%Y").date()
-
-        # Convert NYPUCAttachmentData to generic Attachment objects
 
         attachments = [
             GenericAttachment(name=att.name, url=HttpUrl(att.url))
