@@ -277,21 +277,21 @@ class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
 
         # Convert string date to date object
 
-        filed_date_obj = datetime.strptime(self.date_filed, "%m/%d/%Y").date()
+        filed_date_obj = datetime.strptime(state_data.date_filed, "%m/%d/%Y").date()
 
         # Convert NYPUCAttachmentData to generic Attachment objects
 
         attachments = [
             GenericAttachment(name=att.name, url=HttpUrl(att.url))
-            for att in self.attachements
+            for att in state_data.attachements
         ]
 
         return GenericFiling(
             # case_number=self.docket_id,
             filed_date=filed_date_obj,
-            party_name=self.organization,
-            filing_type=self.nypuc_doctype,
-            description=self.name,
+            party_name=state_data.organization,
+            filing_type=state_data.nypuc_doctype,
+            description=state_data.name,
             attachments=attachments,
             extra_metadata={},
         )
