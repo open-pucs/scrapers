@@ -291,23 +291,3 @@ class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
             attachments=attachments,
             extra_metadata={},
         )
-
-
-def test_small_workflow() -> List[NYPUCFileData]:
-    """Main workflow that coordinates all scraping tasks"""
-    docket = NYPUCDocketInfo(
-        docket_id="18-G-0736",
-        matter_type="Complaint",
-        matter_subtype="Formal Non-Consumer Related",
-        title="Complaint and Formal Dispute Resolution Request For Expedited Resolution of East Coast Power & Gas, LLC Regarding Annual Reconciliation Charges of KeySpan Gas East Corporation d/b/a National Grid for January - April 2018",
-        organization="East Coast Power & Gas, LLC",
-        date_filed="12/05/2018",
-        industry_affected="Gas",  # This field wasn't provided in the comments
-    )
-    # Flyte Task that downloads the html
-    html = process_docket(docket)
-    # Flyte Task that extracts the data from the html
-    results = extract_rows(html, docket.docket_id)
-    print(f"Processed Doc rows for {docket.docket_id}")
-
-    return results

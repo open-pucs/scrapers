@@ -35,3 +35,21 @@ async def post_multiple_objects_to_endpoints(
         except Exception as e:
             print(f"Error during batch upload: {str(e)}")
             raise  # Re-raise the exception
+
+
+async def post_list_to_endpoint_split(
+    objects: List[Any],
+    post_endpoint: str,
+    max_request_size: int = 1000,
+    max_simul_requests: int = 10,
+) -> List[dict]:
+    request_data_list = []
+
+    for i in range(0, len(objects), max_request_size):
+        chunk = objects[i : i + max_request_size]
+        request = RequestData(url=post_endpoint, data=chunk)
+        request_data_list.append(request)
+
+    return await post_multiple_objects_to_endpoints(
+        request_data_list, max_simul_requests=max_simul_requests
+    )
