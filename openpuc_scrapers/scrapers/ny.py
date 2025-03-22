@@ -1,7 +1,4 @@
-from flytekit import task, workflow
-from openpuc_scrapers.models.attachment import Attachment, GenericAttachment
-from openpuc_scrapers.models.filing import Filing, IntoFiling
-from openpuc_scrapers.models.misc import send_castables_to_kessler
+from openpuc_scrapers.models.attachment import GenericAttachment
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
@@ -19,20 +16,20 @@ from openpuc_scrapers.models.generic_scraper import GenericScraper
 
 
 class NYPUCAttachmentData(BaseModel):
-    name: str
-    url: str
-    file_name: str
+    name: str = ""
+    url: str = ""
+    file_name: str = ""
 
 
-class NYPUCFileData(BaseModel, IntoFiling):
-    attachements: List[NYPUCAttachmentData]
-    serial: str
-    date_filed: str
-    nypuc_doctype: str
-    name: str
-    organization: str
-    itemNo: str
-    docket_id: str
+class NYPUCFileData(BaseModel):
+    attachements: List[NYPUCAttachmentData] = []
+    serial: str = ""
+    date_filed: str = ""
+    nypuc_doctype: str = ""
+    name: str = ""
+    organization: str = ""
+    itemNo: str = ""
+    docket_id: str = ""
 
 
 class NYPUCDocketInfo(BaseModel):
@@ -43,44 +40,6 @@ class NYPUCDocketInfo(BaseModel):
     organization: str  # Individual
     date_filed: str
     industry_affected: str
-
-
-def process_industry(industry_num: int) -> Dict[str, Any]:
-    """Task to process a single industry number and return its dockets"""
-    driver = webdriver.Chrome()
-    all_dockets = []
-
-    try:
-        url = f"https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA={industry_num}"
-        driver.get(url)
-
-        wait = WebDriverWait(driver, 300)
-        industry_elem = wait.until(
-            EC.presence_of_element_located(
-                (By.ID, "GridPlaceHolder_lblSearchCriteriaValue")
-            )
-        )
-        industry_affected = industry_elem.text.replace("Industry Affected:", "").strip()
-        time.sleep(2)  # Reduced from 30 for demonstration
-
-        table_elem = wait.until(
-            EC.presence_of_element_located(
-                (By.CSS_SELECTOR, "#tblSearchedMatterExternal > tbody")
-            )
-        )
-        table_html = table_elem.get_attribute("outerHTML") or ""
-
-        # Use existing helper function
-        return {"html": table_html, "industry": industry_affected}
-
-    except TimeoutException as e:
-        print(f"Timeout waiting for industry {industry_num}")
-        raise e
-    except Exception as e:
-        print(f"Error processing industry {industry_num}: {e}")
-        raise e
-    finally:
-        driver.quit()
 
 
 def combine_dockets(docket_lists: List[List[NYPUCDocketInfo]]) -> List[NYPUCDocketInfo]:
@@ -222,6 +181,46 @@ class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
 
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
         """Return industry numbers to process"""
+
+        def process_industry(industry_num: int) -> Dict[str, Any]:
+            """Task to process a single industry number and return its dockets"""
+            driver = webdriver.Chrome()
+            all_dockets = []
+
+            try:
+                url = f"https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA={industry_num}"
+                driver.get(url)
+
+                wait = WebDriverWait(driver, 300)
+                industry_elem = wait.until(
+                    EC.presence_of_element_located(
+                        (By.ID, "GridPlaceHolder_lblSearchCriteriaValue")
+                    )
+                )
+                industry_affected = industry_elem.text.replace(
+                    "Industry Affected:", ""
+                ).strip()
+                time.sleep(2)  # Reduced from 30 for demonstration
+
+                table_elem = wait.until(
+                    EC.presence_of_element_located(
+                        (By.CSS_SELECTOR, "#tblSearchedMatterExternal > tbody")
+                    )
+                )
+                table_html = table_elem.get_attribute("outerHTML") or ""
+
+                # Use existing helper function
+                return {"html": table_html, "industry": industry_affected}
+
+            except TimeoutException as e:
+                print(f"Timeout waiting for industry {industry_num}")
+                raise e
+            except Exception as e:
+                print(f"Error processing industry {industry_num}: {e}")
+                raise e
+            finally:
+                driver.quit()
+
         nums = list(range(1, 21))  # Example range of industry numbers
         docket_intermediate_lists = [
             process_industry(industry_num) for industry_num in nums
@@ -253,7 +252,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocketInfo, NYPUCFileData]):
         raise Exception("Not Impelemented")
 
     def updated_cases_since_date_from_intermediate(
-        self, intermediate: Any, after_date: date
+        self, intermediate: Dict[str, Any], after_date: date
     ) -> List[NYPUCDocketInfo]:
         raise Exception("Not Impelemented")
 

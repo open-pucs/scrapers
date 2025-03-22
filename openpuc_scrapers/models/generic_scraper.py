@@ -118,28 +118,36 @@ def process_cases(
 ) -> List[GenericCaseData]:
     all_generic_cases = []
 
-    for idx, case in enumerate(cases):
+    for case in cases:
+        generic_case = scraper.into_generic_case_data(case)
+        case_num = generic_case.case_number
+
         # Save state-specific case data
-        case_path = f"{base_path}/cases/case_{idx}.json"
+        case_path = f"{base_path}/cases/case_{case_num}.json"
         save_json(case_path, case)
 
         # Process filings
         filings_intermediate = scraper.filing_data_intermediate(case)
-        filings_path = f"{base_path}/filings/case_{idx}.html"
+        filings_path = f"{base_path}/filings/case_{case_num}.json"
         save_json(filings_path, filings_intermediate)
 
         filings = scraper.filing_data_from_intermediate(filings_intermediate)
-        filings_json_path = f"{base_path}/filings/case_{idx}.json"
+        filings_json_path = f"{base_path}/filings/case_{case_num}.json"
         save_json(filings_json_path, filings)
 
         # Convert to generic case
-        generic_case = scraper.into_generic_case_data(case)
-        all_generic_cases.append(generic_case)
+        generic_case = scraper.into_generic_filing_data
+
+        case_specific_generic_cases = []
+        for filing in filings:
+            generic_filing = scraper.into_generic_filing_data(filing)
+            case_specific_generic_cases.append(generic_filing)
+        all_generic_cases.extend(case_specific_generic_cases)
 
     return all_generic_cases
 
 
-def get_all_new_cases(
+def get_all_cases(
     scraper: GenericScraper[StateCaseData, StateFilingData]
 ) -> List[GenericCaseData]:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -147,7 +155,7 @@ def get_all_new_cases(
 
     # Get and save case list
     caselist_intermediate = scraper.universal_caselist_intermediate()
-    caselist_path = f"{base_path}/caselist.html"
+    caselist_path = f"{base_path}/caselist.json"
     save_json(caselist_path, caselist_intermediate)
 
     # Process cases
@@ -163,7 +171,7 @@ def get_new_cases_since_date(
 
     # Get and save updated cases
     updated_intermediate = scraper.updated_cases_since_date_intermediate(after_date)
-    updated_path = f"{base_path}/updated_cases.html"
+    updated_path = f"{base_path}/updated_cases.json"
     save_json(updated_path, updated_intermediate)
 
     # Process updated cases
@@ -179,7 +187,7 @@ async def scrape_and_send_cases_to_endpoint(
     max_request_size: int = 1000,
     max_simul_requests: int = 10,
 ) -> List[dict]:
-    cases = get_all_new_cases(scraper)
+    cases = get_all_cases(scraper)
 
     return await post_list_to_endpoint_split(
         objects=cases,
