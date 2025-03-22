@@ -2,13 +2,13 @@ import unittest
 from pydantic import ValidationError
 
 
-from openpuc_scrapers.models import Attachment
+from openpuc_scrapers.models import GenericAttachment
 
 
 class TestAttachmentModel(unittest.TestCase):
     def test_valid_attachment(self):
         """Test valid attachment data."""
-        attachment = Attachment(
+        attachment = GenericAttachment(
             name="Test Document",
             url="http://example.com/attachment.pdf",
             document_type="PDF",
@@ -20,7 +20,7 @@ class TestAttachmentModel(unittest.TestCase):
 
     def test_missing_optional_fields(self):
         """Test attachment with missing optional fields."""
-        attachment = Attachment(
+        attachment = GenericAttachment(
             name="Test Document",
             url="http://example.com/attachment.pdf",
         )
@@ -32,7 +32,7 @@ class TestAttachmentModel(unittest.TestCase):
     def test_invalid_url(self):
         """Test invalid URL in the attachment."""
         with self.assertRaises(ValidationError):
-            Attachment(filing_id="98765", name="Test Document", url="not-a-valid-url")
+            GenericAttachment(filing_id="98765", name="Test Document", url="not-a-valid-url")
 
 
 if __name__ == "__main__":

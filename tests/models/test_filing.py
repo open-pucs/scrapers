@@ -3,13 +3,13 @@ from datetime import date
 from pydantic import ValidationError
 
 
-from openpuc_scrapers.models import Filing
+from openpuc_scrapers.models import GenericFiling
 
 
 class TestFilingModel(unittest.TestCase):
     def test_valid_filing(self):
         """Test valid filing data."""
-        filing = Filing(
+        filing = GenericFiling(
             filed_date=date(2023, 3, 10),
             party_name="XYZ Corp",
             filing_type="Brief",
@@ -22,7 +22,7 @@ class TestFilingModel(unittest.TestCase):
     def test_missing_required_fields(self):
         """Test missing required fields (e.g., filed_date)."""
         with self.assertRaises(ValidationError):
-            Filing(
+            GenericFiling(
                 filing_type="Brief",
                 description="A filing without a date",
             )

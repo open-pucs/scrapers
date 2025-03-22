@@ -1,5 +1,6 @@
-from .case import Case
-from .filing import Filing
-from .attachment import Attachment
+from .case import GenericCase
+from .filing import GenericFiling
+from .attachment import GenericAttachment
+from .generic_scraper import GenericScraper
 
-__all__ = ["Case", "Filing", "Attachment"]
+__all__ = ["GenericCase", "GenericFiling", "GenericAttachment", "GenericScraper"]

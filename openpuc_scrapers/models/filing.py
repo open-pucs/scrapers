@@ -3,10 +3,10 @@ from typing import Any, Dict, List
 from pydantic import BaseModel
 from datetime import date
 
-from .attachment import Attachment
+from .attachment import GenericAttachment
 
 
-class Filing(BaseModel):
+class GenericFiling(BaseModel):
     """Model representing filing data within a case.
 
     Attributes:
@@ -22,14 +22,5 @@ class Filing(BaseModel):
     party_name: str
     filing_type: str
     description: str
-    attachments: List[Attachment] = []
-    extra_metadata: Dict[str, Any]
-
-    def into_filing(self):
-        return self
-
-
-class IntoFiling(ABC):
-    @abstractmethod
-    def cast_to_filing(self) -> Filing:
-        pass
+    attachments: List[GenericAttachment] = []
+    extra_metadata: Dict[str, Any] = {}

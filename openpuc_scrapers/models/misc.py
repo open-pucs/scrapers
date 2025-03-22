@@ -1,14 +1,7 @@
-from abc import ABC, abstractmethod
 from typing import Any, List
 import asyncio
 import aiohttp
-from openpuc_scrapers.models.filing import Filing, IntoFiling
 from pydantic import BaseModel
-
-
-async def send_castables_to_kessler(castable_filings: List[IntoFiling]) -> None:
-    filing_list = list(map(lambda x: x.cast_to_filing(), castable_filings))
-    await upload_schemas_to_kessler(filing_list, "https://api.kessler.xyz/")
 
 
 class RequestData(BaseModel):
@@ -16,7 +9,7 @@ class RequestData(BaseModel):
     data: Any
 
 
-async def post_objects_to_endpoint(
+async def post_multiple_objects_to_endpoints(
     requests: List[RequestData], max_simul_requests: int
 ) -> List[dict]:
     semaphore = asyncio.Semaphore(max_simul_requests)
@@ -27,7 +20,7 @@ async def post_objects_to_endpoint(
             async with semaphore:  # Acquire semaphore before making request
                 async with session.post(
                     request.url,
-                    json=request.data.to_dict(),  # Convert Filing object to dict
+                    json=request.data.to_dict(),  # Convert GenericFiling object to dict
                     headers={"Content-Type": "application/json"},
                 ) as response:
                     response.raise_for_status()  # Raise exception for bad status codes
@@ -44,7 +37,19 @@ async def post_objects_to_endpoint(
             raise  # Re-raise the exception
 
 
-async def upload_schemas_to_kessler(files: List[Filing], api_url: str):
-    file_post_url = api_url + "ingest_v1/add-task/ingest"
-    requests = [RequestData(url=file_post_url, data=file) for file in files]
-    await post_objects_to_endpoint(requests, 30)
+async def post_list_to_endpoint_split(
+    objects: List[Any],
+    post_endpoint: str,
+    max_request_size: int = 1000,
+    max_simul_requests: int = 10,
+) -> List[dict]:
+    request_data_list = []
+
+    for i in range(0, len(objects), max_request_size):
+        chunk = objects[i : i + max_request_size]
+        request = RequestData(url=post_endpoint, data=chunk)
+        request_data_list.append(request)
+
+    return await post_multiple_objects_to_endpoints(
+        request_data_list, max_simul_requests=max_simul_requests
+    )
