@@ -10,27 +10,57 @@ from openpuc_scrapers.models.case import GenericCase as GenericCaseData
 from openpuc_scrapers.models.misc import (
     RequestData,
     post_list_to_endpoint_split,
-    post_objects_to_endpoint,
 )
 
-# this is cursed yoooo
 StateCaseData = TypeVar("StateCaseData", bound=BaseModel)
 StateFilingData = TypeVar("StateFilingData", bound=BaseModel)
 
 
 """
-With this implementation the intermediate objects are designed to be easily json serializeable with type Dict[str,Any]
+To create a New State Specific Scraper.
 
-And this code should type check everything including StateCaseData, StateFilingData, and the conversion to generics from there, when it comes to the intermediates you still need to guarentee that the intermediate vaugely typed objects line up like so 
+1. Go ahead and define two types related to the data you want to scrape. StateCaseData, StateFilingData.
 
+2. Create a new class with name <StateName>Scraper
 
-(universal_caselist_intermediate) output is parsable by (universal_caselist_from_intermediate)
+To create a New State Specific Scraper, implement three main functionalities:
 
-(filing_data_intermediate) output is parsable by (filing_data_from_intermediate)
+1. Universal Case List: Get a list of all cases in the system
+2. Filing Data: Get detailed filing data for a specific case
+3. Updated Cases: Get cases that have been updated since a given date
 
-and 
+Each functionality requires two steps due to saving JSON-serializable intermediates to disk:
 
-(updated_cases_since_date_intermediate) output is parsable by (updated_cases_since_date_from_intermediate)
+1. Universal Case List Steps:
+   ```python
+   def universal_caselist_intermediate(self) -> Dict[str, Any]:
+   def universal_caselist_from_intermediate(self, intermediate: Dict[str, Any]) -> List[StateCaseData]:
+   ```
+
+2. Filing Data Steps:
+   ```python
+   def filing_data_intermediate(self, data: StateCaseData) -> Dict[str, Any]:
+   def filing_data_from_intermediate(self, intermediate: Dict[str, Any]) -> List[StateFilingData]:
+   ```
+
+3. Updated Cases Steps:
+   ```python
+   def updated_cases_since_date_intermediate(self, after_date: date) -> Dict[str, Any]:
+   
+   def updated_cases_since_date_from_intermediate(self, intermediate: Dict[str, Any], after_date: date) -> List[StateCaseData]:
+   ```
+
+Additionally, implement conversion methods to transform state-specific types into generic types:
+
+```python
+def into_generic_case_data(self, state_data: StateCaseData) -> GenericCaseData:
+def into_generic_filing_data(self, state_data: StateFilingData) -> GenericFilingData:
+
+The intermediate objects must be JSON-serializable (Dict[str,Any]). Each intermediate output must be parsable by its corresponding from_intermediate method:
+
+- universal_caselist_intermediate() → universal_caselist_from_intermediate()
+- filing_data_intermediate() → filing_data_from_intermediate()
+- updated_cases_since_date_intermediate() → updated_cases_since_date_from_intermediate()
 """
 
 
