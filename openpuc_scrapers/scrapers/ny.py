@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.filing import GenericFiling
-from openpuc_scrapers.models.generic_scraper import GenericScraper
+from openpuc_scrapers.scrapers.base import GenericScraper
 
 
 class NYPUCAttachmentData(BaseModel):

@@ -1,4 +1,4 @@
-from openpuc_scrapers.models.generic_scraper import process_cases
+from openpuc_scrapers.pipelines.generic_pipeline import process_cases
 from openpuc_scrapers.models.misc import post_list_to_endpoint_split
 from openpuc_scrapers.scrapers.ny import NYPUCDocketInfo, NYPUCScraper
 
