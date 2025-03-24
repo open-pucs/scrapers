@@ -4,8 +4,8 @@ from typing import Any, Dict, Generic, TypeVar, List, Type
 from datetime import date, datetime, timezone
 from pydantic import BaseModel
 
-from openpuc_scrapers.models.filing import GenericFiling as GenericFilingData
-from openpuc_scrapers.models.case import GenericCase as GenericCaseData
+from openpuc_scrapers.models.filing import GenericFiling
+from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.misc import (
     post_list_to_endpoint_split,
 )
@@ -45,7 +45,7 @@ def process_cases(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     cases: List[StateCaseData],
     base_path: str,
-) -> List[GenericCaseData]:
+) -> List[GenericCase]:
     all_generic_cases = []
 
     for case in cases:
@@ -79,7 +79,7 @@ def process_cases(
 
 def get_all_cases(
     scraper: GenericScraper[StateCaseData, StateFilingData]
-) -> List[GenericCaseData]:
+) -> List[GenericCase]:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     base_path = f"data/{timestamp}"
 
@@ -95,7 +95,7 @@ def get_all_cases(
 
 def get_new_cases_since_date(
     scraper: GenericScraper[StateCaseData, StateFilingData], after_date: date
-) -> List[GenericCaseData]:
+) -> List[GenericCase]:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     base_path = f"data/{timestamp}"
 
