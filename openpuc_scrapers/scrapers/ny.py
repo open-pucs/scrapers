@@ -21,45 +21,35 @@ from openpuc_scrapers.scrapers.base import GenericScraper
 # document_type: str
 # file_name: str
 class NYPUCAttachment(BaseModel):
-    name: str = ""
-    url: str = ""
+    document_title: str = ""
+    url: HttpUrl
+    file_format: str = ""
+    document_type: str = ""
     file_name: str = ""
-
-    # case_number
-    # date_filed
-    # filing_on_behalf_of
-    # description_of_filing
-    # filing_no
-    # filed_by
-    # response_to
 
 
 class NYPUCFiling(BaseModel):
-    attachements: List[NYPUCAttachment] = []
-    serial: str = ""
+    attachments: List[NYPUCAttachment] = []
+    filing_type: str = ""
+    case_number: str = ""
     date_filed: str = ""
-    nypuc_doctype: str = ""
-    name: str = ""
-    organization: str = ""
-    itemNo: str = ""
-    docket_id: str = ""
+    filing_on_behalf_of: str = ""
+    description_of_filing: str = ""
+    filing_no: str = ""
+    filed_by: str = ""
+    response_to: str = ""
 
 
-# organization: str (though maybe it should be OrganizationNY)?
-# matter_type: str
-# matter_subtype: str
-# case_title: str
-# related_cases: list[DocketNY]
-# party_list: list[OrganizationNY] (or list[PartyNY]]?
-# calendar: list[EventNY]?
 class NYPUCDocket(BaseModel):
-    docket_id: str  # 24-C-0663
+    case_number: str  # 24-C-0663
     matter_type: str  # Complaint
     matter_subtype: str  # Appeal of an Informal Hearing Decision
-    title: str  # In the Matter of the Rules and Regulations of the Public Service
+    case_title: str  # In the Matter of the Rules and Regulations of the Public Service
     organization: str  # Individual
     date_filed: str
     industry_affected: str
+    related_cases: List["NYPUCDocket"] = []
+    party_list: List[str] = []  # List of organizations/parties
 
 
 def combine_dockets(docket_lists: List[List[NYPUCDocket]]) -> List[NYPUCDocket]:
@@ -76,7 +66,7 @@ def process_docket(docket: NYPUCDocket) -> str:
     """Task to process a single docket and return its files"""
     driver = webdriver.Chrome()
     try:
-        url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={docket.docket_id}"
+        url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={docket.case_number}"
         driver.get(url)
 
         # Custom wait logic
@@ -92,7 +82,7 @@ def process_docket(docket: NYPUCDocket) -> str:
         return table_element.get_attribute("outerHTML")
 
     except Exception as e:
-        print(f"Error processing docket {docket.docket_id}: {e}")
+        print(f"Error processing docket {docket.case_number}: {e}")
         raise e
     finally:
         driver.quit()
@@ -120,13 +110,16 @@ def extract_docket_info(intermediate: Dict[str, Any]) -> List[NYPUCDocket]:
         if len(cells) >= 6:  # Ensure we have all required cells
             try:
                 docket_info = NYPUCDocket(
-                    docket_id=cells[0].find("a").text.strip(),
+                    case_number=cells[0].find("a").text.strip(),
                     matter_type=cells[1].text.strip(),
                     matter_subtype=cells[2].text.strip(),
                     date_filed=cells[3].text.strip(),
-                    title=cells[4].text.strip(),
+                    case_title=cells[4].text.strip(),
                     organization=cells[5].text.strip(),
                     industry_affected=intermediate["industry"].strip(),
+                    party_list=[
+                        cells[5].text.strip()
+                    ],  # Initialize with the main organization
                 )
                 docket_infos.append(docket_info)
             except Exception as e:
@@ -160,17 +153,26 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFiling]:
                 continue  # Skip rows without links
 
             filing_item = NYPUCFiling(
-                attachment=NYPUCAttachment(
-                    name=link.get_text(strip=True),
-                    url=link["href"],
-                    file_name=cells[6].get_text(strip=True),
-                ),
-                serial=cells[0].get_text(strip=True),
+                attachments=[
+                    NYPUCAttachment(
+                        document_title=link.get_text(strip=True),
+                        url=HttpUrl(link["href"]),
+                        file_name=cells[6].get_text(strip=True),
+                        document_type=cells[2].get_text(strip=True),
+                        file_format=(
+                            cells[6].get_text(strip=True).split(".")[-1]
+                            if cells[6].get_text(strip=True)
+                            else ""
+                        ),
+                    )
+                ],
+                filing_type=cells[2].get_text(strip=True),
+                case_number=case,
                 date_filed=cells[1].get_text(strip=True),
-                nypuc_doctype=cells[2].get_text(strip=True),
-                docket_id=case,
-                organization=cells[4].get_text(strip=True),
-                itemNo=cells[5].get_text(strip=True),
+                filing_on_behalf_of=cells[4].get_text(strip=True),
+                description_of_filing=link.get_text(strip=True),
+                filing_no=cells[5].get_text(strip=True),
+                filed_by=cells[4].get_text(strip=True),
             )
             filing_data.append(filing_item)
         except Exception as e:
@@ -186,12 +188,12 @@ def deduplicate_individual_attachments_into_files(
     dict_nypuc = {}
 
     def make_dedupe_string(file: NYPUCFiling) -> str:
-        return f"itemnum-{file.itemNo}-caseid-{file.docket_id}"
+        return f"filing-{file.filing_no}-case-{file.case_number}"
 
     for file in raw_files:
         dedupestr = make_dedupe_string(file)
         if dict_nypuc.get(dedupestr) is not None:
-            dict_nypuc[dedupestr].attachements.append(file.attachements)
+            dict_nypuc[dedupestr].attachments.extend(file.attachments)
     return_vals = dict_nypuc.values()
     return list(return_vals)
 
@@ -279,9 +281,9 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
     def into_generic_case_data(self, state_data: NYPUCDocket) -> GenericCase:
         """Convert to generic case format"""
         return GenericCase(
-            case_number=state_data.docket_id,
+            case_number=state_data.case_number,
             case_type=f"{state_data.matter_type} - {state_data.matter_subtype}",
-            description=state_data.title,
+            description=state_data.case_title,
             industry=state_data.industry_affected,
             petitioner=state_data.organization,
             opened_date=datetime.strptime(state_data.date_filed, "%m/%d/%Y").date(),
@@ -297,16 +299,16 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         filed_date_obj = datetime.strptime(state_data.date_filed, "%m/%d/%Y").date()
 
         attachments = [
-            GenericAttachment(name=att.name, url=HttpUrl(att.url))
-            for att in state_data.attachements
+            GenericAttachment(name=att.document_title, url=HttpUrl(att.url))
+            for att in state_data.attachments
         ]
 
         return GenericFiling(
             # case_number=self.docket_id,
             filed_date=filed_date_obj,
-            party_name=state_data.organization,
-            filing_type=state_data.nypuc_doctype,
-            description=state_data.name,
+            party_name=state_data.filing_on_behalf_of,
+            filing_type=state_data.filing_type,
+            description=state_data.description_of_filing,
             attachments=attachments,
             extra_metadata={},
         )
