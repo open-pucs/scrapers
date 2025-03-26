@@ -15,11 +15,6 @@ from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.scrapers.base import GenericScraper
 
 
-# document_title: str
-# url: HttpUrl
-# file_format: str
-# document_type: str
-# file_name: str
 class NYPUCAttachment(BaseModel):
     document_title: str = ""
     url: HttpUrl
@@ -261,7 +256,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
 
     def filing_data_intermediate(self, data: NYPUCDocket) -> Dict[str, Any]:
         """Get HTML content for a docket's filings"""
-        return {"docket_id": data.docket_id, "html": process_docket(data)}
+        return {"docket_id": data.case_number, "html": process_docket(data)}
 
     def filing_data_from_intermediate(
         self, intermediate: Dict[str, Any]
