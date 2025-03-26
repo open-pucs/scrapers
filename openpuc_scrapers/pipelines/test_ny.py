@@ -1,12 +1,12 @@
 from openpuc_scrapers.pipelines.generic_pipeline import process_cases
 from openpuc_scrapers.models.misc import post_list_to_endpoint_split
-from openpuc_scrapers.scrapers.ny import NYPUCDocketInfo, NYPUCScraper
+from openpuc_scrapers.scrapers.ny import NYPUCDocket, NYPUCScraper
 
 
 # Run NYPUC processing test
 async def test_ny_on_single_case() -> None:
 
-    docket = NYPUCDocketInfo(
+    docket = NYPUCDocket(
         docket_id="18-G-0736",
         matter_type="Complaint",
         matter_subtype="Formal Non-Consumer Related",
