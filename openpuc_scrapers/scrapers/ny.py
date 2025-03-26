@@ -15,10 +15,23 @@ from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.scrapers.base import GenericScraper
 
 
+# document_title: str
+# url: HttpUrl
+# file_format: str
+# document_type: str
+# file_name: str
 class NYPUCAttachment(BaseModel):
     name: str = ""
     url: str = ""
     file_name: str = ""
+
+    # case_number
+    # date_filed
+    # filing_on_behalf_of
+    # description_of_filing
+    # filing_no
+    # filed_by
+    # response_to
 
 
 class NYPUCFiling(BaseModel):
