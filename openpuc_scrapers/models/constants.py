@@ -19,7 +19,11 @@ S3_SCRAPER_INTERMEDIATE_BUCKET = os.environ.get(
 TMP_DIR = Path(os.environ.get("TMP_DIR", "/tmp/open_scrapers"))
 
 
-LOCAL_CACHE_DIR: Optional[Path] = Maybe(Path)(os.environ.get("LOCAL_CACHE_DIR"))
+LOCAL_CACHE_DIR: Optional[Path] = (
+    None
+    if os.environ.get("LOCAL_CACHE_DIR") is None
+    else Path(os.environ.get("LOCAL_CACHE_DIR"))
+)
 
 S3_ACCESS_KEY = os.environ["S3_ACCESS_KEY"]
 S3_SECRET_KEY = os.environ["S3_SECRET_KEY"]
