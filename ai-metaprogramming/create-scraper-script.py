@@ -1,37 +1,43 @@
 import argparse
-import json
+import os
 from pathlib import Path
 from typing import Optional, Dict, Any
+from langchain_community.chat_models import ChatDeepInfra
 from scrapegraphai.graphs import ScriptCreatorGraph
 
 
-def load_prompt(prompt_file: str) -> str:
+CHEAP_DEEPINFRA_MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+
+EXPENSIVE_DEEPINFRA_MODEL_NAME = "deepseek-ai/DeepSeek-R1-Turbo"
+
+DEEPINFRA_API_TOKEN = os.getenv("DEEPINFRA_API_TOKEN", None)
+
+
+def load_prompt(prompt_file: Path, format_dict: Dict[str, Any] = {}) -> str:
     """Load prompt content from a markdown file."""
     with open(prompt_file, "r") as f:
-        return f.read()
+        results = f.read()
+        return results.format(**format_dict)
 
 
-def create_graph_config(api_key: Optional[str] = None) -> Dict[str, Any]:
-    """Create the graph configuration."""
-    if not api_key:
-        import os
+def create_graph_config() -> Dict[str, Any]:
 
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "OpenAI API key must be provided either through --api-key argument "
-                "or OPENAI_API_KEY environment variable"
-            )
+    if DEEPINFRA_API_TOKEN is None:
+        raise ValueError("DeepInfra API token not provided")
 
+    llm_instance = ChatDeepInfra(
+        model=CHEAP_DEEPINFRA_MODEL_NAME, deepinfra_api_token=DEEPINFRA_API_TOKEN
+    )
     config = {
         "llm": {
-            "provider": "openai",
-            "model": "gpt-4",
-            "api_key": api_key,
-            "temperature": 0.7,
+            "model_instance": llm_instance,
+            "model_tokens": 10240,  # Default context window for Llama-2
         },
         "library": "beautifulsoup4",
     }
+
+    # Add common configuration
+
     return config
 
 
@@ -51,7 +57,7 @@ def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
 
     # Step 1: Initial Reconnaissance
     recon_graph = ScriptCreatorGraph(
-        prompt=f"{recon_prompt}\nAnalyze this PUC website: {url}\n{instructions or ''}",
+        prompt=f"{recon_prompt}\nAnalyze this PUC website: {url}",
         source=url,
         config=config,
     )
@@ -59,10 +65,10 @@ def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
 
     # Step 2: Create Initial Scraper
     create_graph = ScriptCreatorGraph(
-        prompt=f"{create_prompt}\nCreate a scraper for: {url}\nUsing schema:\n{schema_result}\n{instructions or ''}",
+        prompt=f"{create_prompt}\nCreate a scraper for: {url}\nUsing schema:\n{schema_result}",
         source=url,
         config=config,
-        schema=schema_result,
+        # schema=schema_result,
     )
     initial_scraper = create_graph.run()
 
@@ -105,16 +111,14 @@ def main():
         help="Additional instructions for the scraper generation",
     )
     parser.add_argument("--output", "-o", help="Output file for the generated scraper")
-    parser.add_argument(
-        "--api-key",
-        help="OpenAI API key (defaults to OPENAI_API_KEY environment variable)",
-    )
 
     args = parser.parse_args()
 
     try:
         # Create config first to validate API key
-        config = create_graph_config(args.api_key)
+        config = create_graph_config(
+            api_key=args.api_key, provider=args.provider, model=args.model
+        )
         result = run_pipeline(args.url, args.instructions)
 
         if args.output:
