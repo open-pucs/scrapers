@@ -23,12 +23,22 @@ from models.constants import (
 
 
 from typing import Any, Optional
+import base64
+import secrets
 
 
 import logging
 
 
 default_logger = logging.getLogger(__name__)
+
+
+def rand_string() -> str:
+    return base64.urlsafe_b64encode(secrets.token_bytes(8)).decode()
+
+
+def rand_filepath() -> Path:
+    return Path(rand_string())
 
 
 """"
@@ -61,6 +71,19 @@ class S3FileManager:
             self.s3_cache_directory = LOCAL_CACHE_DIR / Path(self.bucket)
         else:
             self.s3_cache_directory = None
+
+    def get_local_dir_from_key(self, key: str) -> Optional[Path]:
+        if self.s3_cache_directory is not None:
+            return self.s3_cache_directory / Path(key)
+        return None
+
+    def save_string_to_file(self, key: str, content: str):
+        local_path = self.get_local_dir_from_key(key)
+        if local_path is None:
+            local_path = self.tmpdir / rand_filepath()
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        local_path.write_text(content, encoding="utf-8")
+        self.push_file_to_s3(local_path, key)
 
     def download_file_to_path(self, url: str, savepath: Path) -> Path:
         savepath.parent.mkdir(exist_ok=True, parents=True)

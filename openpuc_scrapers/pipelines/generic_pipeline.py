@@ -11,6 +11,7 @@ from openpuc_scrapers.models.misc import (
 )
 
 
+from openpuc_scrapers.pipelines.s3_utils import S3FileManager
 from openpuc_scrapers.scrapers.base import (
     GenericScraper,
     StateCaseData,
@@ -19,10 +20,8 @@ from openpuc_scrapers.scrapers.base import (
 
 
 # Helper functions
-def save_to_disk(path: str, content: str) -> None:
-    file_path = Path(path)
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text(content, encoding="utf-8")
+def save_to_disk_and_s3(path: str, content: str) -> None:
+    S3FileManager().save_string_to_remote_file(path, content)
 
 
 # isnt working due to the higher order types sadly
@@ -37,7 +36,7 @@ def save_json(path: str, data: Any) -> None:
     else:
         raise Exception("Data is not a list, dict, or BaseModel")
     json_str = json.dumps(json_data, indent=2)
-    save_to_disk(path, json_str)
+    save_to_disk_and_s3(path, json_str)
 
 
 # Processing functions
