@@ -10,6 +10,7 @@ dependencies = [
     "beautifulsoup4>=4.13.3",
     "pydantic>=2.10.6",
     "requests>=2.32.3",
+    "scrapegraphai>=1.44.0",
     "selenium>=4.29.0",
 ]
 
