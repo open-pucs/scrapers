@@ -5,8 +5,9 @@ from typing import Optional, Dict, Any
 from langchain_community.chat_models import ChatDeepInfra
 from scrapegraphai.graphs import ScriptCreatorGraph
 
+from enum import Enum, auto
 
-CHEAP_DEEPINFRA_MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+CHEAP_DEEPINFRA_MODEL_NAME = "Qwen/QwQ-32B"
 
 EXPENSIVE_DEEPINFRA_MODEL_NAME = "deepseek-ai/DeepSeek-R1-Turbo"
 
@@ -20,17 +21,31 @@ def load_prompt(prompt_file: Path, format_dict: Dict[str, Any] = {}) -> str:
         return results.format(**format_dict)
 
 
-def create_graph_config() -> Dict[str, Any]:
+class ModelType(Enum):
+    CHEAP = auto()
+    EXPENSIVE = auto()
 
+
+def get_deepinfra_llm(model_name: str | ModelType) -> ChatDeepInfra:
+    if isinstance(model_name, ModelType):
+        match model_name:
+            case ModelType.CHEAP:
+                model_name = CHEAP_DEEPINFRA_MODEL_NAME
+            case ModelType.EXPENSIVE:
+                model_name = EXPENSIVE_DEEPINFRA_MODEL_NAME
     if DEEPINFRA_API_TOKEN is None:
         raise ValueError("DeepInfra API token not provided")
 
     llm_instance = ChatDeepInfra(
         model=CHEAP_DEEPINFRA_MODEL_NAME, deepinfra_api_token=DEEPINFRA_API_TOKEN
     )
+    return llm_instance
+
+
+def create_graph_config() -> Dict[str, Any]:
     config = {
         "llm": {
-            "model_instance": llm_instance,
+            "model_instance": get_deepinfra_llm(ModelType.CHEAP),
             "model_tokens": 10240,  # Default context window for Llama-2
         },
         "library": "beautifulsoup4",
@@ -71,6 +86,8 @@ def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
         # schema=schema_result,
     )
     initial_scraper = create_graph.run()
+
+    thoughtful_llm = get_deepinfra_llm(ModelType.EXPENSIVE)
 
     # Step 3: Create Generic Adapters
     adapter_graph = ScriptCreatorGraph(
