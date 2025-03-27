@@ -11,3 +11,7 @@ script_creator_graph = ScriptCreatorGraph(
 
 result = script_creator_graph.run()
 print(result)
+
+
+def codeblock(content: str, lang: str = "") -> str:
+    return f"```{lang}\n{content}\n```"
