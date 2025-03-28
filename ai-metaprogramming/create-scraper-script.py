@@ -1,6 +1,12 @@
 import argparse
+import base64
+from datetime import datetime
 import os
 from pathlib import Path
+import re
+import secrets
+import sys
+import itertools
 from typing import Optional, Dict, Any
 from langchain_community.chat_models import ChatDeepInfra
 from scrapegraphai.graphs import ScriptCreatorGraph
@@ -125,9 +131,75 @@ async def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
     return final_result
 
 
-def main():
-    # could you implement a cli tool on this, so that when this script is run, it prompts the user for a url, displays a loading animation while it runs the pipeline, when successful it displays a congradulations message to the user and saves the file in a new path with the url, date and random id?
-    pass
+async def spin():
+    """Display an animated spinner while processing."""
+    symbols = itertools.cycle(["-", "/", "|", "\\"])
+    while True:
+        sys.stdout.write("\r" + next(symbols) + " Processing...")
+        sys.stdout.flush()
+        await asyncio.sleep(0.1)
+
+
+async def main_async(url: str) -> str:
+    """Run the pipeline with spinner animation."""
+    spinner_task = asyncio.create_task(spin())
+    try:
+        result = await run_pipeline(url)
+    finally:
+        spinner_task.cancel()
+    return result
+
+
+def rand_string() -> str:
+    return base64.urlsafe_b64encode(secrets.token_bytes(8)).decode()
+
+
+def main() -> int:
+    """CLI entry point."""
+    parser = argparse.ArgumentParser(description="Generate web scraper script.")
+    parser.add_argument("--url", type=str, help="URL to scrape")
+    args = parser.parse_args()
+
+    # Get URL from args or prompt
+    url = args.url
+    if not url:
+        url = input("Please enter the URL to scrape: ")
+
+    # Validate URL format
+    if not url.startswith(("http://", "https://")):
+        print("Error: Invalid URL. Must start with http:// or https://")
+        return 1
+
+    # Set up output directory
+    output_dir = Path("outputs")
+    output_dir.mkdir(exist_ok=True)
+
+    # Generate filename components
+    sanitized_url = re.sub(r"[^a-zA-Z0-9]", "_", url)[:50]  # Limit length
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    filename = f"scraper_{sanitized_url}_{date_str}_.py"
+    output_path = output_dir / filename
+
+    # Run the pipeline with spinner
+    print("\nGenerating scraper...")
+    try:
+        result = asyncio.run(main_async(url))
+    except Exception as e:
+        print(f"\nError: {e}")
+        return 1
+
+    # Save the result
+    try:
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(result)
+    except IOError as e:
+        print(f"\nError saving file: {e}")
+        return 1
+
+    print(
+        f"\nCongratulations! The scraper has been saved to:\n{output_path.resolve()}\n"
+    )
+    return 0
 
 
 if __name__ == "__main__":
