@@ -1,0 +1,11 @@
+# docker-compose.yml
+version: "3.8"
+
+services:
+  scraper:
+    build: .
+    environment:
+      - DEEPINFRA_API_TOKEN=${DEEPINFRA_API_TOKEN}
+    volumes:
+      - ./outputs:/app/outputs
+    command: ["python", "your_script_name.py", "--url", "https://example.com"]
