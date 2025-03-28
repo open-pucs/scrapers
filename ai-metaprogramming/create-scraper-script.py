@@ -7,6 +7,8 @@ from scrapegraphai.graphs import ScriptCreatorGraph
 
 from enum import Enum, auto
 
+import asyncio
+
 CHEAP_REGULAR_DEEPINFRA_MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
 CHEAP_REASONING_DEEPINFRA_MODEL_NAME = "Qwen/QwQ-32B"
@@ -61,7 +63,7 @@ def create_graph_config() -> Dict[str, Any]:
     return config
 
 
-def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
+async def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
     """Run the full pipeline to generate a scraper."""
     current_dir = Path(__file__).parent
 
@@ -94,21 +96,22 @@ def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
 
     thoughtful_llm = get_deepinfra_llm(ModelType.EXPENSIVE)
 
-    # Step 3: Create Generic Adapters
-    adapter_message = f"{adapter_prompt}\nCreate adapters for this scraper:\n{initial_scraper}\n{instructions or ''}"
-    adapters_response = thoughtful_llm.invoke(adapter_message)
-    adapters = adapters_response.content
+    # Step 3 & 4: Create Generic Adapters and Refactor in parallel
+    async def get_adapters():
+        adapter_message = f"{adapter_prompt}\nCreate adapters for this scraper:\n{initial_scraper}\n{instructions or ''}"
+        adapters_response = await thoughtful_llm.ainvoke(adapter_message)
+        return adapters_response.content
 
-    # Step 4: Refactor
-    refactor_message = f"{refactor_prompt}\nRefactor this code:\n{initial_scraper}\n{adapters}\n{instructions or ''}"
-    refactor_response = thoughtful_llm.invoke(refactor_message)
-    refactored = refactor_response.content
+    async def get_refactored():
+        refactor_message = f"{refactor_prompt}\nRefactor this code:\n{initial_scraper}"
+        refactor_response = await thoughtful_llm.ainvoke(refactor_message)
+        return refactor_response.content
+
+    adapters, refactored = await asyncio.gather(get_adapters(), get_refactored())
 
     # Step 5: Final Recombination
-    final_message = (
-        f"{final_prompt}\nFinalize this scraper:\n{refactored}\n{instructions or ''}"
-    )
-    final_response = thoughtful_llm.invoke(final_message)
+    final_message = f"{final_prompt}\nFinalize this scraper:\n{refactored}\nWith these adapters:{adapters}"
+    final_response = await thoughtful_llm.ainvoke(final_message)
     final_result = final_response.content
 
     if not isinstance(final_result, str):
