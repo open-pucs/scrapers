@@ -53,7 +53,7 @@ def create_graph_config() -> Dict[str, Any]:
             "model_instance": get_deepinfra_llm(ModelType.CHEAP_REASONING),
             "model_tokens": 10240,  # Default context window for Llama-2
         },
-        "library": "beautifulsoup4",
+        "library": "selenium",
     }
 
     # Add common configuration
@@ -95,28 +95,26 @@ def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
     thoughtful_llm = get_deepinfra_llm(ModelType.EXPENSIVE)
 
     # Step 3: Create Generic Adapters
-    adapter_graph = ScriptCreatorGraph(
-        prompt=f"{adapter_prompt}\nCreate adapters for this scraper:\n{initial_scraper}\n{instructions or ''}",
-        source=url,
-        config=config,
-    )
-    adapters = adapter_graph.run()
+    adapter_message = f"{adapter_prompt}\nCreate adapters for this scraper:\n{initial_scraper}\n{instructions or ''}"
+    adapters_response = thoughtful_llm.invoke(adapter_message)
+    adapters = adapters_response.content
 
     # Step 4: Refactor
-    refactor_graph = ScriptCreatorGraph(
-        prompt=f"{refactor_prompt}\nRefactor this code:\n{initial_scraper}\n{adapters}\n{instructions or ''}",
-        source=url,
-        config=config,
-    )
-    refactored = refactor_graph.run()
+    refactor_message = f"{refactor_prompt}\nRefactor this code:\n{initial_scraper}\n{adapters}\n{instructions or ''}"
+    refactor_response = thoughtful_llm.invoke(refactor_message)
+    refactored = refactor_response.content
 
     # Step 5: Final Recombination
-    final_graph = ScriptCreatorGraph(
-        prompt=f"{final_prompt}\nFinalize this scraper:\n{refactored}\n{instructions or ''}",
-        source=url,
-        config=config,
+    final_message = (
+        f"{final_prompt}\nFinalize this scraper:\n{refactored}\n{instructions or ''}"
     )
-    final_result = final_graph.run()
+    final_response = thoughtful_llm.invoke(final_message)
+    final_result = final_response.content
+
+    if not isinstance(final_result, str):
+        raise ValueError(
+            "Final result is not a string. Please check your prompt and try again."
+        )
 
     return final_result
 
