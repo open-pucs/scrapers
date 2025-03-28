@@ -5,7 +5,7 @@ services:
   scraper:
     build: .
     environment:
-      - DEEPINFRA_API_TOKEN=${DEEPINFRA_API_TOKEN}
+      - DEEPINFRA_API_KEY=${DEEPINFRA_API_KEY}
     volumes:
       - ./outputs:/app/outputs
-    command: ["python", "your_script_name.py", "--url", "https://example.com"]
+    command: ["python", "create-scraper-script.py", "--url", "${URL}"]
