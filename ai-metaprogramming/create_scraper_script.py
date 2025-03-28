@@ -80,8 +80,8 @@ async def run_pipeline(url: str) -> str:
     current_dir = Path(__file__).parent
 
     # Load all prompts
-    recon_prompt_path = current_dir / "initial-recognisance-prompt.md"
-    make_scraper_prompt_path = current_dir / "make-scraper-prompt.md"
+    recon_prompt_path = current_dir / "initial_recognisance_prompt.md"
+    make_scraper_path = current_dir / "make_scraper_prompt.md"
     adapter_prompt_path = current_dir / "write_generic_adapters_prompt.md"
     refactor_prompt_path = current_dir / "refactor_prompt.md"
     final_prompt_path = current_dir / "final_recombine_prompt.md"
@@ -110,9 +110,7 @@ async def run_pipeline(url: str) -> str:
 
         # Step 2: Create Initial Scraper
         create_graph = ScriptCreatorGraph(
-            prompt=load_prompt(
-                make_scraper_prompt_path, {"schema": schema, "url": url}
-            ),
+            prompt=load_prompt(make_scraper_path, {"schema": schema, "url": url}),
             source=url,
             config=config,
         )
