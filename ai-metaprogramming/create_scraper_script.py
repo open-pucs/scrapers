@@ -182,6 +182,7 @@ def main() -> int:
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Generate web scraper script.")
     parser.add_argument("--url", type=str, help="URL to scrape")
+    parser.add_argument("--deepinfra", type=str, help="Override DeepInfra API key")
     args = parser.parse_args()
 
     # Get URL from args or prompt
@@ -194,10 +195,10 @@ def main() -> int:
         print("Error: Invalid URL. Must start with http:// or https://")
         return 1
     global DEEPINFRA_API_KEY
-    if args.deepinfra_api_key is not None:
+    if args.deepinfra is not None:
         DEEPINFRA_API_KEY = args.deepinfra_api_key
     if DEEPINFRA_API_KEY is None:
-        DEEPINFRA_API_KEY = input("Please enter your DeepInfra API token: ")
+        DEEPINFRA_API_KEY = input("Please enter your DeepInfra API key: ")
 
     # Run the pipeline with spinner
     print("\nGenerating scraper...")
