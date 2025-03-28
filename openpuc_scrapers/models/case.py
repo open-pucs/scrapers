@@ -2,10 +2,10 @@ from pydantic import BaseModel
 from typing import Any, Dict, Optional
 from datetime import date
 
-from .filing import Filing
+from .filing import GenericFiling
 
 
-class Case(BaseModel):
+class GenericCase(BaseModel):
     """Model representing case data.
 
     Attributes:
@@ -28,5 +28,5 @@ class Case(BaseModel):
     hearing_officer: Optional[str] = None
     opened_date: Optional[date] = None
     closed_date: Optional[date] = None
-    filings: Optional[list[Filing]] = None
+    filings: Optional[list[GenericFiling]] = None
     extra_metadata: Dict[str, Any] = {}

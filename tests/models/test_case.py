@@ -2,13 +2,13 @@ import unittest
 from datetime import date
 from pydantic import ValidationError
 
-from openpuc_scrapers.models import Case
+from openpuc_scrapers.models import GenericCase
 
 
 class TestCaseModel(unittest.TestCase):
     def test_valid_case(self):
         """Test valid case data."""
-        case = Case(
+        case = GenericCase(
             case_number="12345",
             case_type="Regulatory",
             description="A regulatory case regarding energy tariffs.",
@@ -24,7 +24,7 @@ class TestCaseModel(unittest.TestCase):
 
     def test_missing_optional_fields(self):
         """Test case where optional fields are missing."""
-        case = Case(case_number="67890", opened_date=date(2023, 7, 1))
+        case = GenericCase(case_number="67890", opened_date=date(2023, 7, 1))
         self.assertEqual(case.case_number, "67890")
         self.assertIsNone(case.case_type)
         self.assertIsNone(case.description)
@@ -33,7 +33,7 @@ class TestCaseModel(unittest.TestCase):
     def test_invalid_date_format(self):
         """Test invalid date format."""
         with self.assertRaises(ValidationError):
-            Case(case_number="12345", opened_date="not-a-date")
+            GenericCase(case_number="12345", opened_date="not-a-date")
 
 
 if __name__ == "__main__":
