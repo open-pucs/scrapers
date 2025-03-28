@@ -25,7 +25,7 @@ CHEAP_REASONING_DEEPINFRA_MODEL_NAME = "Qwen/QwQ-32B"
 
 EXPENSIVE_DEEPINFRA_MODEL_NAME = "deepseek-ai/DeepSeek-R1-Turbo"
 
-DEEPINFRA_API_TOKEN = os.getenv("DEEPINFRA_API_TOKEN", None)
+DEEPINFRA_API_KEY = os.getenv("DEEPINFRA_API_KEY", None)
 
 default_logger = logging.getLogger(__name__)
 
@@ -52,11 +52,11 @@ def get_deepinfra_llm(model_name: str | ModelType) -> ChatDeepInfra:
                 model_name = CHEAP_REASONING_DEEPINFRA_MODEL_NAME
             case ModelType.EXPENSIVE:
                 model_name = EXPENSIVE_DEEPINFRA_MODEL_NAME
-    if DEEPINFRA_API_TOKEN is None:
+    if DEEPINFRA_API_KEY is None:
         raise ValueError("DeepInfra API token not provided")
 
     llm_instance = ChatDeepInfra(
-        model=model_name, deepinfra_api_token=DEEPINFRA_API_TOKEN
+        model=model_name, deepinfra_api_token=DEEPINFRA_API_KEY
     )
     return llm_instance
 
@@ -193,9 +193,11 @@ def main() -> int:
     if not url.startswith(("http://", "https://")):
         print("Error: Invalid URL. Must start with http:// or https://")
         return 1
-    global DEEPINFRA_API_TOKEN
-    if DEEPINFRA_API_TOKEN is None:
-        DEEPINFRA_API_TOKEN = input("Please enter your DeepInfra API token: ")
+    global DEEPINFRA_API_KEY
+    if args.deepinfra_api_key is not None:
+        DEEPINFRA_API_KEY = args.deepinfra_api_key
+    if DEEPINFRA_API_KEY is None:
+        DEEPINFRA_API_KEY = input("Please enter your DeepInfra API token: ")
 
     # Run the pipeline with spinner
     print("\nGenerating scraper...")
