@@ -126,42 +126,8 @@ async def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate a PUC website scraper",
-        epilog="Note: OpenAI API key must be provided either through --api-key argument or OPENAI_API_KEY environment variable",
-    )
-    parser.add_argument("url", help="URL of the PUC website to scrape")
-    parser.add_argument(
-        "--instructions",
-        "-i",
-        help="Additional instructions for the scraper generation",
-    )
-    parser.add_argument("--output", "-o", help="Output file for the generated scraper")
-
-    args = parser.parse_args()
-
-    try:
-        # Create config first to validate API key
-        config = create_graph_config(
-            api_key=args.api_key, provider=args.provider, model=args.model
-        )
-        result = run_pipeline(args.url, args.instructions)
-
-        if args.output:
-            with open(args.output, "w") as f:
-                f.write(result)
-            print(f"Scraper written to {args.output}")
-        else:
-            print(result)
-
-    except ValueError as e:
-        print(f"Configuration error: {e}")
-        return 1
-    except Exception as e:
-        print(f"Error generating scraper: {e}")
-        return 1
-
-    return 0
+    # could you implement a cli tool on this, so that when this script is run, it prompts the user for a url, displays a loading animation while it runs the pipeline, when successful it displays a congradulations message to the user and saves the file in a new path with the url, date and random id?
+    pass
 
 
 if __name__ == "__main__":
