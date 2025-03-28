@@ -11,6 +11,10 @@ from typing import Optional, Dict, Any
 from langchain_community.chat_models import ChatDeepInfra
 from scrapegraphai.graphs import ScriptCreatorGraph
 
+import logging
+
+from concurrent.futures import ThreadPoolExecutor
+
 from enum import Enum, auto
 
 import asyncio
@@ -22,6 +26,8 @@ CHEAP_REASONING_DEEPINFRA_MODEL_NAME = "Qwen/QwQ-32B"
 EXPENSIVE_DEEPINFRA_MODEL_NAME = "deepseek-ai/DeepSeek-R1-Turbo"
 
 DEEPINFRA_API_TOKEN = os.getenv("DEEPINFRA_API_TOKEN", None)
+
+default_logger = logging.getLogger(__name__)
 
 
 def load_prompt(prompt_file: Path, format_dict: Dict[str, Any] = {}) -> str:
@@ -61,7 +67,7 @@ def create_graph_config() -> Dict[str, Any]:
             "model_instance": get_deepinfra_llm(ModelType.CHEAP_REASONING),
             "model_tokens": 10240,  # Default context window for Llama-2
         },
-        "library": "selenium",
+        "library": "playwright",
     }
 
     # Add common configuration
@@ -69,7 +75,7 @@ def create_graph_config() -> Dict[str, Any]:
     return config
 
 
-async def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
+async def run_pipeline(url: str) -> str:
     """Run the full pipeline to generate a scraper."""
     current_dir = Path(__file__).parent
 
@@ -82,23 +88,41 @@ async def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
 
     # Create base configuration
     config = create_graph_config()
-
-    # Step 1: Initial Reconnaissance
-    recon_graph = ScriptCreatorGraph(
-        prompt=load_prompt(recon_prompt_path, {"url": url}),
-        source=url,
-        config=config,
+    default_logger.info(
+        "Configuration initialized, beginning script creator graph processing"
     )
-    schema = recon_graph.run()
 
-    # Step 2: Create Initial Scraper
-    create_graph = ScriptCreatorGraph(
-        prompt=load_prompt(make_scraper_prompt_path, {"schema": schema, "url": url}),
-        source=url,
-        config=config,
-        # schema=schema_result,
-    )
-    initial_scraper = create_graph.run()
+    # Create executor for running sync code in threads
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        # Step 1: Initial Reconnaissance
+        recon_graph = ScriptCreatorGraph(
+            prompt=load_prompt(recon_prompt_path, {"url": url}),
+            source=url,
+            config=config,
+        )
+        # Run in thread and get future
+        schema_future = executor.submit(recon_graph.run)
+
+        # Wait for schema before creating scraper
+        schema = await asyncio.get_event_loop().run_in_executor(
+            None, schema_future.result
+        )
+
+        # Step 2: Create Initial Scraper
+        create_graph = ScriptCreatorGraph(
+            prompt=load_prompt(
+                make_scraper_prompt_path, {"schema": schema, "url": url}
+            ),
+            source=url,
+            config=config,
+        )
+        # Run in thread and get future
+        scraper_future = executor.submit(create_graph.run)
+
+        # Wait for scraper
+        initial_scraper = await asyncio.get_event_loop().run_in_executor(
+            None, scraper_future.result
+        )
 
     thoughtful_llm = get_deepinfra_llm(ModelType.EXPENSIVE)
 
@@ -169,16 +193,9 @@ def main() -> int:
     if not url.startswith(("http://", "https://")):
         print("Error: Invalid URL. Must start with http:// or https://")
         return 1
-
-    # Set up output directory
-    output_dir = Path("outputs")
-    output_dir.mkdir(exist_ok=True)
-
-    # Generate filename components
-    sanitized_url = re.sub(r"[^a-zA-Z0-9]", "_", url)[:50]  # Limit length
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    filename = f"scraper_{sanitized_url}_{date_str}_.py"
-    output_path = output_dir / filename
+    global DEEPINFRA_API_TOKEN
+    if DEEPINFRA_API_TOKEN is None:
+        DEEPINFRA_API_TOKEN = input("Please enter your DeepInfra API token: ")
 
     # Run the pipeline with spinner
     print("\nGenerating scraper...")
@@ -188,6 +205,14 @@ def main() -> int:
         print(f"\nError: {e}")
         return 1
 
+    # Set up output directory
+    output_dir = Path("outputs")
+    output_dir.mkdir(exist_ok=True)
+    # Generate filename components
+    sanitized_url = re.sub(r"[^a-zA-Z0-9]", "_", url)[:50]  # Limit length
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    filename = f"scraper_{sanitized_url}_{date_str}_.py"
+    output_path = output_dir / filename
     # Save the result
     try:
         with open(output_path, "w", encoding="utf-8") as f:
