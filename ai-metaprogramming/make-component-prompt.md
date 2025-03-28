@@ -1,6 +1,6 @@
 # For this website 
 
-{website}
+{url}
 
 Write a scraper to capture all the data on this page into this schema format 
 

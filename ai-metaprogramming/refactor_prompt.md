@@ -61,3 +61,12 @@ Likewise if you have a docket where all attachments are seperate.
   - enrich_filing_data_from_intermediate_intermediate() that will take that intermediate representation, and the original incomplete filing data, and return a complete one with all the attachments. 
 
 Both of those methods have default definitions that do nothing and just pass the StateFilingData through unchanged, so you can implement these steps in the data pipeline for all cases, and they will only actually be utilized for dockets that need them.
+
+Here are the scrapers 
+
+```py 
+{scrapers}
+```
+
+
+Please complete this refactor and return only the python code and nothing else.

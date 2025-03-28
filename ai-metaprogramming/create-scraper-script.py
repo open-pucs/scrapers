@@ -68,26 +68,26 @@ async def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
     current_dir = Path(__file__).parent
 
     # Load all prompts
-    recon_prompt = load_prompt(current_dir / "initial-recognisance-prompt.md")
-    create_prompt = load_prompt(current_dir / "create-scraper-prompt.md")
-    adapter_prompt = load_prompt(current_dir / "write_generic_adapters_prompt.md")
-    refactor_prompt = load_prompt(current_dir / "refactor_prompt.md")
-    final_prompt = load_prompt(current_dir / "final_recombine_prompt.md")
+    recon_prompt_path = current_dir / "initial-recognisance-prompt.md"
+    make_scraper_prompt_path = current_dir / "make-scraper-prompt.md"
+    adapter_prompt_path = current_dir / "write_generic_adapters_prompt.md"
+    refactor_prompt_path = current_dir / "refactor_prompt.md"
+    final_prompt_path = current_dir / "final_recombine_prompt.md"
 
     # Create base configuration
     config = create_graph_config()
 
     # Step 1: Initial Reconnaissance
     recon_graph = ScriptCreatorGraph(
-        prompt=f"{recon_prompt}\nAnalyze this PUC website: {url}",
+        prompt=load_prompt(recon_prompt_path, {"url": url}),
         source=url,
         config=config,
     )
-    schema_result = recon_graph.run()
+    schema = recon_graph.run()
 
     # Step 2: Create Initial Scraper
     create_graph = ScriptCreatorGraph(
-        prompt=f"{create_prompt}\nCreate a scraper for: {url}\nUsing schema:\n{schema_result}",
+        prompt=load_prompt(make_scraper_prompt_path, {"schema": schema, "url": url}),
         source=url,
         config=config,
         # schema=schema_result,
@@ -96,21 +96,24 @@ async def run_pipeline(url: str, instructions: Optional[str] = None) -> str:
 
     thoughtful_llm = get_deepinfra_llm(ModelType.EXPENSIVE)
 
-    # Step 3 & 4: Create Generic Adapters and Refactor in parallel
     async def get_adapters():
-        adapter_message = f"{adapter_prompt}\nCreate adapters for this scraper:\n{initial_scraper}\n{instructions or ''}"
+        adapter_message = load_prompt(adapter_prompt_path, {"schemas": schema})
         adapters_response = await thoughtful_llm.ainvoke(adapter_message)
         return adapters_response.content
 
     async def get_refactored():
-        refactor_message = f"{refactor_prompt}\nRefactor this code:\n{initial_scraper}"
+        refactor_message = load_prompt(
+            refactor_prompt_path, {"scrapers": initial_scraper}
+        )
         refactor_response = await thoughtful_llm.ainvoke(refactor_message)
         return refactor_response.content
 
     adapters, refactored = await asyncio.gather(get_adapters(), get_refactored())
 
     # Step 5: Final Recombination
-    final_message = f"{final_prompt}\nFinalize this scraper:\n{refactored}\nWith these adapters:{adapters}"
+    final_message = load_prompt(
+        final_prompt_path, {"adapters": adapters, "scrapers": refactored}
+    )
     final_response = await thoughtful_llm.ainvoke(final_message)
     final_result = final_response.content
 

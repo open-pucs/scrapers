@@ -1,7 +1,7 @@
-Take these schemas 
+Take these schemas in the form of pydantic objects
 
 ```py
-{state_specific_schemas}
+{schemas}
 ```
 
 and write adapter functions to transform them into these types:

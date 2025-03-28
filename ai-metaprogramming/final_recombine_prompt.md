@@ -1,10 +1,10 @@
 Take both of these segments of code 
 ```py
-{schema_adapters}
+{adapters}
 ```
 and
 ```py
-{refactored_scrapers}
+{scrapers}
 ```
 And combine them into a single abstract class following this format 
 
