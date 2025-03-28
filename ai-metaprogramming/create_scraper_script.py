@@ -77,14 +77,13 @@ def create_graph_config() -> Dict[str, Any]:
 
 async def run_pipeline(url: str) -> str:
     """Run the full pipeline to generate a scraper."""
-    current_dir = Path(__file__).parent
 
     # Load all prompts
-    recon_prompt_path = current_dir / "initial_recognisance_prompt.md"
-    make_scraper_path = current_dir / "make_scraper_prompt.md"
-    adapter_prompt_path = current_dir / "write_generic_adapters_prompt.md"
-    refactor_prompt_path = current_dir / "refactor_prompt.md"
-    final_prompt_path = current_dir / "final_recombine_prompt.md"
+    recon_prompt_path = Path("./initial_recognisance_prompt.md")
+    make_scraper_path = Path("./make_scraper_prompt.md")
+    adapter_prompt_path = Path("./generic_adapters_prompt.md")
+    refactor_prompt_path = Path("./refactor_prompt.md")
+    final_prompt_path = Path("./final_recombine_prompt.md")
 
     # Create base configuration
     config = create_graph_config()
