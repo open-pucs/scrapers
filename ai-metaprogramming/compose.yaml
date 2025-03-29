@@ -8,4 +8,6 @@ services:
       - DEEPINFRA_API_KEY=${DEEPINFRA_API_KEY}
     volumes:
       - ./outputs:/app/outputs
-    command: ["python", "create_scraper_script.py", "--url", "${URL}"]
+      - .:/app
+    # command: ["python", "create_scraper_script.py", "--url", "${URL}"]
+    command: ["sleep", "50000000"]

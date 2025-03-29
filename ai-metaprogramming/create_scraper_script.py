@@ -28,6 +28,9 @@ EXPENSIVE_DEEPINFRA_MODEL_NAME = "deepseek-ai/DeepSeek-R1-Turbo"
 DEEPINFRA_API_KEY = os.getenv("DEEPINFRA_API_KEY", None)
 
 default_logger = logging.getLogger(__name__)
+default_logger.setLevel(logging.DEBUG)
+default_logger.addHandler(logging.StreamHandler(sys.stdout))
+default_logger.addHandler(logging.StreamHandler(sys.stderr))
 
 
 def load_prompt(prompt_file: Path, format_dict: Dict[str, Any] = {}) -> str:
@@ -87,39 +90,47 @@ async def run_pipeline(url: str) -> str:
 
     # Create base configuration
     config = create_graph_config()
-    default_logger.info(
+    default_logger.error(
         "Configuration initialized, beginning script creator graph processing"
     )
 
     # Create executor for running sync code in threads
     with ThreadPoolExecutor(max_workers=2) as executor:
+        default_logger.debug("Creating initial reconnaissance graph")
         # Step 1: Initial Reconnaissance
         recon_graph = ScriptCreatorGraph(
             prompt=load_prompt(recon_prompt_path, {"url": url}),
             source=url,
             config=config,
         )
+        default_logger.debug("Submitting reconnaissance task to executor")
         # Run in thread and get future
         schema_future = executor.submit(recon_graph.run)
 
+        default_logger.debug("Waiting for schema result")
         # Wait for schema before creating scraper
         schema = await asyncio.get_event_loop().run_in_executor(
             None, schema_future.result
         )
+        default_logger.debug(f"Schema result: {schema}")
 
+        default_logger.debug("Creating initial scraper graph")
         # Step 2: Create Initial Scraper
         create_graph = ScriptCreatorGraph(
             prompt=load_prompt(make_scraper_path, {"schema": schema, "url": url}),
             source=url,
             config=config,
         )
+        default_logger.debug("Submitting scraper creation task to executor")
         # Run in thread and get future
         scraper_future = executor.submit(create_graph.run)
 
+        default_logger.debug("Waiting for initial scraper result")
         # Wait for scraper
         initial_scraper = await asyncio.get_event_loop().run_in_executor(
             None, scraper_future.result
         )
+        default_logger.debug(f"Initial scraper result: {initial_scraper}")
 
     thoughtful_llm = get_deepinfra_llm(ModelType.EXPENSIVE)
 
