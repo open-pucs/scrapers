@@ -131,22 +131,33 @@ async def run_pipeline(url: str) -> str:
             None, scraper_future.result
         )
         default_logger.debug(f"Initial scraper result: {initial_scraper}")
+        default_logger.debug(f"Initial Scraper type: {type(initial_scraper)}")
+        # Step 3: Create Adapter and Refactor
+    default_logger.debug("Creating adapter and refactoring graph")
 
     thoughtful_llm = get_deepinfra_llm(ModelType.EXPENSIVE)
 
-    async def get_adapters():
-        adapter_message = load_prompt(adapter_prompt_path, {"schemas": schema})
-        adapters_response = await thoughtful_llm.ainvoke(adapter_message)
-        return adapters_response.content
+    default_logger.info("succesfuly created llm")
 
-    async def get_refactored():
-        refactor_message = load_prompt(
-            refactor_prompt_path, {"scrapers": initial_scraper}
-        )
-        refactor_response = await thoughtful_llm.ainvoke(refactor_message)
-        return refactor_response.content
+    # async def get_adapters():
+    default_logger.debug(f"Loading adapter refactoring prompt")
+    adapter_message = load_prompt(adapter_prompt_path, {"schemas": str(schema)})
+    default_logger.debug(f"Adapter message: {adapter_message}")
+    adapters_response = await thoughtful_llm.ainvoke(adapter_message)
+    default_logger.debug(f"Adapters response: {adapters_response.content}")
+    global adapters
+    adapters = adapters_response.content
 
-    adapters, refactored = await asyncio.gather(get_adapters(), get_refactored())
+    # async def get_refactored():
+    default_logger.debug(f"Loading scraper refactoring prompt")
+    refactor_message = load_prompt(
+        refactor_prompt_path, {"scrapers": str(initial_scraper)}
+    )
+    refactor_response = await thoughtful_llm.ainvoke(refactor_message)
+    global refactored
+    refactored = refactor_response.content
+
+    # await asyncio.gather(get_adapters(), get_refactored())
 
     # Step 5: Final Recombination
     final_message = load_prompt(
