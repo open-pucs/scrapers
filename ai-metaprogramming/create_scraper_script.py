@@ -9,6 +9,7 @@ import sys
 import itertools
 from typing import Optional, Dict, Any
 from langchain_community.chat_models import ChatDeepInfra
+from pydantic import BaseModel
 from scrapegraphai.graphs import ScriptCreatorGraph
 
 import logging
@@ -37,6 +38,8 @@ def load_prompt(prompt_file: Path, format_dict: Dict[str, Any] = {}) -> str:
     """Load prompt content from a markdown file."""
     with open(prompt_file, "r") as f:
         results = f.read()
+        if format_dict == {}:
+            return results
         return results.format(**format_dict)
 
 
@@ -78,15 +81,14 @@ def create_graph_config() -> Dict[str, Any]:
     return config
 
 
-async def run_pipeline(url: str) -> str:
-    """Run the full pipeline to generate a scraper."""
+class ScrapegraphOutput(BaseModel):
+    scraper_code: str
+    schemas: str
 
-    # Load all prompts
+
+async def handle_scrapegraph_creation(url: str) -> ScrapegraphOutput:
     recon_prompt_path = Path("./initial_recognisance_prompt.md")
     make_scraper_path = Path("./make_scraper_prompt.md")
-    adapter_prompt_path = Path("./generic_adapters_prompt.md")
-    refactor_prompt_path = Path("./refactor_prompt.md")
-    final_prompt_path = Path("./final_recombine_prompt.md")
 
     # Create base configuration
     config = create_graph_config()
@@ -94,7 +96,6 @@ async def run_pipeline(url: str) -> str:
         "Configuration initialized, beginning script creator graph processing"
     )
 
-    # Create executor for running sync code in threads
     with ThreadPoolExecutor(max_workers=2) as executor:
         default_logger.debug("Creating initial reconnaissance graph")
         # Step 1: Initial Reconnaissance
@@ -130,9 +131,17 @@ async def run_pipeline(url: str) -> str:
         initial_scraper = await asyncio.get_event_loop().run_in_executor(
             None, scraper_future.result
         )
-        default_logger.debug(f"Initial scraper result: {initial_scraper}")
-        default_logger.debug(f"Initial Scraper type: {type(initial_scraper)}")
-        # Step 3: Create Adapter and Refactor
+        return ScrapegraphOutput(scraper_code=initial_scraper, schemas=schema)
+
+
+async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> str:
+    schema = inputs.schemas
+    initial_scraper = inputs.scraper_code
+
+    adapter_prompt_path = Path("./generic_adapters_prompt.md")
+    refactor_prompt_path = Path("./refactor_prompt.md")
+    final_prompt_path = Path("./final_recombine_prompt.md")
+
     default_logger.debug("Creating adapter and refactoring graph")
 
     thoughtful_llm = get_deepinfra_llm(ModelType.EXPENSIVE)
@@ -141,7 +150,10 @@ async def run_pipeline(url: str) -> str:
 
     # async def get_adapters():
     default_logger.debug(f"Loading adapter refactoring prompt")
-    adapter_message = load_prompt(adapter_prompt_path, {"schemas": str(schema)})
+    adapter_message = (
+        f"Take these schemas in the form of pydantic objects\n{schema}and write adapter functions to transform them into these types:"
+        + load_prompt(adapter_prompt_path)
+    )
     default_logger.debug(f"Adapter message: {adapter_message}")
     adapters_response = await thoughtful_llm.ainvoke(adapter_message)
     default_logger.debug(f"Adapters response: {adapters_response.content}")
@@ -170,7 +182,14 @@ async def run_pipeline(url: str) -> str:
         raise ValueError(
             "Final result is not a string. Please check your prompt and try again."
         )
+    return final_result
 
+
+async def run_pipeline(url: str) -> str:
+    """Run the full pipeline to generate a scraper."""
+
+    scrapegraph_intermediate = await handle_scrapegraph_creation(url)
+    final_result = await refactor_scrapegraph(scrapegraph_intermediate)
     return final_result
 
 

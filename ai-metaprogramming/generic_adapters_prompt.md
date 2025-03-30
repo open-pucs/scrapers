@@ -1,10 +1,3 @@
-Take these schemas in the form of pydantic objects
-
-```py
-{schemas}
-```
-
-and write adapter functions to transform them into these types:
 
 ```py
 class GenericCase(BaseModel):
