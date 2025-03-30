@@ -12,6 +12,7 @@ from langchain_community.chat_models import ChatDeepInfra
 from pydantic import BaseModel
 from scrapegraphai.graphs import ScriptCreatorGraph
 
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 import logging
 
 from concurrent.futures import ThreadPoolExecutor
@@ -19,6 +20,8 @@ from concurrent.futures import ThreadPoolExecutor
 from enum import Enum, auto
 
 import asyncio
+
+env = Environment(loader=FileSystemLoader("yourapp"), autoescape=select_autoescape())
 
 CHEAP_REGULAR_DEEPINFRA_MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
@@ -36,11 +39,21 @@ default_logger.addHandler(logging.StreamHandler(sys.stderr))
 
 def load_prompt(prompt_file: Path, format_dict: Dict[str, Any] = {}) -> str:
     """Load prompt content from a markdown file."""
-    with open(prompt_file, "r") as f:
-        results = f.read()
-        if format_dict == {}:
-            return results
+    try:
+        with open(prompt_file, "r") as f:
+            results = f.read()
+    except Exception as e:
+        default_logger.error(
+            f"Failed to load prompt file, {prompt_file} with error: {e}"
+        )
+        raise e
+    if format_dict == {}:
+        return results
+    try:
         return results.format(**format_dict)
+    except Exception as e:
+        default_logger.error(f"Failed to format prompt: {e}\nPrompt: {results}")
+        raise e
 
 
 class ModelType(Enum):
