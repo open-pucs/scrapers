@@ -253,6 +253,10 @@ def save_scraper_output(
     with open(intermediate_path, "w", encoding="utf-8") as f:
         f.write(scraper_output.model_dump_json(indent=2))
 
+    print(
+        f"\nCongratulations! The scraper has been saved to:\n{scraper_dir.resolve()}\n"
+    )
+
 
 async def run_pipeline(url: str) -> ScraperOutputs:
     """Run the full pipeline to generate a scraper."""
@@ -320,9 +324,6 @@ def main() -> int:
         print(traceback.format_exc())
         return 1
 
-    print(
-        f"\nCongratulations! The scraper has been saved to:\n{output_path.resolve()}\n"
-    )
     return 0
 
 
