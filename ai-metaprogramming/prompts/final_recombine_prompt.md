@@ -85,3 +85,6 @@ class GenericScraper(ABC, Generic[StateCaseData, StateFilingData]):
         """Convert state-specific filing data to generic format"""
         pass
 ```
+
+
+IT IS ESSENTIAL YOU VERBOSELY COPY ALL THE CODE INTO THE METHODS, AND RETURN THE CODE NOT INSIDE ANY CODE BLOCK. the script you output will be directly fed directly outputed and inputed into a .py file to be ran. Try to make sure it works!

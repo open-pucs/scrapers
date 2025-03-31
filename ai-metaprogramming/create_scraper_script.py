@@ -167,9 +167,18 @@ async def handle_scrapegraph_creation(url: str) -> ScrapegraphOutput:
         return ScrapegraphOutput(scraper_code=initial_scraper, schemas=schema)
 
 
-async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> str:
+class ScraperOutputs(BaseModel):
+    schemas: str = ""
+    initial_scraper: str = ""
+    adapters: str = ""
+    refactored_scraper: str = ""
+    final: str = ""
+
+
+async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> ScraperOutputs:
     schema = inputs.schemas
     initial_scraper = inputs.scraper_code
+    output = ScraperOutputs(schemas=schema, initial_scraper=initial_scraper)
 
     adapter_prompt_template = env.get_template("generic_adapters_prompt.md")
     refactor_prompt_template = env.get_template("refactor_prompt.md")
@@ -199,6 +208,8 @@ async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> str:
         return discard_llm_thoughts(refactor_response)
 
     adapters, refactored = await asyncio.gather(get_adapters(), get_refactored())
+    output.adapters = adapters
+    output.refactored_scraper = refactored
 
     # Step 5: Final Recombination
     final_message = final_prompt_template.render(
@@ -206,20 +217,40 @@ async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> str:
     )
     final_response = await thoughtful_llm.ainvoke(final_message)
     final_result = discard_llm_thoughts(final_response)
+    output.final = final_result
 
-    if not isinstance(final_result, str):
-        raise ValueError(
-            "Final result is not a string. Please check your prompt and try again."
-        )
-    return final_result
+    return output
 
 
-async def run_pipeline(url: str) -> str:
+def save_scraper_output(
+    scraper_output: ScraperOutputs, output_dir: Path, url: str
+) -> None:
+    # Set up output directory
+    output_dir.mkdir(exist_ok=True)
+    # Generate filename components
+    sanitized_url = re.sub(r"[^a-zA-Z0-9]", "_", url)[:50]  # Limit length
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    folder_name = f"scraper_{sanitized_url}_{date_str}_{rand_string()}"
+    scraper_dir = output_dir / folder_name
+    scraper_dir.mkdir(exist_ok=True)
+
+    # Save the final result
+    result_path = scraper_dir / "result.py"
+    with open(result_path, "w", encoding="utf-8") as f:
+        f.write(scraper_output.final)
+
+    # Save intermediate outputs
+    intermediate_path = scraper_dir / "intermediate.py"
+    with open(intermediate_path, "w", encoding="utf-8") as f:
+        f.write(scraper_output.model_dump_json(indent=2))
+
+
+async def run_pipeline(url: str) -> ScraperOutputs:
     """Run the full pipeline to generate a scraper."""
 
     scrapegraph_intermediate = await handle_scrapegraph_creation(url)
-    final_result = await refactor_scrapegraph(scrapegraph_intermediate)
-    return final_result
+    result = await refactor_scrapegraph(scrapegraph_intermediate)
+    return result
 
 
 async def spin():
@@ -231,14 +262,15 @@ async def spin():
         await asyncio.sleep(0.1)
 
 
-async def main_async(url: str) -> str:
+async def main_async(url: str) -> None:
     """Run the pipeline with spinner animation."""
     spinner_task = asyncio.create_task(spin())
     try:
         result = await run_pipeline(url)
+        output_dir = Path("outputs")
+        save_scraper_output(scraper_output=result, output_dir=output_dir, url=url)
     finally:
         spinner_task.cancel()
-    return result
 
 
 def rand_string() -> str:
@@ -276,22 +308,6 @@ def main() -> int:
         print(f"\nError: {e}")
         print("\nTraceback:")
         print(traceback.format_exc())
-        return 1
-
-    # Set up output directory
-    output_dir = Path("outputs")
-    output_dir.mkdir(exist_ok=True)
-    # Generate filename components
-    sanitized_url = re.sub(r"[^a-zA-Z0-9]", "_", url)[:50]  # Limit length
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    filename = f"scraper_{sanitized_url}_{date_str}_{rand_string()}.py"
-    output_path = output_dir / filename
-    # Save the result
-    try:
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(result)
-    except IOError as e:
-        print(f"\nError saving file: {e}")
         return 1
 
     print(
