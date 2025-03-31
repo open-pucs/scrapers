@@ -22,7 +22,13 @@ from enum import Enum, auto
 import asyncio
 from langchain_core.messages import BaseMessage
 
+
+def raise_helper(msg):
+    raise Exception(msg)
+
+
 env = Environment(loader=FileSystemLoader("./prompts"), autoescape=select_autoescape())
+env.globals["raise"] = raise_helper
 
 CHEAP_REGULAR_DEEPINFRA_MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
