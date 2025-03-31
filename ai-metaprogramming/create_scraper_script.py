@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from enum import Enum, auto
 
 import asyncio
+from langchain_core.messages import BaseMessage
 
 env = Environment(loader=FileSystemLoader("./prompts"), autoescape=select_autoescape())
 
@@ -75,9 +76,21 @@ def get_deepinfra_llm(model_name: str | ModelType) -> ChatDeepInfra:
         raise ValueError("DeepInfra API token not provided")
 
     llm_instance = ChatDeepInfra(
-        model=model_name, deepinfra_api_token=DEEPINFRA_API_KEY
+        model=model_name, deepinfra_api_token=DEEPINFRA_API_KEY, max_tokens=10000
     )
     return llm_instance
+
+
+def discard_llm_thoughts(thoughtful_code: str | BaseMessage) -> str:
+    if not isinstance(thoughtful_code, str):
+        thoughtful_code = str(thoughtful_code.content)
+    split_thoughts = thoughtful_code.split("</think>")
+    if len(split_thoughts) != 2:
+        default_logger.warning(
+            f"Response didnt have the structure we anticipated, we detected {len(split_thoughts)} instances of the </think> tag."
+        )
+        return thoughtful_code
+    return split_thoughts[1]
 
 
 def create_graph_config() -> Dict[str, Any]:
@@ -167,21 +180,21 @@ async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> str:
         default_logger.debug(f"Adapter message: {adapter_message}")
         adapters_response = await thoughtful_llm.ainvoke(adapter_message)
         default_logger.debug(f"Adapters response: {adapters_response.content}")
-        return str(adapters_response.content)
+        return discard_llm_thoughts(adapters_response)
 
     async def get_refactored():
         # NOTE: THIS SHOULD BE RUN IN PARALLEL FOR EACH INDIVIDUAL WEBSITE PAGE
         default_logger.debug(f"Loading scraper refactoring prompt")
         refactor_message = refactor_prompt_template.render(scraper=initial_scraper)
         refactor_response = await thoughtful_llm.ainvoke(refactor_message)
-        return str(refactor_response.content)
+        return discard_llm_thoughts(refactor_response)
 
     adapters, refactored = await asyncio.gather(get_adapters(), get_refactored())
 
     # Step 5: Final Recombination
     final_message = final_prompt_template.render(adapters=adapters, scrapers=refactored)
     final_response = await thoughtful_llm.ainvoke(final_message)
-    final_result = final_response.content
+    final_result = discard_llm_thoughts(final_response)
 
     if not isinstance(final_result, str):
         raise ValueError(
