@@ -170,13 +170,15 @@ async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> str:
 
     default_logger.debug("Creating adapter and refactoring graph")
 
-    thoughtful_llm = get_deepinfra_llm(ModelType.EXPENSIVE)
+    thoughtful_llm = get_deepinfra_llm(ModelType.CHEAP_REASONING)
 
     default_logger.info("succesfuly created llm")
 
     async def get_adapters() -> str:
-        default_logger.debug(f"Loading adapter refactoring prompt")
-        adapter_message = adapter_prompt_template.render(schema=schema)
+        default_logger.debug(
+            f"Loading adapter refactoring prompt with schemas: {schema}"
+        )
+        adapter_message = adapter_prompt_template.render(schemas=schema)
         default_logger.debug(f"Adapter message: {adapter_message}")
         adapters_response = await thoughtful_llm.ainvoke(adapter_message)
         default_logger.debug(f"Adapters response: {adapters_response.content}")
@@ -270,7 +272,7 @@ def main() -> int:
     # Generate filename components
     sanitized_url = re.sub(r"[^a-zA-Z0-9]", "_", url)[:50]  # Limit length
     date_str = datetime.now().strftime("%Y-%m-%d")
-    filename = f"scraper_{sanitized_url}_{date_str}_.py"
+    filename = f"scraper_{sanitized_url}_{date_str}_{rand_string()}.py"
     output_path = output_dir / filename
     # Save the result
     try:

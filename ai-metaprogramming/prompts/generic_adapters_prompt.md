@@ -1,7 +1,11 @@
 Take these following pydantic python objects 
 
 ```py
-{{schemas}}
+{% if not schemas %}
+{{ raise("Scrapers content is required but was undefined or empty") }}
+{% else %}
+{{ schemas }}
+{% endif %}
 ```
 
 And write adapter functions that convert each of them into one of the approprtiate generic types.

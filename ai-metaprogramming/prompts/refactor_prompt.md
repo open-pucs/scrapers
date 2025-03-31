@@ -65,7 +65,11 @@ Both of those methods have default definitions that do nothing and just pass the
 Here are the scrapers 
 
 ```py 
-{{scraper}}
+{% if not scrapers %}
+{{ raise("Scrapers content is required but was undefined or empty") }}
+{% else %}
+{{ scrapers }}
+{% endif %}
 ```
 
 

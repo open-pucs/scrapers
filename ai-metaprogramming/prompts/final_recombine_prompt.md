@@ -1,10 +1,23 @@
 Take both of these segments of code 
 ```py
-{{adapters}}
+{% if not schemas %}
+{{ raise("Scrapers content is required but was undefined or empty") }}
+{% else %}
+{{ schemas }}
+{% endif %}
+{% if not adapters %}
+{{ raise("Adapters content is required but was undefined or empty") }}
+{% else %}
+{{ adapters }}
+{% endif %}
 ```
 and
 ```py
-{{scrapers}}
+{% if not scrapers %}
+{{ raise("Scrapers content is required but was undefined or empty") }}
+{% else %}
+{{ scrapers }}
+{% endif %}
 ```
 And combine them into a single abstract class following this format 
 
