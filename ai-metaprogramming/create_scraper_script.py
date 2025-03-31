@@ -8,7 +8,9 @@ import secrets
 import sys
 import itertools
 from typing import Optional, Dict, Any
+from langchain.chat_models.base import BaseChatModel
 from langchain_community.chat_models import ChatDeepInfra
+from langchain_core.language_models import LLM
 from pydantic import BaseModel
 from scrapegraphai.graphs import ScriptCreatorGraph
 import traceback
@@ -35,7 +37,9 @@ CHEAP_REGULAR_DEEPINFRA_MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
 CHEAP_REASONING_DEEPINFRA_MODEL_NAME = "Qwen/QwQ-32B"
 
-EXPENSIVE_DEEPINFRA_MODEL_NAME = "deepseek-ai/DeepSeek-R1-Turbo"
+EXPENSIVE_REASONING_DEEPINFRA_MODEL_NAME = "deepseek-ai/DeepSeek-R1-Turbo"
+
+EXPENSIVE_REGULAR_DEEPINFRA_MODEL_NAME = "deepseek-ai/DeepSeek-V3-0324"
 
 DEEPINFRA_API_KEY = os.getenv("DEEPINFRA_API_KEY", None)
 
@@ -67,7 +71,8 @@ def load_prompt(prompt_file: Path, format_dict: Dict[str, Any] = {}) -> str:
 class ModelType(Enum):
     CHEAP_REGULAR = auto()
     CHEAP_REASONING = auto()
-    EXPENSIVE = auto()
+    EXPENSIVE_REGULAR = auto()
+    EXPENSIVE_REASONING = auto()
 
 
 def get_deepinfra_llm(model_name: str | ModelType) -> ChatDeepInfra:
@@ -77,8 +82,10 @@ def get_deepinfra_llm(model_name: str | ModelType) -> ChatDeepInfra:
                 model_name = CHEAP_REGULAR_DEEPINFRA_MODEL_NAME
             case ModelType.CHEAP_REASONING:
                 model_name = CHEAP_REASONING_DEEPINFRA_MODEL_NAME
-            case ModelType.EXPENSIVE:
-                model_name = EXPENSIVE_DEEPINFRA_MODEL_NAME
+            case ModelType.EXPENSIVE_REASONING:
+                model_name = EXPENSIVE_REASONING_DEEPINFRA_MODEL_NAME
+            case ModelType.EXPENSIVE_REGULAR:
+                model_name = EXPENSIVE_REGULAR_DEEPINFRA_MODEL_NAME
     if DEEPINFRA_API_KEY is None:
         raise ValueError("DeepInfra API token not provided")
 
@@ -88,22 +95,23 @@ def get_deepinfra_llm(model_name: str | ModelType) -> ChatDeepInfra:
     return llm_instance
 
 
-def discard_llm_thoughts(thoughtful_code: str | BaseMessage) -> str:
+def discard_llm_thoughts(thoughtful_code: str | BaseMessage, warn: bool = True) -> str:
     if not isinstance(thoughtful_code, str):
         thoughtful_code = str(thoughtful_code.content)
     split_thoughts = thoughtful_code.split("</think>")
     if len(split_thoughts) != 2:
-        default_logger.warning(
-            f"Response didnt have the structure we anticipated, we detected {len(split_thoughts)} instances of the </think> tag."
-        )
+        if warn:
+            default_logger.warning(
+                f"Response didnt have the structure we anticipated, we detected {len(split_thoughts)-1} instances of the </think> tag."
+            )
         return thoughtful_code
     return split_thoughts[1]
 
 
-def create_graph_config() -> Dict[str, Any]:
+def create_graph_config(llm: BaseChatModel) -> Dict[str, Any]:
     config = {
         "llm": {
-            "model_instance": get_deepinfra_llm(ModelType.CHEAP_REASONING),
+            "model_instance": llm,
             "model_tokens": 10240,  # Default context window for Llama-2
         },
         "library": "playwright",
@@ -119,12 +127,14 @@ class ScrapegraphOutput(BaseModel):
     schemas: str
 
 
-async def handle_scrapegraph_creation(url: str) -> ScrapegraphOutput:
+async def handle_scrapegraph_creation(
+    url: str, llm: BaseChatModel
+) -> ScrapegraphOutput:
     recon_prompt_template = env.get_template("initial_recognisance_prompt.md")
     make_scraper_template = env.get_template("make_scraper_prompt.md")
 
     # Create base configuration
-    config = create_graph_config()
+    config = create_graph_config(llm)
     default_logger.error(
         "Configuration initialized, beginning script creator graph processing"
     )
@@ -175,9 +185,11 @@ class ScraperOutputs(BaseModel):
     final: str = ""
 
 
-async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> ScraperOutputs:
-    schema = inputs.schemas
-    initial_scraper = inputs.scraper_code
+async def refactor_scrapegraph(
+    inputs: ScrapegraphOutput, llm: BaseChatModel
+) -> ScraperOutputs:
+    schema = discard_llm_thoughts(inputs.schemas, warn=False)
+    initial_scraper = discard_llm_thoughts(inputs.scraper_code, warn=False)
     output = ScraperOutputs(schemas=schema, initial_scraper=initial_scraper)
 
     adapter_prompt_template = env.get_template("generic_adapters_prompt.md")
@@ -185,8 +197,6 @@ async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> ScraperOutputs:
     final_prompt_template = env.get_template("final_recombine_prompt.md")
 
     default_logger.debug("Creating adapter and refactoring graph")
-
-    thoughtful_llm = get_deepinfra_llm(ModelType.CHEAP_REASONING)
 
     default_logger.info("succesfuly created llm")
 
@@ -196,7 +206,7 @@ async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> ScraperOutputs:
         )
         adapter_message = adapter_prompt_template.render(schemas=schema)
         default_logger.debug(f"Adapter message: {adapter_message}")
-        adapters_response = await thoughtful_llm.ainvoke(adapter_message)
+        adapters_response = await llm.ainvoke(adapter_message)
         default_logger.debug(f"Adapters response: {adapters_response.content}")
         return discard_llm_thoughts(adapters_response)
 
@@ -204,7 +214,7 @@ async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> ScraperOutputs:
         # NOTE: THIS SHOULD BE RUN IN PARALLEL FOR EACH INDIVIDUAL WEBSITE PAGE
         default_logger.debug(f"Loading scraper refactoring prompt")
         refactor_message = refactor_prompt_template.render(scrapers=initial_scraper)
-        refactor_response = await thoughtful_llm.ainvoke(refactor_message)
+        refactor_response = await llm.ainvoke(refactor_message)
         return discard_llm_thoughts(refactor_response)
 
     adapters, refactored = await asyncio.gather(get_adapters(), get_refactored())
@@ -215,7 +225,7 @@ async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> ScraperOutputs:
     final_message = final_prompt_template.render(
         adapters=adapters, scrapers=refactored, schemas=schema
     )
-    final_response = await thoughtful_llm.ainvoke(final_message)
+    final_response = await llm.ainvoke(final_message)
     final_result = discard_llm_thoughts(final_response)
     output.final = final_result
 
@@ -240,16 +250,19 @@ def save_scraper_output(
         f.write(scraper_output.final)
 
     # Save intermediate outputs
-    intermediate_path = scraper_dir / "intermediate.py"
+    intermediate_path = scraper_dir / "intermediate.json"
     with open(intermediate_path, "w", encoding="utf-8") as f:
         f.write(scraper_output.model_dump_json(indent=2))
 
 
 async def run_pipeline(url: str) -> ScraperOutputs:
     """Run the full pipeline to generate a scraper."""
+    thoughtful_llm = get_deepinfra_llm(ModelType.CHEAP_REASONING)
+    regular_llm = get_deepinfra_llm(ModelType.CHEAP_REGULAR)
 
-    scrapegraph_intermediate = await handle_scrapegraph_creation(url)
-    result = await refactor_scrapegraph(scrapegraph_intermediate)
+    scrapegraph_intermediate = await handle_scrapegraph_creation(url, regular_llm)
+    result = await refactor_scrapegraph(scrapegraph_intermediate, thoughtful_llm)
+    save_scraper_output(result, Path("outputs"), url)
     return result
 
 
@@ -266,9 +279,7 @@ async def main_async(url: str) -> None:
     """Run the pipeline with spinner animation."""
     spinner_task = asyncio.create_task(spin())
     try:
-        result = await run_pipeline(url)
-        output_dir = Path("outputs")
-        save_scraper_output(scraper_output=result, output_dir=output_dir, url=url)
+        await run_pipeline(url)
     finally:
         spinner_task.cancel()
 
