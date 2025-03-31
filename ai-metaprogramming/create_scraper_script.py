@@ -203,6 +203,7 @@ async def refactor_scrapegraph(
     adapter_prompt_template = env.get_template("generic_adapters_prompt.md")
     refactor_prompt_template = env.get_template("refactor_prompt.md")
     final_prompt_template = env.get_template("final_recombine_prompt.md")
+    final_python_script_template = env.get_template("final_prompt_template.py")
 
     default_logger.debug("Creating adapter and refactoring graph")
 
@@ -235,7 +236,9 @@ async def refactor_scrapegraph(
     )
     final_response = await llm.ainvoke(final_message)
     final_result = discard_llm_thoughts(final_response)
-    output.final = extract_py_from_md_str(final_result)
+    main_code_block = extract_py_from_md_str(final_result)
+    final_code = final_python_script_template.render(code=main_code_block)
+    output.final = final_code
 
     return output
 
