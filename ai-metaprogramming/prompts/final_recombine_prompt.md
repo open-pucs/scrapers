@@ -86,5 +86,8 @@ class GenericScraper(ABC, Generic[StateCaseData, StateFilingData]):
         pass
 ```
 
+The script you output will be directly fed directly outputed and inputed into a .py file to be ran. Try to make sure it works! All the generic cases filings and datatypes as welll as the GenericScraper classwill be imported at the top of the file. In your response you should include properly formatted:
+- Scraper Specific Schemas 
+- A class instance with all the scraping logic built in.
 
-IT IS ESSENTIAL YOU VERBOSELY COPY ALL THE CODE INTO THE METHODS, AND RETURN THE CODE NOT INSIDE ANY CODE BLOCK. the script you output will be directly fed directly outputed and inputed into a .py file to be ran. Try to make sure it works!
+Your output will be directly fed into a python script with extra import statements at the top so just return the python and nothing else.

@@ -75,7 +75,9 @@ class ModelType(Enum):
     EXPENSIVE_REASONING = auto()
 
 
-def get_deepinfra_llm(model_name: str | ModelType) -> ChatDeepInfra:
+def get_deepinfra_llm(
+    model_name: str | ModelType, max_tokens: int = 20480
+) -> ChatDeepInfra:
     if isinstance(model_name, ModelType):
         match model_name:
             case ModelType.CHEAP_REGULAR:
@@ -90,7 +92,7 @@ def get_deepinfra_llm(model_name: str | ModelType) -> ChatDeepInfra:
         raise ValueError("DeepInfra API token not provided")
 
     llm_instance = ChatDeepInfra(
-        model=model_name, deepinfra_api_token=DEEPINFRA_API_KEY, max_tokens=10000
+        model=model_name, deepinfra_api_token=DEEPINFRA_API_KEY, max_tokens=max_tokens
     )
     return llm_instance
 
@@ -108,12 +110,9 @@ def discard_llm_thoughts(thoughtful_code: str | BaseMessage, warn: bool = True) 
     return split_thoughts[1]
 
 
-def create_graph_config(llm: BaseChatModel) -> Dict[str, Any]:
+def create_graph_config(llm: BaseChatModel, max_tokens: int = 10240) -> Dict[str, Any]:
     config = {
-        "llm": {
-            "model_instance": llm,
-            "model_tokens": 10240,  # Default context window for Llama-2
-        },
+        "llm": {"model_instance": llm, "model_tokens": max_tokens},
         "library": "playwright",
     }
 
