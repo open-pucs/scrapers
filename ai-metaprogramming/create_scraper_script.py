@@ -110,6 +110,15 @@ def discard_llm_thoughts(thoughtful_code: str | BaseMessage, warn: bool = True) 
     return split_thoughts[1]
 
 
+def extract_py_from_md_str(md_str: str) -> str:
+    # Match both ```python and ```py code blocks, using non-greedy matching
+    match = re.search(r"```(?:python|py)\n(.*?)```", md_str, re.DOTALL)
+    if not match:
+        default_logger.warning("No Python code block found.")
+        return md_str
+    return match.group(1)
+
+
 def create_graph_config(llm: BaseChatModel, max_tokens: int = 10240) -> Dict[str, Any]:
     config = {
         "llm": {"model_instance": llm, "model_tokens": max_tokens},
@@ -226,7 +235,7 @@ async def refactor_scrapegraph(
     )
     final_response = await llm.ainvoke(final_message)
     final_result = discard_llm_thoughts(final_response)
-    output.final = final_result
+    output.final = extract_py_from_md_str(final_result)
 
     return output
 
