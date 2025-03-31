@@ -33,13 +33,13 @@ def raise_helper(msg):
 env = Environment(loader=FileSystemLoader("./prompts"), autoescape=select_autoescape())
 env.globals["raise"] = raise_helper
 
-CHEAP_REGULAR_DEEPINFRA_MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+CHEAP_REGULAR_DEEPINFRA_MODEL_NAME = "google/gemma-3-27b-it"
 
 CHEAP_REASONING_DEEPINFRA_MODEL_NAME = "Qwen/QwQ-32B"
 
 EXPENSIVE_REASONING_DEEPINFRA_MODEL_NAME = "deepseek-ai/DeepSeek-R1-Turbo"
 
-EXPENSIVE_REGULAR_DEEPINFRA_MODEL_NAME = "deepseek-ai/DeepSeek-V3-0324"
+EXPENSIVE_REGULAR_DEEPINFRA_MODEL_NAME = "google/gemma-3-27b-it"
 
 DEEPINFRA_API_KEY = os.getenv("DEEPINFRA_API_KEY", None)
 
@@ -203,7 +203,7 @@ async def refactor_scrapegraph(
     adapter_prompt_template = env.get_template("generic_adapters_prompt.md")
     refactor_prompt_template = env.get_template("refactor_prompt.md")
     final_prompt_template = env.get_template("final_recombine_prompt.md")
-    final_python_script_template = env.get_template("final_prompt_template.py")
+    final_python_script_template = env.get_template("final_python_template.py")
 
     default_logger.debug("Creating adapter and refactoring graph")
 
@@ -272,8 +272,10 @@ def save_scraper_output(
 
 async def run_pipeline(url: str) -> ScraperOutputs:
     """Run the full pipeline to generate a scraper."""
-    thoughtful_llm = get_deepinfra_llm(ModelType.CHEAP_REASONING)
-    regular_llm = get_deepinfra_llm(ModelType.CHEAP_REGULAR)
+    # thoughtful_llm = get_deepinfra_llm(ModelType.CHEAP_REASONING)
+    # regular_llm = get_deepinfra_llm(ModelType.CHEAP_REGULAR)
+    thoughtful_llm = get_deepinfra_llm(ModelType.EXPENSIVE_REASONING)
+    regular_llm = get_deepinfra_llm(ModelType.EXPENSIVE_REGULAR)
 
     scrapegraph_intermediate = await handle_scrapegraph_creation(url, regular_llm)
     result = await refactor_scrapegraph(scrapegraph_intermediate, thoughtful_llm)
