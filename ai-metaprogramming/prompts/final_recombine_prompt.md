@@ -1,10 +1,10 @@
 Take both of these segments of code 
 ```py
-{adapters}
+{{adapters}}
 ```
 and
 ```py
-{scrapers}
+{{scrapers}}
 ```
 And combine them into a single abstract class following this format 
 

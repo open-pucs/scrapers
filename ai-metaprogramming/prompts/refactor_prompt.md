@@ -65,7 +65,7 @@ Both of those methods have default definitions that do nothing and just pass the
 Here are the scrapers 
 
 ```py 
-{scrapers}
+{{scraper}}
 ```
 
 

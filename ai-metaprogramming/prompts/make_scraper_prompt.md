@@ -1,10 +1,10 @@
 # For this website 
 
-{url}
+{{url}}
 
 Write a scraper to capture all the data on this page into this schema format 
 
 ```json
-{schema}
+{{schema}}
 ```
 
