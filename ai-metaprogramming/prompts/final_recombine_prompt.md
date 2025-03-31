@@ -1,7 +1,7 @@
 Take both of these segments of code 
 ```py
 {% if not schemas %}
-{{ raise("Scrapers content is required but was undefined or empty") }}
+{{ raise("Schemas content is required but was undefined or empty") }}
 {% else %}
 {{ schemas }}
 {% endif %}

@@ -11,6 +11,7 @@ from typing import Optional, Dict, Any
 from langchain_community.chat_models import ChatDeepInfra
 from pydantic import BaseModel
 from scrapegraphai.graphs import ScriptCreatorGraph
+import traceback
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 import logging
@@ -193,14 +194,16 @@ async def refactor_scrapegraph(inputs: ScrapegraphOutput) -> str:
     async def get_refactored():
         # NOTE: THIS SHOULD BE RUN IN PARALLEL FOR EACH INDIVIDUAL WEBSITE PAGE
         default_logger.debug(f"Loading scraper refactoring prompt")
-        refactor_message = refactor_prompt_template.render(scraper=initial_scraper)
+        refactor_message = refactor_prompt_template.render(scrapers=initial_scraper)
         refactor_response = await thoughtful_llm.ainvoke(refactor_message)
         return discard_llm_thoughts(refactor_response)
 
     adapters, refactored = await asyncio.gather(get_adapters(), get_refactored())
 
     # Step 5: Final Recombination
-    final_message = final_prompt_template.render(adapters=adapters, scrapers=refactored)
+    final_message = final_prompt_template.render(
+        adapters=adapters, scrapers=refactored, schemas=schema
+    )
     final_response = await thoughtful_llm.ainvoke(final_message)
     final_result = discard_llm_thoughts(final_response)
 
@@ -269,7 +272,10 @@ def main() -> int:
     try:
         result = asyncio.run(main_async(url))
     except Exception as e:
+
         print(f"\nError: {e}")
+        print("\nTraceback:")
+        print(traceback.format_exc())
         return 1
 
     # Set up output directory
