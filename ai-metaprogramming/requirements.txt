@@ -1,0 +1,4 @@
+langchain-community
+scrapegraphai
+python-dotenv
+playwright
