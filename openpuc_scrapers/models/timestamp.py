@@ -5,8 +5,9 @@ import json
 class RFC3339Time:
 
     def __init__(self, time_obj=None):
+        self.time = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
         if time_obj is None:
-            self.time = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+            pass
         elif isinstance(time_obj, datetime.datetime):
             self.time = time_obj
         else:

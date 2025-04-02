@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
-from openpuc_scrapers.models.misc import (
+from openpuc_scrapers.models.networking import (
     post_list_to_endpoint_split,
 )
 
