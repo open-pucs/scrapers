@@ -43,14 +43,18 @@ class RFC3339Time:
         return self.time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def rfc_time_from_string(str_data):
+def rfc_time_now() -> RFC3339Time:
+    return RFC3339Time(datetime.datetime.now(tz=datetime.timezone.utc))
+
+
+def rfc_time_from_string(str_data: str) -> RFC3339Time:
     """Create a KesslerTime from a string"""
     kt = RFC3339Time()
     kt.from_json(f'"{str_data}"')
     return kt
 
 
-def rfc_time_from_mmddyyyy(date_str):
+def rfc_time_from_mmddyyyy(date_str: str) -> RFC3339Time:
     """Create a KesslerTime from a MM/DD/YYYY formatted string"""
     if not date_str:
         raise ValueError("empty date string")

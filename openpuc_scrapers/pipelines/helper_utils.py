@@ -7,13 +7,13 @@ from openpuc_scrapers.pipelines.s3_utils import S3FileManager
 
 
 # Helper functions
-def save_to_disk_and_s3(path: str, content: str) -> None:
-    S3FileManager().save_string_to_remote_file(path, content)
+def save_to_disk_and_s3(path: str, bucket: str, content: str) -> None:
+    S3FileManager(bucket).save_string_to_remote_file(path, content)
 
 
 # isnt working due to the higher order types sadly
 # def save_json(path: str, data: BaseModel | List[BaseModel]) -> None:
-def save_json(path: str, data: Any) -> None:
+def save_json(path: str, bucket: str, data: Any) -> None:
     if isinstance(data, dict):
         json_data = data
     if isinstance(data, BaseModel):
@@ -23,4 +23,4 @@ def save_json(path: str, data: Any) -> None:
     else:
         raise Exception("Data is not a list, dict, or BaseModel")
     json_str = json.dumps(json_data, indent=2)
-    save_to_disk_and_s3(path, json_str)
+    save_to_disk_and_s3(path, bucket, json_str)

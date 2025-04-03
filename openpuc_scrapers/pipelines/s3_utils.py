@@ -49,7 +49,7 @@ await asyncio.to_thread(<sync s3 function>)
 
 
 class S3FileManager:
-    def __init__(self, logger: Optional[Any] = None) -> None:
+    def __init__(self, bucket: str, logger: Optional[Any] = None) -> None:
         if logger is None:
             logger = default_logger
         self.endpoint = S3_ENDPOINT
@@ -64,9 +64,9 @@ class S3FileManager:
             endpoint_url=self.endpoint,
             aws_access_key_id=S3_ACCESS_KEY,
             aws_secret_access_key=S3_SECRET_KEY,
-            region_name=S3_SCRAPER_INTERMEDIATE_BUCKET,
+            region_name=S3_CLOUD_REGION,
         )
-        self.bucket = S3_SCRAPER_INTERMEDIATE_BUCKET
+        self.bucket = bucket
         if LOCAL_CACHE_DIR is not None:
             self.s3_cache_directory = LOCAL_CACHE_DIR / Path(self.bucket)
         else:

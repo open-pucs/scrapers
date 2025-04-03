@@ -6,18 +6,40 @@ from pydantic import BaseModel
 
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
-from openpuc_scrapers.models.networking import (
-    post_list_to_endpoint_split,
-)
 
 
+from openpuc_scrapers.models.timestamp import rfc_time_now
 from openpuc_scrapers.pipelines.helper_utils import save_json
-from openpuc_scrapers.pipelines.s3_utils import S3FileManager
 from openpuc_scrapers.scrapers.base import (
     GenericScraper,
     StateCaseData,
     StateFilingData,
 )
+
+
+def generate_intermediate_object_save_path(
+    scraper: GenericScraper[StateCaseData, StateFilingData]
+):
+    time_now = rfc_time_now()
+    base_path = f"{scraper.state}/{scraper.jurisdiction_name}/{str(time_now)}"
+
+    return base_path
+
+
+@fl.workflow
+def get_all_cases_complete(
+    scraper: GenericScraper[StateCaseData, StateFilingData]
+) -> List[GenericCase]:
+    caselist = get_all_caselist_raw(scraper)
+    return fl.map(process_case)(caselist)
+
+
+@fl.workflow
+def get_new_cases_since_date_complete(
+    scraper: GenericScraper[StateCaseData, StateFilingData], after_date: date
+) -> List[GenericCase]:
+    caselist = get_new_cases_since_date_complete(scraper=scraper, after_date=after_date)
+    return fl.map(process_case)(caselist)
 
 
 @fl.task
@@ -53,11 +75,8 @@ def process_case(
 
 @fl.task
 def get_all_caselist_raw(
-    scraper: GenericScraper[StateCaseData, StateFilingData]
+    scraper: GenericScraper[StateCaseData, StateFilingData], base_path: str
 ) -> List[StateCaseData]:
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    base_path = f"data/{timestamp}"
-
     # Get and save case list
     caselist_intermediate = scraper.universal_caselist_intermediate()
     caselist_path = f"{base_path}/caselist.json"
@@ -68,12 +87,12 @@ def get_all_caselist_raw(
     return state_cases
 
 
-def get_new_cases_since_date(
-    scraper: GenericScraper[StateCaseData, StateFilingData], after_date: date
+@fl.task
+def get_new_caselist_since_date(
+    scraper: GenericScraper[StateCaseData, StateFilingData],
+    after_date: date,
+    base_path: str,
 ) -> List[StateCaseData]:
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    base_path = f"data/{timestamp}"
-
     # Get and save updated cases
     updated_intermediate = scraper.updated_cases_since_date_intermediate(after_date)
     updated_path = f"{base_path}/updated_cases.json"

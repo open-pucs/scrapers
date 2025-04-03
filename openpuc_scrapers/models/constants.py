@@ -15,6 +15,11 @@ S3_SCRAPER_INTERMEDIATE_BUCKET = os.environ.get(
     "S3_SCRAPER_INTERMEDIATE_BUCKET", "opescraper-intermediates"
 )
 
+S3_OBJECT_BUCKET = os.environ.get("S3_OBJECT_BUCKET", "opescraper-objects")
+S3_RAW_ATTACHMENT_BUCKET = os.environ.get(
+    "S3_RAW_ATTACHMENT_BUCKET", "opescraper-raw-attachments"
+)
+
 
 TMP_DIR = Path(os.environ.get("TMP_DIR", "/tmp/open_scrapers"))
 

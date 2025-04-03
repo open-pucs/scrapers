@@ -6,7 +6,7 @@ from typing import Tuple
 from hashlib import blake2b
 
 
-class KesslerHash:
+class Blake2bHash:
     """
     Represents a base64 encoded BLAKE2b hash
 
