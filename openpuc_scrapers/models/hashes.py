@@ -1,6 +1,7 @@
 import base64
 import io
 import os
+from pathlib import Path
 from typing import Tuple
 
 from hashlib import blake2b
@@ -30,7 +31,7 @@ class Blake2bHash:
         return f'"{str(self)}"'
 
     @classmethod
-    def from_json(cls, json_data: bytes) -> "KesslerHash":
+    def from_json(cls, json_data: bytes) -> "Blake2bHash":
         """Unmarshal a hash from JSON data"""
         if len(json_data) < 2 or json_data[0] != ord('"') or json_data[-1] != ord('"'):
             raise ValueError("Invalid JSON string")
@@ -40,7 +41,7 @@ class Blake2bHash:
         return cls.from_string(b64_str)
 
     @classmethod
-    def from_string(cls, s: str) -> "KesslerHash":
+    def from_string(cls, s: str) -> "Blake2bHash":
         """Create a KesslerHash from a base64 encoded string"""
         try:
             decoded = base64.urlsafe_b64decode(s)
@@ -53,13 +54,13 @@ class Blake2bHash:
         return cls(decoded)
 
     @classmethod
-    def from_bytes(cls, b: bytes) -> "KesslerHash":
+    def from_bytes(cls, b: bytes) -> "Blake2bHash":
         """Create a KesslerHash by hashing the provided bytes"""
         h = blake2b(b, digest_size=32)
         return cls(h.digest())
 
     @classmethod
-    def from_file(cls, file_path: str) -> "KesslerHash":
+    def from_file(cls, file_path: Path) -> "Blake2bHash":
         """Create a KesslerHash by hashing the contents of a file"""
         try:
             with open(file_path, "rb") as file:

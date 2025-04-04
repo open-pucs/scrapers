@@ -1,3 +1,4 @@
+import os
 import boto3
 
 
@@ -17,7 +18,6 @@ from models.constants import (
     S3_SECRET_KEY,
     S3_ACCESS_KEY,
     S3_ENDPOINT,
-    S3_SCRAPER_INTERMEDIATE_BUCKET,
     TMP_DIR,
 )
 
@@ -72,10 +72,12 @@ class S3FileManager:
         else:
             self.s3_cache_directory = None
 
-    def get_local_dir_from_key(self, key: str) -> Optional[Path]:
+    def get_local_dir_from_key(self, key: str) -> Path:
         if self.s3_cache_directory is not None:
             return self.s3_cache_directory / Path(key)
-        return None
+        else:
+            raise ValueError("S3 Cache directory is not set")
+        # return None
 
     def save_string_to_remote_file(self, key: str, content: str):
         local_path = self.get_local_dir_from_key(key)
@@ -114,12 +116,14 @@ class S3FileManager:
     # S3 Stuff Below this point
 
     def download_s3_file_to_path(
-        self, file_name: str, file_path: Path, bucket: Optional[str] = None
+        self, file_name: str, bucket: Optional[str] = None
     ) -> Optional[Path]:
+        file_path = self.get_local_dir_from_key(file_name)
         if bucket is None:
             bucket = self.bucket
         if file_path.is_file():
-            raise Exception("File Already Present at Path, not downloading")
+            os.remove(file_path)
+            # raise Exception("File Already Present at Path, not downloading")
         try:
             self.s3.download_file(bucket, file_name, str(file_path))
             return file_path
@@ -129,17 +133,22 @@ class S3FileManager:
             )
             return None
 
-    def download_file_from_s3_url(
-        self, s3_url: str, local_path: Path
-    ) -> Optional[Path]:
+    def download_s3_file_to_string(
+        self, file_name: str, bucket: Optional[str] = None
+    ) -> str:
+        path = self.download_s3_file_to_path(file_name, bucket)
+        if path is None:
+            raise ValueError("Error Encountered getting file from s3.")
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def download_file_from_s3_url(self, s3_url: str) -> Optional[Path]:
         domain = urlparse(s3_url).hostname
         s3_key = urlparse(s3_url).path
         if domain is None or s3_key is None:
             raise ValueError("Invalid URL")
         s3_bucket = domain.split(".")[0]
-        return self.download_s3_file_to_path(
-            file_name=s3_key, file_path=local_path, bucket=s3_bucket
-        )
+        return self.download_s3_file_to_path(file_name=s3_key, bucket=s3_bucket)
 
     def generate_s3_uri(
         self,
