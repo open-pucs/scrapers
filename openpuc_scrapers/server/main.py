@@ -1,15 +1,34 @@
 from typing import Union
+from pathlib import Path
 
 from fastapi import FastAPI
+from openpuc_scrapers.db.s3_utils import (
+    fetch_attachment_data_from_s3,
+    fetch_case_filing_from_s3,
+)
+from openpuc_scrapers.models.case import GenericCase
+from openpuc_scrapers.models.raw_attachments import RawAttachment
+from openpuc_scrapers.models.hashes import Blake2bHash
 
 app = FastAPI()
+
+
+@app.get("/cases/{state}/{{jurisdiction_name}/case_name}")
+async def handle_case_filing_from_s3(
+    case_name: str, jurisdiction_name: str, state: str
+) -> GenericCase:
+    return await fetch_case_filing_from_s3(
+        case_name=case_name,
+        jurisdiction_name=jurisdiction_name,
+        state=state,
+    )
+
+
+@app.get("/attachments/{blake2b_hash}")
+async def handle_attachment_data_from_s3(blake2b_hash: Blake2bHash) -> RawAttachment:
+    return await fetch_attachment_data_from_s3(hash=blake2b_hash)
 
 
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
-
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: Union[str, None] = None):
-    return {"item_id": item_id, "q": q}

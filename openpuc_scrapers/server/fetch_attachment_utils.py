@@ -14,7 +14,3 @@ def get_highest_quality_text(attach: RawAttachment) -> str:
 
     best_attachment_text = max(attach.text_objects, key=attach_ranker)
     return best_attachment_text.text
-
-
-def get_raw_attachment_object(hash: Blake2bHash) -> RawAttachment:
-    return RawAttachment(hash=hash, name="", extension="", text_objects=[])

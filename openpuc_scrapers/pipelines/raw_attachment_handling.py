@@ -1,4 +1,5 @@
 from enum import Enum
+from hmac import new
 from pathlib import Path
 from typing import List, Optional
 from pydantic import BaseModel
@@ -6,6 +7,7 @@ from pydantic import BaseModel
 from openpuc_scrapers.db.s3_wrapper import rand_filepath
 from openpuc_scrapers.models.attachment import GenericAttachment
 from openpuc_scrapers.models.constants import TMP_DIR
+from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.hashes import Blake2bHash
 from openpuc_scrapers.models.raw_attachments import (
     AttachmentTextQuality,
@@ -20,6 +22,16 @@ import aiofiles
 
 import pymupdf4llm
 import pymupdf
+
+
+async def process_generic_filing(filing: GenericFiling) -> GenericFiling:
+    attachments = filing.attachments
+    new_attachments = []
+    for att in attachments:
+        new_att = await process_and_shipout_initial_attachment(att)
+        new_attachments.append(new_att)
+    filing.attachments = new_attachments
+    return filing
 
 
 async def process_and_shipout_initial_attachment(

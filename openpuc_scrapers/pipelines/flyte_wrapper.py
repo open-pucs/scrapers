@@ -4,6 +4,7 @@ from typing import Any, List
 from datetime import date, datetime, timezone
 from pydantic import BaseModel
 
+from openpuc_scrapers.db.s3_utils import push_case_to_s3_and_db
 from openpuc_scrapers.models.constants import S3_SCRAPER_INTERMEDIATE_BUCKET
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
@@ -11,6 +12,7 @@ from openpuc_scrapers.models.case import GenericCase
 
 from openpuc_scrapers.models.timestamp import rfc_time_now
 from openpuc_scrapers.pipelines.helper_utils import save_json
+from openpuc_scrapers.pipelines.raw_attachment_handling import process_generic_filing
 from openpuc_scrapers.scrapers.base import (
     GenericScraper,
     StateCaseData,
@@ -82,7 +84,15 @@ def process_case(
         generic_filing = scraper.into_generic_filing_data(filing)
         case_specific_generic_cases.append(generic_filing)
 
+    for generic_filing in case_specific_generic_cases:
+        # FIXME : What do I do about async with flyte????
+        await process_generic_filing(generic_filing)
     generic_case.filings = case_specific_generic_cases
+    push_case_to_s3_and_db(
+        case=generic_case,
+        jurisdiction_name=scraper.jurisdiction_name,
+        state=scraper.state,
+    )
     return generic_case
 
 
