@@ -15,6 +15,7 @@ dependencies = [
     "langchain-community>=0.3.20",
     "pugsql>=0.3.5",
     "pydantic>=2.10.6",
+    "pymupdf>=1.25.5",
     "pytest>=8.3.5",
     "requests>=2.32.3",
     "scrapegraphai>=1.44.0",
