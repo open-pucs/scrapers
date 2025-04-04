@@ -20,6 +20,8 @@ S3_RAW_ATTACHMENT_BUCKET = os.environ.get(
     "S3_RAW_ATTACHMENT_BUCKET", "opescraper-raw-attachments"
 )
 
+SQL_DB_CONNECTION = os.environ.get("SQL_DB_CONNECTION", "sqlite:///db.sqlite3")
+
 
 TMP_DIR = Path(os.environ.get("TMP_DIR", "/tmp/open_scrapers"))
 
