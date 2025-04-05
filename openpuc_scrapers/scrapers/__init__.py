@@ -1,3 +1,11 @@
-from .ma import MassachusettsDPU
+"""Scrapers for various public utility commission websites."""
 
-__all__ = ["MassachusettsDPU"]
+from typing import Dict, List, Optional, Union
+
+from .base import GenericScraper
+from .il import IllinoisICCScraper
+
+__all__ = [
+    'GenericScraper',
+    'IllinoisICCScraper',
+]
