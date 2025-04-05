@@ -77,7 +77,7 @@ class S3FileManager:
             return self.s3_cache_directory / Path(key)
         return None
 
-    def save_string_to_file(self, key: str, content: str):
+    def save_string_to_remote_file(self, key: str, content: str):
         local_path = self.get_local_dir_from_key(key)
         if local_path is None:
             local_path = self.tmpdir / rand_filepath()
