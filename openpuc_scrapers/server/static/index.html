@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenPUC Scrapers API</title>
+    <title>OpenPUC Scrapers</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @keyframes gradient {
@@ -15,47 +15,33 @@
 </head>
 <body class="min-h-screen bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 animate-gradient">
     <div class="container mx-auto px-4 py-12">
+
         <header class="text-center mb-16">
-            <h1 class="text-4xl font-bold text-white mb-4">🏛️ OpenPUC Legal Scrapers API</h1>
-            <p class="text-xl text-white opacity-90">Public access to structured legal data</p>
+            <h1 class="text-4xl font-bold text-white mb-4">🏛️ Open Justice Infrastructure</h1>
+            <p class="text-xl text-white opacity-90 max-w-2xl mx-auto">
+                Transparent government data forms the bedrock of democratic accountability. By maintaining open access 
+                to legal records and court documents, we empower journalists, researchers, and grassroots organizations 
+                to hold institutions accountable and advance social justice through evidence-based advocacy.
+            </p>
         </header>
-
-        <main class="grid md:grid-cols-2 gap-8 mb-16">
-            <div class="bg-white rounded-lg p-6 shadow-xl hover:transform hover:scale-105 transition-all">
-                <h2 class="text-2xl font-semibold mb-4">📂 Case Filings</h2>
-                <p class="text-gray-600 mb-4">Retrieve structured case data by jurisdiction:</p>
-                <code class="bg-gray-100 p-2 rounded text-sm block mb-4">GET /api/cases/{state}/{jurisdiction}/{case}</code>
-            </div>
-
-            <div class="bg-white rounded-lg p-6 shadow-xl hover:transform hover:scale-105 transition-all">
-                <h2 class="text-2xl font-semibold mb-4">📎 Raw Attachments</h2>
-                <p class="text-gray-600 mb-4">Access original court documents and files:</p>
-                <code class="bg-gray-100 p-2 rounded text-sm block mb-4">GET /api/raw_attachments/{hash}/obj</code>
-                <code class="bg-gray-100 p-2 rounded text-sm block">GET /api/raw_attachments/{hash}/raw</code>
+        <main class="mb-16">
+            <div class="bg-white/90 backdrop-blur-sm rounded-xl shadow-2xl p-6 max-w-5xl mx-auto">
+                <h2 class="text-2xl font-semibold mb-4 text-center">API Documentation Explorer</h2>
+                <iframe 
+                    src="/docs" 
+                    class="w-full h-[600px] rounded-lg border-2 border-white/20 shadow-inner"
+                    style="background: white">
+                </iframe>
             </div>
         </main>
 
+
         <footer class="text-center text-white opacity-75">
-            <p class="mb-2">📡 Serving public legal data since <span id="year"></span></p>
-            <p>🔗 <a href="/docs" class="underline hover:opacity-80">API Documentation</a></p>
+            <p><a href="https://github.com/Open-PUCs/scrapers" class="underline hover:opacity-80">👩‍💻 Contribute!</a></p>
+            <p><a href="/docs" class="underline hover:opacity-80">🔗 API Documentation</a></p>
         </footer>
     </div>
 
-    <script>
-        // Dynamic year in footer
-        document.getElementById('year').textContent = new Date().getFullYear();
-        
-        // Animate cards on load
-        document.addEventListener('DOMContentLoaded', () => {
-            const cards = document.querySelectorAll('main > div');
-            cards.forEach((card, index) => {
-                setTimeout(() => {
-                    card.style.opacity = 1;
-                    card.style.transform = 'translateY(0)';
-                }, index * 150);
-            });
-        });
-    </script>
 </body>
 </html>
 
