@@ -39,17 +39,26 @@ async def fetch_attachment_data_from_s3(hash: Blake2bHash) -> RawAttachment:
     return raw_attach
 
 
+async def fetch_attachment_file_from_s3(hash: Blake2bHash) -> Path:
+    obj_key = get_raw_attach_file_key(hash)
+    s3 = S3FileManager(bucket=S3_RAW_ATTACHMENT_BUCKET)
+    result_path = s3.download_s3_file_to_path(obj_key, serve_cache=True)
+    if result_path is None:
+        raise Exception("Failed to get file from s3")
+    return result_path
+
+
 async def push_raw_attach_to_s3_and_db(raw_att: RawAttachment, file_path: Path) -> None:
     dumped_data = raw_att.model_dump_json()
     obj_key = get_raw_attach_obj_key(raw_att.hash)
     file_key = get_raw_attach_file_key(raw_att.hash)
     s3 = S3FileManager(bucket=S3_RAW_ATTACHMENT_BUCKET)
     s3.save_string_to_remote_file(key=obj_key, content=dumped_data)
-    s3.push_file_to_s3(filepath=file_path, file_upload_name=file_key)
+    s3.push_file_to_s3(filepath=file_path, file_upload_key=file_key)
     # TODO: Maybe update db that the file has been updated?
 
 
-def push_case_to_s3_and_db(
+async def push_case_to_s3_and_db(
     case: GenericCase, jurisdiction_name: str, state: str, country: str = "usa"
 ) -> GenericCase:
     key = get_case_s3_key(
@@ -61,8 +70,9 @@ def push_case_to_s3_and_db(
     case.indexed_at = rfc_time_now()
     s3 = S3FileManager(bucket=S3_OBJECT_BUCKET)
     case_jsonified = case.model_dump_json()
+    # Maybe async this in its own thread?
     s3.save_string_to_remote_file(key=key, content=case_jsonified)
-    set_case_as_updated(
+    await set_case_as_updated(
         case=case, jurisdiction=jurisdiction_name, state=state, country=country
     )
     return case
