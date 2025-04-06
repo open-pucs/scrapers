@@ -2,6 +2,8 @@ from pydantic import BaseModel
 from typing import Any, Dict, Optional
 from datetime import date
 
+from openpuc_scrapers.models.timestamp import RFC3339Time, rfc_time_now
+
 from .filing import GenericFiling
 
 
@@ -30,3 +32,4 @@ class GenericCase(BaseModel):
     closed_date: Optional[date] = None
     filings: Optional[list[GenericFiling]] = None
     extra_metadata: Dict[str, Any] = {}
+    indexed_at: RFC3339Time = rfc_time_now()

@@ -194,6 +194,8 @@ def deduplicate_individual_attachments_into_files(
 
 
 class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
+    state: str = "ny"
+    jurisdiction_name: str = "ny_puc"
     """Concrete implementation of GenericScraper for NYPUC"""
 
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
@@ -202,7 +204,6 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         def process_industry(industry_num: int) -> Dict[str, Any]:
             """Task to process a single industry number and return its dockets"""
             driver = webdriver.Chrome()
-            all_dockets = []
 
             try:
                 url = f"https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA={industry_num}"

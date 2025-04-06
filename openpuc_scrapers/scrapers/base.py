@@ -88,6 +88,9 @@ StateFilingData = TypeVar("StateFilingData", bound=BaseModel)
 
 
 class GenericScraper(ABC, Generic[StateCaseData, StateFilingData]):
+    state: str
+    jurisdiction_name: str
+
     # Universal case list methods
     @abstractmethod
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
