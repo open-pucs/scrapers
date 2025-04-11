@@ -18,6 +18,7 @@ from openpuc_scrapers.models.timestamp import RFC3339Time, rfc_time_now
 
 import aiohttp
 import aiofiles
+import asyncio
 
 
 import pymupdf4llm
@@ -26,10 +27,10 @@ import pymupdf
 
 async def process_generic_filing(filing: GenericFiling) -> GenericFiling:
     attachments = filing.attachments
-    new_attachments = []
+    tasks = []
     for att in attachments:
-        new_att = await process_and_shipout_initial_attachment(att)
-        new_attachments.append(new_att)
+        tasks.append(process_and_shipout_initial_attachment(att))
+    new_attachments = await asyncio.gather(*tasks)
     filing.attachments = new_attachments
     return filing
 

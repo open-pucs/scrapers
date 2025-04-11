@@ -1,10 +1,24 @@
 FROM apache/airflow:2.5.1
 
-# Copy the requirements file
-COPY requirements.txt .
+FROM python:3.12-slim
 
-# Install the dependencies from the requirements file
+WORKDIR /app
+
+RUN pip install --no-cache-dir uv
+
+# Copy package structure
+COPY pyproject.toml uv.lock ./
+
+RUN uv pip compile pyproject.toml --output requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
+
+COPY openpuc_scrapers/ ./openpuc_scrapers/
+# Old example code
+# # Copy the requirements file
+# COPY requirements.txt .
+#
+# # Install the dependencies from the requirements file
+# RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the DAGs directory to the Airflow home directory
 COPY dags/ /opt/airflow/dags/

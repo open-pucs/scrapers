@@ -15,11 +15,11 @@ RUN pip install --no-cache-dir uv
 
 # Copy package structure
 COPY pyproject.toml uv.lock ./
-COPY openpuc_scrapers/ ./openpuc_scrapers/
 
 RUN uv pip install . --python /usr/local/bin/python
 # Install Python dependencies
 
+COPY openpuc_scrapers/ ./openpuc_scrapers/
 WORKDIR /app/openpuc_scrapers/server
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
