@@ -1,22 +1,24 @@
-FROM python:3.10-slim
+# Maybe its worth replacing with a custom docker image,
+# Based on python3.x-alpine:
+#
+#     ghcr.io/astral-sh/uv:python3.13-alpine
+#     ghcr.io/astral-sh/uv:python3.12-alpine
+#     ghcr.io/astral-sh/uv:python3.11-alpine
+#     ghcr.io/astral-sh/uv:python3.10-alpine
+#     ghcr.io/astral-sh/uv:python3.9-alpine
+#     ghcr.io/astral-sh/uv:python3.8-alpine
+FROM python:3.12-slim
 
 WORKDIR /app
 
-# System dependencies
-RUN apt-get update && apt-get install -y \
-  gcc \
-  python3-dev \
-  && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir uv
 
 # Copy package structure
-COPY pyproject.toml poetry.lock* ./
+COPY pyproject.toml uv.lock ./
 COPY openpuc_scrapers/ ./openpuc_scrapers/
 
+RUN uv pip install . --python /usr/local/bin/python
 # Install Python dependencies
-RUN pip install --upgrade pip && \
-  pip install poetry && \
-  poetry config virtualenvs.create false && \
-  poetry install --only main
 
 WORKDIR /app/openpuc_scrapers/server
 
