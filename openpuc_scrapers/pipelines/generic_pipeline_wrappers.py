@@ -18,6 +18,7 @@ from openpuc_scrapers.scrapers.base import (
     StateCaseData,
     StateFilingData,
 )
+import asyncio
 
 
 def generate_intermediate_object_save_path(
@@ -29,27 +30,6 @@ def generate_intermediate_object_save_path(
     return base_path
 
 
-@fl.workflow
-def get_all_cases_complete(
-    scraper: GenericScraper[StateCaseData, StateFilingData]
-) -> List[GenericCase]:
-    base_path = generate_intermediate_object_save_path(scraper)
-    caselist = get_all_caselist_raw(scraper, base_path=base_path)
-    return fl.map(process_case)(caselist)
-
-
-@fl.workflow
-def get_new_cases_since_date_complete(
-    scraper: GenericScraper[StateCaseData, StateFilingData], after_date: date
-) -> List[GenericCase]:
-    base_path = generate_intermediate_object_save_path(scraper)
-    caselist = get_new_caselist_since_date(
-        scraper=scraper, after_date=after_date, base_path=base_path
-    )
-    return fl.map(process_case)(caselist)
-
-
-@fl.task
 def process_case(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     case: StateCaseData,
@@ -84,19 +64,24 @@ def process_case(
         generic_filing = scraper.into_generic_filing_data(filing)
         case_specific_generic_cases.append(generic_filing)
 
-    for generic_filing in case_specific_generic_cases:
-        # FIXME : What do I do about async with flyte????
-        await process_generic_filing(generic_filing)
-    generic_case.filings = case_specific_generic_cases
-    push_case_to_s3_and_db(
-        case=generic_case,
-        jurisdiction_name=scraper.jurisdiction_name,
-        state=scraper.state,
-    )
-    return generic_case
+    async def async_shit() -> GenericCase:
+        tasks = []
+        for generic_filing in case_specific_generic_cases:
+            # FIXME : What do I do about async with flyte????
+            tasks.append(process_generic_filing(generic_filing))
+        result_generic_cases = await asyncio.gather(*tasks)
+        generic_case.filings = result_generic_cases
+        await push_case_to_s3_and_db(
+            case=generic_case,
+            jurisdiction_name=scraper.jurisdiction_name,
+            state=scraper.state,
+        )
+        return generic_case
+
+    return_generic_case = asyncio.run(async_shit())
+    return return_generic_case
 
 
-@fl.task
 def get_all_caselist_raw(
     scraper: GenericScraper[StateCaseData, StateFilingData], base_path: str
 ) -> List[StateCaseData]:
@@ -114,7 +99,6 @@ def get_all_caselist_raw(
     return state_cases
 
 
-@fl.task
 def get_new_caselist_since_date(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     after_date: date,

@@ -1,14 +1,17 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, List
 from airflow.decorators import dag, task
-from helpers.scraper_utils import (
+from openpuc_scrapers.models.case import GenericCase
+from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
     generate_intermediate_object_save_path,
-    get_scraper,
-    process_generic_filing_wrapper,
-    S3_SCRAPER_INTERMEDIATE_BUCKET,
+    get_all_caselist_raw,
+    process_case,
 )
-from openpuc_scrapers.db.s3_utils import push_case_to_s3_and_db
-from openpuc_scrapers.pipelines.helper_utils import save_json
+from openpuc_scrapers.scrapers.base import StateCaseData, StateFilingData
+from openpuc_scrapers.scrapers.scraper_lookup import (
+    get_scraper_type_from_name_unvalidated,
+)
+from functools import partial
 
 default_args = {
     "owner": "airflow",
@@ -19,40 +22,34 @@ default_args = {
 @dag(
     default_args=default_args,
     schedule_interval=None,
-    params={"state": "default_state", "jurisdiction_name": "default_jurisdiction"},
+    params={"scraper_name": "unknown"},
     tags=["scrapers"],
 )
 def all_cases_dag():
-    @task
-    def generate_base_path(state: str, jurisdiction_name: str) -> str:
-        return generate_intermediate_object_save_path(state, jurisdiction_name)
+    # TODO: Add the types for this later, rn I am wanting to do things as simply as possible to avoid weird shit
 
     @task
-    def get_all_caselist_raw(
-        state: str, jurisdiction_name: str, base_path: str
-    ) -> list:
-        scraper = get_scraper(state, jurisdiction_name)
-        caselist_intermediate = scraper.universal_caselist_intermediate()
-        save_json(
-            path=f"{base_path}/caselist.json",
-            bucket=S3_SCRAPER_INTERMEDIATE_BUCKET,
-            data=caselist_intermediate,
-        )
-        return scraper.universal_caselist_from_intermediate(caselist_intermediate)
+    def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[Any]:
+        return get_all_caselist_raw(scraper=scraper, base_path=base_path)
 
     @task
-    def process_case(
-        case: Any, state: str, jurisdiction_name: str, base_path: str
-    ) -> Any:
+    def process_case_airflow(scraper: Any, case: Any, base_path: str) -> Any:
+        return process_case(scraper=scraper, case=case, base_path=base_path)
 
     # DAG structure
-    state = "{{ params.state }}"
-    jurisdiction = "{{ params.jurisdiction_name }}"
-    base_path = generate_base_path(state, jurisdiction)
-    cases = get_all_caselist_raw(state, jurisdiction, base_path)
-    process_case.partial(
-        state=state, jurisdiction_name=jurisdiction, base_path=base_path
-    ).expand(case=cases)
+    scraper_name = "{{ params.scraper_name }}"
+    scraper_type = get_scraper_type_from_name_unvalidated(scraper_name)
+    scraper = scraper_type()
+    base_path = generate_intermediate_object_save_path(scraper)
+    cases = get_all_caselist_raw_airflow(scraper=scraper, base_path=base_path)
+    for case in cases:
+        process_case_airflow(scraper=scraper, case=case, base_path=base_path)
+
+    # partial_process_case = partial(
+    #     process_case_airflow, scraper=scraper, base_path=base_path
+    # )
+    # for case in cases:
+    #     partial_process_case(case=case)
 
 
 all_cases_workflow = all_cases_dag()
