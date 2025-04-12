@@ -24,7 +24,7 @@ COPY openpuc_scrapers/ ./openpuc_scrapers/
 COPY dags/ /opt/airflow/dags/
 
 # Copy the entrypoint script
-COPY entrypoint.sh /entrypoint.sh
+COPY airflow-startup.sh /entrypoint.sh
 
 # Switch to the root user to change permissions
 USER root
