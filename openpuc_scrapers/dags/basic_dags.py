@@ -1,17 +1,19 @@
 from datetime import datetime
 from typing import Any, List
 from airflow.decorators import dag, task
-from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
     generate_intermediate_object_save_path,
     get_all_caselist_raw,
+    get_new_caselist_since_date,
     process_case,
 )
-from openpuc_scrapers.scrapers.base import StateCaseData, StateFilingData
 from openpuc_scrapers.scrapers.scraper_lookup import (
     get_scraper_type_from_name_unvalidated,
 )
-from functools import partial
+
+# from openpuc_scrapers.models.case import GenericCase
+# from openpuc_scrapers.scrapers.base import StateCaseData, StateFilingData
+# from functools import partial
 
 default_args = {
     "owner": "airflow",
@@ -31,6 +33,14 @@ def all_cases_dag():
     @task
     def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[Any]:
         return get_all_caselist_raw(scraper=scraper, base_path=base_path)
+
+    @task
+    def get_caselist_since_date_raw_airflow(
+        scraper: Any, after_date: datetime, base_path: str
+    ) -> List[Any]:
+        return get_new_caselist_since_date(
+            scraper=scraper, after_date=after_date, base_path=base_path
+        )
 
     @task
     def process_case_airflow(scraper: Any, case: Any, base_path: str) -> Any:
