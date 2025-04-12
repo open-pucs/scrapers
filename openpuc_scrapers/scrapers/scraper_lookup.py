@@ -10,6 +10,7 @@ class ScraperName(str, Enum):
     MA_PUC = "ma_puc"
     IL_PUC = "il_puc"
     CO_PUC = "co_puc"
+    TEST = "test"
 
 
 def get_scraper_type_from_name(name: ScraperName) -> type[GenericScraper]:
@@ -22,6 +23,7 @@ def get_scraper_type_from_name(name: ScraperName) -> type[GenericScraper]:
             raise ValueError("Not implemented")
         case ScraperName.CO_PUC:
             raise ValueError("Not implemented")
+
         # case _:
         #     raise ValueError("Scraper not Found")
 

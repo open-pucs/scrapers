@@ -3,7 +3,7 @@ from typing import Any, List, Optional
 import pugsql
 from pydantic import BaseModel
 from openpuc_scrapers.models.case import GenericCase
-from openpuc_scrapers.models.constants import SQL_DB_CONNECTION
+from openpuc_scrapers.models.constants import OPENSCRAPERS_SQL_DB_SCONNECTION
 from openpuc_scrapers.models.filing import GenericFiling
 
 
@@ -56,7 +56,7 @@ ORDER BY updated_at ASC
 LIMIT :limit;
 """
 
-engine = create_async_engine(SQL_DB_CONNECTION)
+engine = create_async_engine(OPENSCRAPERS_SQL_DB_SCONNECTION)
 
 MakeAsyncSession = sessionmaker(
     engine=engine, class_=AsyncSession, expire_on_commit=False

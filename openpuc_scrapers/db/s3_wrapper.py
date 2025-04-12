@@ -14,10 +14,10 @@ from urllib.parse import urlparse
 
 from models.constants import (
     LOCAL_CACHE_DIR,
-    S3_CLOUD_REGION,
-    S3_SECRET_KEY,
-    S3_ACCESS_KEY,
-    S3_ENDPOINT,
+    OPENSCRAPERS_S3_CLOUD_REGION,
+    OPENSCRAPERS_S3_SECRET_KEY,
+    OPENSCRAPERS_S3_ACCESS_KEY,
+    OPENSCRAPERS_S3_ENDPOINT,
     TMP_DIR,
 )
 
@@ -53,7 +53,7 @@ class S3FileManager:
     def __init__(self, bucket: str, logger: Optional[Any] = None) -> None:
         if logger is None:
             logger = default_logger
-        self.endpoint = S3_ENDPOINT
+        self.endpoint = OPENSCRAPERS_S3_ENDPOINT
         self.logger = logger
 
         self.tmpdir = TMP_DIR
@@ -63,9 +63,9 @@ class S3FileManager:
         self.s3 = boto3.client(
             "s3",
             endpoint_url=self.endpoint,
-            aws_access_key_id=S3_ACCESS_KEY,
-            aws_secret_access_key=S3_SECRET_KEY,
-            region_name=S3_CLOUD_REGION,
+            aws_access_key_id=OPENSCRAPERS_S3_ACCESS_KEY,
+            aws_secret_access_key=OPENSCRAPERS_S3_SECRET_KEY,
+            region_name=OPENSCRAPERS_S3_CLOUD_REGION,
         )
         self.bucket = bucket
         if LOCAL_CACHE_DIR is not None:
