@@ -68,6 +68,8 @@ services:
       - "traefik.http.routers.whoami.tls.certresolver=myresolver"
     volumes:
       - openpuc_scrapers:/app/openpuc_scrapers
+    expose:
+      - 8000
     environment:
       <<: *openscraper-env-variables
   reverse-proxy:

@@ -12,7 +12,7 @@ from tempfile import TemporaryFile
 
 from urllib.parse import urlparse
 
-from models.constants import (
+from openpuc_scrapers.models.constants import (
     LOCAL_CACHE_DIR,
     OPENSCRAPERS_S3_CLOUD_REGION,
     OPENSCRAPERS_S3_SECRET_KEY,
