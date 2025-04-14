@@ -11,7 +11,7 @@ COPY pyproject.toml uv.lock /app/
 WORKDIR /app
 
 USER root 
-RUN chown -R airflow:airflow /app
+RUN chown -R airflow /app
 USER airflow
 
 
@@ -21,9 +21,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY openpuc_scrapers/ /app/openpuc_scrapers/
 
 USER root 
-RUN chown -R airflow:airflow /app
+RUN chown -R airflow /app
 USER airflow
 
-RUN export PYTHONPATH=$PYTHONPATH:/app
+# RUN export PYTHONPATH=$PYTHONPATH:/app
+ENV PYTHONPATH=/app:$PYTHONPATH
 
 WORKDIR /home/airflow
