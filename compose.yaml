@@ -81,14 +81,13 @@ services:
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
       - "--certificatesresolvers.myresolver.acme.email=mbright@kessler.xyz"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-      - "--providers.file.filename=/etc/traefik/traefik_dynamic.yaml"
     ports:
       - "80:80"
       - "443:443"
       - "8083:8080"
     volumes:
       - "./volumes/letsencrypt:/letsencrypt"
-      - "/run/podman/podman.sock:/var/run/docker.sock:ro"
+      - /var/run/docker.sock:/var/run/docker.sock
 
   # Airflow Services
   airflow-postgres:

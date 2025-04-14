@@ -1891,6 +1891,7 @@ dependencies = [
     { name = "requests" },
     { name = "scrapegraphai" },
     { name = "selenium" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
@@ -1910,6 +1911,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.32.3" },
     { name = "scrapegraphai", specifier = ">=1.44.0" },
     { name = "selenium", specifier = ">=4.29.0" },
+    { name = "uvicorn", specifier = ">=0.34.1" },
 ]
 
 [[package]]
@@ -3033,6 +3035,19 @@ wheels = [
 [package.optional-dependencies]
 socks = [
     { name = "pysocks" },
+]
+
+[[package]]
+name = "uvicorn"
+version = "0.34.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "h11" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/86/37/dd92f1f9cedb5eaf74d9999044306e06abe65344ff197864175dbbd91871/uvicorn-0.34.1.tar.gz", hash = "sha256:af981725fc4b7ffc5cb3b0e9eda6258a90c4b52cb2a83ce567ae0a7ae1757afc", size = 76755 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5f/38/a5801450940a858c102a7ad9e6150146a25406a119851c993148d56ab041/uvicorn-0.34.1-py3-none-any.whl", hash = "sha256:984c3a8c7ca18ebaad15995ee7401179212c59521e67bfc390c07fa2b8d2e065", size = 62404 },
 ]
 
 [[package]]
