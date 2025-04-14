@@ -3,7 +3,10 @@ name = "openpuc-scrapers"
 version = "0.1.0"
 description = "Web scrapers for open-access PUC data"
 readme = "README.md"
-authors = ["Charles Dawson <charles.dwsn@gmail.com>"]
+authors = [
+    {name = "Charles Dawson", email = "charles.dwsn@gmail.com"},
+    {name = "Nicole Venner", email = "n@mycor.io"},
+]
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.11.14",

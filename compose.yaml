@@ -1,7 +1,11 @@
 version: "3.8"
 
-x-airflow-common: &airflow-common
-  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.10.5}
+x-airflow-common:
+  &airflow-common # image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.10.5}
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
@@ -86,7 +90,9 @@ services:
 
   # Airflow Services
   airflow-postgres:
-    image: postgres:13
+    # image: postgres:13
+    # Original image used postgres 13, if anything appears wrong, I think its a good idea to revert to the old image
+    image: postgres:17.4-alpine
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow

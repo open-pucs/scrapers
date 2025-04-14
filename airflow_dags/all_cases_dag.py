@@ -4,7 +4,6 @@ from airflow.decorators import dag, task
 from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
     generate_intermediate_object_save_path,
     get_all_caselist_raw,
-    get_new_caselist_since_date,
     process_case,
 )
 from openpuc_scrapers.scrapers.scraper_lookup import (
