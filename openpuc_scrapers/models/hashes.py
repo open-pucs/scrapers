@@ -6,6 +6,10 @@ from typing import Tuple
 
 from hashlib import blake2b
 
+from pydantic_core import core_schema
+from pydantic import GetCoreSchemaHandler
+from typing import Any, Annotated
+
 
 class Blake2bHash:
     """
@@ -71,3 +75,41 @@ class Blake2bHash:
                 return cls(h.digest())
         except Exception as e:
             raise IOError(f"Error reading file {file_path}: {e}")
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _source_type: Any, _handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        """
+        Provide a Pydantic core schema for Blake2bHash.
+
+        This allows Pydantic to validate and serialize Blake2bHash instances
+        using the from_string and __str__ methods.
+
+        Args:
+            _source_type: The source type being validated
+            _handler: Pydantic's core schema handler
+
+        Returns:
+            A Pydantic core schema for Blake2bHash
+        """
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.str_schema(),
+            python_schema=core_schema.union_schema(
+                [
+                    # Direct Blake2bHash instance
+                    core_schema.is_instance_schema(cls),
+                    # Convert from string
+                    core_schema.no_info_plain_validator_function(cls.from_string),
+                ]
+            ),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda x: str(x), return_schema=core_schema.str_schema()
+            ),
+        )
+
+
+# # Type alias for easier type hinting
+# Blake2bHashType = Annotated[
+#     Blake2bHash, GetCoreSchemaHandler(Blake2bHash.__get_pydantic_core_schema__)
+# ]
