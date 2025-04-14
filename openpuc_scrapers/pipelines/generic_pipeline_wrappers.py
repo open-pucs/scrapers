@@ -5,7 +5,9 @@ from datetime import date, datetime, timezone
 from pydantic import BaseModel
 
 from openpuc_scrapers.db.s3_utils import push_case_to_s3_and_db
-from openpuc_scrapers.models.constants import OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET
+from openpuc_scrapers.models.constants import (
+    OPENSCRAPERS_S3_OBJECT_BUCKET,
+)
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
 
@@ -22,10 +24,12 @@ import asyncio
 
 
 def generate_intermediate_object_save_path(
-    scraper: GenericScraper[StateCaseData, StateFilingData]
+    scraper: GenericScraper[StateCaseData, StateFilingData],
 ) -> str:
     time_now = rfc_time_now()
-    base_path = f"{scraper.state}/{scraper.jurisdiction_name}/{str(time_now)}"
+    base_path = (
+        f"intermediates/{scraper.state}/{scraper.jurisdiction_name}/{str(time_now)}"
+    )
 
     return base_path
 
@@ -40,14 +44,16 @@ def process_case(
 
     # Save state-specific case data
     case_path = f"{base_path}/cases/case_{case_num}.json"
-    save_json(path=case_path, bucket=OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET, data=case)
+    save_json(
+        path=case_path, bucket=OPENSCRAPERS_S3_OBJECT_BUCKET, data=case
+    )
 
     # Process filings
     filings_intermediate = scraper.filing_data_intermediate(case)
     filings_path = f"{base_path}/filings/case_{case_num}.json"
     save_json(
         path=filings_path,
-        bucket=OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET,
+        bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=filings_intermediate,
     )
 
@@ -55,7 +61,7 @@ def process_case(
     filings_json_path = f"{base_path}/filings/case_{case_num}.json"
     save_json(
         path=filings_json_path,
-        bucket=OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET,
+        bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=filings,
     )
 
@@ -90,7 +96,7 @@ def get_all_caselist_raw(
     caselist_path = f"{base_path}/caselist.json"
     save_json(
         path=caselist_path,
-        bucket=OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET,
+        bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=caselist_intermediate,
     )
 
@@ -109,7 +115,7 @@ def get_new_caselist_since_date(
     updated_path = f"{base_path}/updated_cases.json"
     save_json(
         path=updated_path,
-        bucket=OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET,
+        bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=updated_intermediate,
     )
 

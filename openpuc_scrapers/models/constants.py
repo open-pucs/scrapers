@@ -10,17 +10,20 @@ def Maybe(f: Callable) -> Callable:
 
 
 OPENSCRAPERS_S3_CLOUD_REGION = os.environ.get("OPENSCRAPERS_S3_CLOUD_REGION", "sfo3")
-OPENSCRAPERS_S3_ENDPOINT = os.environ.get("OPENSCRAPERS_S3_ENDPOINT", "https://sfo3.digitaloceanspaces.com")
-OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET = os.environ.get(
-    "OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET", "opescraper-intermediates"
+OPENSCRAPERS_S3_ENDPOINT = os.environ.get(
+    "OPENSCRAPERS_S3_ENDPOINT", "https://sfo3.digitaloceanspaces.com"
+)
+# OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET = os.environ.get(
+#     "OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET", "opescraper-intermediates"
+# )
+
+OPENSCRAPERS_S3_OBJECT_BUCKET = os.environ.get(
+    "OPENSCRAPERS_S3_OBJECT_BUCKET", "opescrapers"
 )
 
-OPENSCRAPERS_S3_OBJECT_BUCKET = os.environ.get("OPENSCRAPERS_S3_OBJECT_BUCKET", "opescraper-objects")
-OPENSCRAPERS_S3_RAW_ATTACHMENT_BUCKET = os.environ.get(
-    "OPENSCRAPERS_S3_RAW_ATTACHMENT_BUCKET", "opescraper-raw-attachments"
+OPENSCRAPERS_SQL_DB_SCONNECTION = os.environ.get(
+    "OPENSCRAPERS_SQL_DB_SCONNECTION", "sqlite:///db.sqlite3"
 )
-
-OPENSCRAPERS_SQL_DB_SCONNECTION = os.environ.get("OPENSCRAPERS_SQL_DB_SCONNECTION", "sqlite:///db.sqlite3")
 
 
 TMP_DIR = Path(os.environ.get("TMP_DIR", "/tmp/open_scrapers"))

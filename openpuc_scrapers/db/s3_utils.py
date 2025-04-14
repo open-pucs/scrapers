@@ -2,7 +2,9 @@ from pathlib import Path
 from openpuc_scrapers.db.s3_wrapper import S3FileManager
 from openpuc_scrapers.db.sql_utilities import set_case_as_updated
 from openpuc_scrapers.models.case import GenericCase
-from openpuc_scrapers.models.constants import OPENSCRAPERS_S3_OBJECT_BUCKET, OPENSCRAPERS_S3_RAW_ATTACHMENT_BUCKET
+from openpuc_scrapers.models.constants import (
+    OPENSCRAPERS_S3_OBJECT_BUCKET,
+)
 from openpuc_scrapers.models.hashes import Blake2bHash
 from openpuc_scrapers.models.raw_attachments import RawAttachment
 from openpuc_scrapers.models.timestamp import rfc_time_now
@@ -11,7 +13,7 @@ from openpuc_scrapers.models.timestamp import rfc_time_now
 def get_case_s3_key(
     case_name: str, jurisdiction_name: str, state: str, country: str = "usa"
 ) -> str:
-    return f"{country}/{state}/{jurisdiction_name}/{case_name}.json"
+    return f"objects/{country}/{state}/{jurisdiction_name}/{case_name}.json"
 
 
 def get_raw_attach_obj_key(hash: Blake2bHash) -> str:
@@ -33,7 +35,7 @@ async def fetch_case_filing_from_s3(
 
 async def fetch_attachment_data_from_s3(hash: Blake2bHash) -> RawAttachment:
     obj_key = get_raw_attach_obj_key(hash)
-    s3 = S3FileManager(bucket=OPENSCRAPERS_S3_RAW_ATTACHMENT_BUCKET)
+    s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
     result_str = s3.download_s3_file_to_string(obj_key)
     raw_attach = RawAttachment.model_validate_json(result_str)
     return raw_attach
@@ -41,7 +43,7 @@ async def fetch_attachment_data_from_s3(hash: Blake2bHash) -> RawAttachment:
 
 async def fetch_attachment_file_from_s3(hash: Blake2bHash) -> Path:
     obj_key = get_raw_attach_file_key(hash)
-    s3 = S3FileManager(bucket=OPENSCRAPERS_S3_RAW_ATTACHMENT_BUCKET)
+    s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
     result_path = s3.download_s3_file_to_path(obj_key, serve_cache=True)
     if result_path is None:
         raise Exception("Failed to get file from s3")
@@ -52,7 +54,7 @@ async def push_raw_attach_to_s3_and_db(raw_att: RawAttachment, file_path: Path) 
     dumped_data = raw_att.model_dump_json()
     obj_key = get_raw_attach_obj_key(raw_att.hash)
     file_key = get_raw_attach_file_key(raw_att.hash)
-    s3 = S3FileManager(bucket=OPENSCRAPERS_S3_RAW_ATTACHMENT_BUCKET)
+    s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
     s3.save_string_to_remote_file(key=obj_key, content=dumped_data)
     s3.push_file_to_s3(filepath=file_path, file_upload_key=file_key)
     # TODO: Maybe update db that the file has been updated?

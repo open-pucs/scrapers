@@ -50,11 +50,9 @@ await asyncio.to_thread(<sync s3 function>)
 
 
 class S3FileManager:
-    def __init__(self, bucket: str, logger: Optional[Any] = None) -> None:
-        if logger is None:
-            logger = default_logger
+    def __init__(self, bucket: str) -> None:
         self.endpoint = OPENSCRAPERS_S3_ENDPOINT
-        self.logger = logger
+        self.logger = default_logger
 
         self.tmpdir = TMP_DIR
 
