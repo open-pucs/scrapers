@@ -1,73 +1,55 @@
+from typing import Annotated
 import base64
-import io
-import os
 from pathlib import Path
-from typing import Tuple
-
 from hashlib import blake2b
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    AfterValidator,
+    PlainSerializer,
+    WithJsonSchema,
+    ValidationError,
+    TypeAdapter,
+)
+import pydantic
 
 
-class Blake2bHash:
-    """
-    Represents a base64 encoded BLAKE2b hash
-
-    A base64url-encoded BLAKE2b-256 hash
-    Example: "_EYNhTcsAPjIT3iNNvTnY5KFC1wm61Mki_uBcb3yKv2zDncVYfdI6c_7tH_PAAS8IlhNaapBg21fwT4Z7Ttxig=="
-    """
-
-    def __init__(self, data: bytes = bytes(32)):
-        if len(data) != 32:
-            raise ValueError(f"Hash data must be 32 bytes, got {len(data)}")
-        self.data = data
-
-    def __str__(self) -> str:
-        return base64.urlsafe_b64encode(self.data).decode("ascii")
-
-    def __repr__(self) -> str:
-        return f"KesslerHash({self.data!r})"
-
-    def to_json(self) -> str:
-        """Marshal the hash to a JSON string"""
-        return f'"{str(self)}"'
-
-    @classmethod
-    def from_json(cls, json_data: bytes) -> "Blake2bHash":
-        """Unmarshal a hash from JSON data"""
-        if len(json_data) < 2 or json_data[0] != ord('"') or json_data[-1] != ord('"'):
-            raise ValueError("Invalid JSON string")
-
-        # Extract the string between quotes
-        b64_str = json_data[1:-1].decode("ascii")
-        return cls.from_string(b64_str)
-
-    @classmethod
-    def from_string(cls, s: str) -> "Blake2bHash":
-        """Create a KesslerHash from a base64 encoded string"""
+def decode_blake2b(v):
+    if isinstance(v, str):
         try:
-            decoded = base64.urlsafe_b64decode(s)
+            return base64.urlsafe_b64decode(v)
         except Exception as e:
             raise ValueError(f"Failed to decode base64 string: {e}")
+    elif isinstance(v, bytes):
+        return v
+    else:
+        raise ValueError("Expected a string or bytes")
 
-        if len(decoded) != 32:
-            raise ValueError(f"Decoded base64 string length {len(decoded)} != 32")
 
-        return cls(decoded)
+def validate_length(v: bytes):
+    if len(v) != 32:
+        raise ValueError(f"Expected 32 bytes, got {len(v)}")
+    return v
 
-    @classmethod
-    def from_bytes(cls, b: bytes) -> "Blake2bHash":
-        """Create a KesslerHash by hashing the provided bytes"""
-        h = blake2b(b, digest_size=32)
-        return cls(h.digest())
 
-    @classmethod
-    def from_file(cls, file_path: Path) -> "Blake2bHash":
-        """Create a KesslerHash by hashing the contents of a file"""
-        try:
-            with open(file_path, "rb") as file:
-                h = blake2b(digest_size=32)
-                # Read and update hash in chunks to avoid loading large files into memory
-                for chunk in iter(lambda: file.read(4096), b""):
-                    h.update(chunk)
-                return cls(h.digest())
-        except Exception as e:
-            raise IOError(f"Error reading file {file_path}: {e}")
+Blake2bHash = Annotated[
+    bytes,
+    BeforeValidator(decode_blake2b),
+    AfterValidator(validate_length),
+    PlainSerializer(lambda x: base64.urlsafe_b64encode(x).decode("ascii")),
+    WithJsonSchema({"type": "string"}, mode="serialization"),
+]
+
+
+def blake2b_hash_from_bytes(data: bytes) -> Blake2bHash:
+    """Generate a Blake2bHash from the given bytes."""
+    return blake2b(data, digest_size=32).digest()
+
+
+def blake2b_hash_from_file(file_path: Path) -> Blake2bHash:
+    """Generate a Blake2bHash from the contents of a file."""
+    hasher = blake2b(digest_size=32)
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hasher.update(chunk)
+    return hasher.digest()

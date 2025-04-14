@@ -8,7 +8,7 @@ from openpuc_scrapers.db.s3_wrapper import rand_filepath
 from openpuc_scrapers.models.attachment import GenericAttachment
 from openpuc_scrapers.models.constants import TMP_DIR
 from openpuc_scrapers.models.filing import GenericFiling
-from openpuc_scrapers.models.hashes import Blake2bHash
+from openpuc_scrapers.models.hashes import Blake2bHash, blake2b_hash_from_file
 from openpuc_scrapers.models.raw_attachments import (
     AttachmentTextQuality,
     RawAttachment,
@@ -42,7 +42,7 @@ async def process_and_shipout_initial_attachment(
         raise ValueError("Cannot Process Attachment if document_type is None or empty")
     str_url = str(att.url)
     tmp_filepath = await download_file_from_url_to_path(str_url)
-    hash = Blake2bHash.from_file(tmp_filepath)
+    hash = blake2b_hash_from_file(tmp_filepath)
     att.hash = hash
     raw_attach = RawAttachment(
         hash=hash, name=att.name, extension=att.document_type, text_objects=[]
