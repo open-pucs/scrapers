@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Union
 import base64
 from pathlib import Path
 from hashlib import blake2b
@@ -14,7 +14,7 @@ from pydantic import (
 import pydantic
 
 
-def decode_blake2b(v):
+def decode_blake2b(v: Union[str, bytes]):
     if isinstance(v, str):
         try:
             return base64.urlsafe_b64decode(v)
@@ -22,8 +22,7 @@ def decode_blake2b(v):
             raise ValueError(f"Failed to decode base64 string: {e}")
     elif isinstance(v, bytes):
         return v
-    else:
-        raise ValueError("Expected a string or bytes")
+    raise ValueError("Expected a string or bytes")
 
 
 def validate_length(v: bytes):
