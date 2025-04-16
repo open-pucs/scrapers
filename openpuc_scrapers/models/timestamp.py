@@ -63,6 +63,10 @@ RFC3339Time = Annotated[
 ]
 
 
+def rfc_time_from_string(input: str) -> RFC3339Time:
+    return to_rfc339_time(input)
+
+
 def rfc_time_now() -> RFC3339Time:
     return datetime.now(tz=timezone.utc)
 

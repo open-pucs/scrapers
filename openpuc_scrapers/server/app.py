@@ -11,6 +11,10 @@ def create_app() -> FastAPI:
     app = FastAPI()
 
     # Mount static files
-    app.mount("/", StaticFiles(directory="static", html=True), name="static")
+    app.mount(
+        "/",
+        StaticFiles(directory="openpuc_scrapers/server/static", html=True),
+        name="static",
+    )
 
     return app
