@@ -22,7 +22,7 @@ OPENSCRAPERS_S3_OBJECT_BUCKET = os.environ.get(
 )
 
 OPENSCRAPERS_SQL_DB_SCONNECTION = os.environ.get(
-    "OPENSCRAPERS_SQL_DB_SCONNECTION", "sqlite:///db.sqlite3"
+    "OPENSCRAPERS_SQL_DB_SCONNECTION", "sqlite+aiosqlite:///db.sqlite3"
 )
 
 
