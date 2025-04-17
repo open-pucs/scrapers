@@ -12,13 +12,12 @@ RUN chown -R airflow /app
 USER airflow
 
 # Copy package structure
-RUN pip install apache-airflow-providers-celery
 COPY pyproject.toml uv.lock /app/
 
 
 
 RUN uv pip compile pyproject.toml --output-file requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# RUN pip install --no-cache-dir -r requirements.txt
 
 COPY openpuc_scrapers/ /app/openpuc_scrapers/
 
@@ -26,7 +25,10 @@ USER root
 RUN chown -R airflow /app
 USER airflow
 
+# Doesnt work rn
 # RUN export PYTHONPATH=$PYTHONPATH:/app
-ENV PYTHONPATH=/app:$PYTHONPATH
+# ENV PYTHONPATH=/app:$PYTHONPATH
 
 WORKDIR /home/airflow
+
+CMD [ "airflow","standalone" ]
