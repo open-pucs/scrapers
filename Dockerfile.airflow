@@ -1,18 +1,20 @@
-FROM apache/airflow:slim-3.0.0rc2-python3.12
+FROM apache/airflow:2.10.5-python3.12
 
 
 # RUN pip --version && sleep 5000
 RUN pip install --no-cache-dir uv
 
 
-# Copy package structure
-COPY pyproject.toml uv.lock /app/
-
 WORKDIR /app
 
 USER root 
 RUN chown -R airflow /app
 USER airflow
+
+# Copy package structure
+RUN pip install apache-airflow-providers-celery
+COPY pyproject.toml uv.lock /app/
+
 
 
 RUN uv pip compile pyproject.toml --output-file requirements.txt
