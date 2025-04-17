@@ -3,7 +3,7 @@ version: "3.8"
 x-airflow-common: &airflow-common
   build:
     context: .
-    dockerfile: Dockerfile.airflow
+    dockerfile: Dockerfile.airflow-standalone
 
   # environment: &airflow-common-env
   #   AIRFLOW__CORE__EXECUTOR: CeleryExecutor
@@ -24,11 +24,11 @@ x-airflow-common: &airflow-common
     # - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
   # user: "${AIRFLOW_UID:-50000}:0"
   user: "50000:0"
-  depends_on: &airflow-common-depends-on
-    redis:
-      condition: service_healthy
-    airflow-postgres:
-      condition: service_healthy
+  # depends_on: &airflow-common-depends-on
+  #   redis:
+  #     condition: service_healthy
+  #   airflow-postgres:
+  #     condition: service_healthy
 
 x-openscraper-env-variables:
   &openscraper-env-variables # - OPENSCRAPERS_SQL_DB_CONNECTION: postgresql://postgres:dolphins@openscrapers-postgres:5432/postgres
@@ -39,94 +39,95 @@ x-openscraper-env-variables:
 
 services:
   # OpenScrapers Services
-  openscrapers-postgres:
-    image: postgres:17.4-alpine
-    restart: always
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=dolphins
-      - POSTGRES_DB=postgres
-      - PGDATA=/var/lib/postgresql/data/pgdata
-    volumes:
-      - ./volumes/openscrapers/pgdata:/var/lib/postgresql/data
-    expose:
-      - 5432
-
-  openscrapers-api:
-    build:
-      context: .
-      dockerfile: Dockerfile.server
-    depends_on:
-      - openscrapers-postgres
-    labels:
-      - "traefik.enable=true"
-      - "traefik.namespace=openscrapers"
-      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)"
-      - "traefik.http.routers.blog.tls.domains[0].main=${DOMAIN}"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
-      - "traefik.http.routers.whoami.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.whoami.entrypoints=websecure"
-      - "traefik.http.routers.whoami.tls.certresolver=myresolver"
-    volumes:
-      - ./openpuc_scrapers:/app/openpuc_scrapers
-    expose:
-      - 8000
-    environment:
-      <<: *openscraper-env-variables
-  reverse-proxy:
-    image: traefik:v3.0
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.constraints=Label(`traefik.namespace`,`openscrapers`)"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entryPoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.email=mbright@kessler.xyz"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8083:8080"
-    volumes:
-      - "./volumes/letsencrypt:/letsencrypt"
-      - /var/run/docker.sock:/var/run/docker.sock
-  # Airflow Services
-  airflow-postgres:
-    # image: postgres:13
-    # Original image used postgres 13, if anything appears wrong, I think its a good idea to revert to the old image
-    image: postgres:17.4-alpine
-    environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
-    volumes:
-      - .volumes/postgres-db-volume:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
-      interval: 10s
-      retries: 5
-      start_period: 5s
-    restart: always
-
-  redis:
-    image: redis:7.2-bookworm
-    expose:
-      - 6379
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 30s
-      retries: 50
-      start_period: 30s
-    restart: always
+  # openscrapers-postgres:
+  #   image: postgres:17.4-alpine
+  #   restart: always
+  #   environment:
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=dolphins
+  #     - POSTGRES_DB=postgres
+  #     - PGDATA=/var/lib/postgresql/data/pgdata
+  #   volumes:
+  #     - ./volumes/openscrapers/pgdata:/var/lib/postgresql/data
+  #   expose:
+  #     - 5432
+  #
+  # openscrapers-api:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.server
+  #   depends_on:
+  #     - openscrapers-postgres
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.namespace=openscrapers"
+  #     - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)"
+  #     - "traefik.http.routers.blog.tls.domains[0].main=${DOMAIN}"
+  #     - "traefik.http.routers.frontend.entrypoints=websecure"
+  #     - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+  #     - "traefik.http.routers.whoami.rule=Host(`${DOMAIN}`)"
+  #     - "traefik.http.routers.whoami.entrypoints=websecure"
+  #     - "traefik.http.routers.whoami.tls.certresolver=myresolver"
+  #   volumes:
+  #     - ./openpuc_scrapers:/app/openpuc_scrapers
+  #   expose:
+  #     - 8000
+  #   environment:
+  #     <<: *openscraper-env-variables
+  # reverse-proxy:
+  #   image: traefik:v3.0
+  #   command:
+  #     - "--api.insecure=true"
+  #     - "--providers.docker=true"
+  #     - "--providers.docker.constraints=Label(`traefik.namespace`,`openscrapers`)"
+  #     - "--providers.docker.exposedbydefault=false"
+  #     - "--entryPoints.websecure.address=:443"
+  #     - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+  #     - "--certificatesresolvers.myresolver.acme.email=mbright@kessler.xyz"
+  #     - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #     - "8083:8080"
+  #   volumes:
+  #     - "./volumes/letsencrypt:/letsencrypt"
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  # # Airflow Services
+  # airflow-postgres:
+  #   # image: postgres:13
+  #   # Original image used postgres 13, if anything appears wrong, I think its a good idea to revert to the old image
+  #   image: postgres:17.4-alpine
+  #   environment:
+  #     POSTGRES_USER: airflow
+  #     POSTGRES_PASSWORD: airflow
+  #     POSTGRES_DB: airflow
+  #   volumes:
+  #     - .volumes/postgres-db-volume:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD", "pg_isready", "-U", "airflow"]
+  #     interval: 10s
+  #     retries: 5
+  #     start_period: 5s
+  #   restart: always
+  #
+  # redis:
+  #   image: redis:7.2-bookworm
+  #   expose:
+  #     - 6379
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 30s
+  #     retries: 50
+  #     start_period: 30s
+  #   restart: always
 
   airflow-standalone:
     <<: *airflow-common
-    command: airflow-standalone
-    ports:
-      - "3030:8080"
+    # ports:
+    #   - "3030:8080"
+    network_mode: "host"
+
   # airflow-webserver:
   #   <<: *airflow-common
   #   command: webserver
