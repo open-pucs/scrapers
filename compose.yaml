@@ -93,34 +93,34 @@ services:
   #     - "./volumes/letsencrypt:/letsencrypt"
   #     - /var/run/docker.sock:/var/run/docker.sock
   # # Airflow Services
-  # airflow-postgres:
-  #   # image: postgres:13
-  #   # Original image used postgres 13, if anything appears wrong, I think its a good idea to revert to the old image
-  #   image: postgres:17.4-alpine
-  #   environment:
-  #     POSTGRES_USER: airflow
-  #     POSTGRES_PASSWORD: airflow
-  #     POSTGRES_DB: airflow
-  #   volumes:
-  #     - .volumes/postgres-db-volume:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD", "pg_isready", "-U", "airflow"]
-  #     interval: 10s
-  #     retries: 5
-  #     start_period: 5s
-  #   restart: always
-  #
-  # redis:
-  #   image: redis:7.2-bookworm
-  #   expose:
-  #     - 6379
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 10s
-  #     timeout: 30s
-  #     retries: 50
-  #     start_period: 30s
-  #   restart: always
+  airflow-postgres:
+    # image: postgres:13
+    # Original image used postgres 13, if anything appears wrong, I think its a good idea to revert to the old image
+    image: postgres:17.4-alpine
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - .volumes/postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  redis:
+    image: valkey/valkey:alpine
+    expose:
+      - 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 30s
+      retries: 50
+      start_period: 30s
+    restart: always
 
   airflow-standalone:
     <<: *airflow-common

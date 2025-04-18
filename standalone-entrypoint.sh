@@ -10,10 +10,10 @@ until pg_isready -h airflow-postgres -p 5432 -U airflow; do
 done
 
 # Wait for Redis to be ready
-until redis-cli -h redis -p 6379 ping; do
-  echo "Waiting for Redis..."
-  sleep 1
-done
+# until redis-cli -h redis -p 6379 ping; do
+#   echo "Waiting for Redis..."
+#   sleep 1
+# done
 
 # Initialize the database
 airflow db init
