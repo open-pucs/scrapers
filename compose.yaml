@@ -5,17 +5,17 @@ x-airflow-common: &airflow-common
     context: .
     dockerfile: Dockerfile.airflow-standalone
 
-  # environment: &airflow-common-env
-  #   AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-  #   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
-  #   AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
-  #   AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
-  #   AIRFLOW__CORE__FERNET_KEY: ""
-  #   AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
-  #   AIRFLOW__CORE__LOAD_EXAMPLES: "true"
-  #   AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
-  #   AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
-  #   _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
+    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    # AIRFLOW__CORE__FERNET_KEY: ""
+    # AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    # AIRFLOW__CORE__LOAD_EXAMPLES: "true"
+    # AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+    # AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    # _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
   volumes:
     - ./airflow_dags:/opt/airflow/dags
     - ./openpuc_scrapers:/app/openpuc_scrapers
@@ -24,11 +24,11 @@ x-airflow-common: &airflow-common
     # - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
   # user: "${AIRFLOW_UID:-50000}:0"
   user: "50000:0"
-  # depends_on: &airflow-common-depends-on
-  #   redis:
-  #     condition: service_healthy
-  #   airflow-postgres:
-  #     condition: service_healthy
+  depends_on: &airflow-common-depends-on
+    redis:
+      condition: service_healthy
+    airflow-postgres:
+      condition: service_healthy
 
 x-openscraper-env-variables:
   &openscraper-env-variables # - OPENSCRAPERS_SQL_DB_CONNECTION: postgresql://postgres:dolphins@openscrapers-postgres:5432/postgres
@@ -124,9 +124,9 @@ services:
 
   airflow-standalone:
     <<: *airflow-common
-    # ports:
-    #   - "3030:8080"
-    network_mode: "host"
+    ports:
+      - "3030:8081"
+    # network_mode: "host"
     # command: "./entrypoint.sh"
 
   # airflow-webserver:
