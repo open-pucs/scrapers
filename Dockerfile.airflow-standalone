@@ -24,18 +24,19 @@ COPY openpuc_scrapers/ /app/openpuc_scrapers/
 USER root 
 RUN chown -R airflow /app
 
+WORKDIR /home/airflow
 # TODO: Move to beginning of file to prevent reinstalling every time dependancies change.
 # Install socat and netcat (for port checking)
 RUN apt-get update && \
-  apt-get install -y socat netcat && \
+  apt-get install -y socat netcat-traditional && \
   rm -rf /var/lib/apt/lists/*
-USER airflow
-WORKDIR /home/airflow
-
 COPY standalone-entrypoint.sh ./entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+USER airflow
 
+ENTRYPOINT [ "/bin/bash" ]
 CMD ["./entrypoint.sh"]
+# CMD ["./entrypoint.sh"]
 
 # Doesnt work rn
 # RUN export PYTHONPATH=$PYTHONPATH:/app

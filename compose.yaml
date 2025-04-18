@@ -127,6 +127,7 @@ services:
     # ports:
     #   - "3030:8080"
     network_mode: "host"
+    # command: "./entrypoint.sh"
 
   # airflow-webserver:
   #   <<: *airflow-common
