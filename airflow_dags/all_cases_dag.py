@@ -8,12 +8,8 @@ from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
 )
 from openpuc_scrapers.scrapers.scraper_lookup import (
     get_scraper_type_from_name_default_dummy,
-    get_scraper_type_from_name_unvalidated,
 )
 
-# from openpuc_scrapers.models.case import GenericCase
-# from openpuc_scrapers.scrapers.base import StateCaseData, StateFilingData
-# from functools import partial
 
 default_args = {
     "owner": "airflow",
@@ -34,14 +30,6 @@ def all_cases_dag():
     def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[Any]:
         return get_all_caselist_raw(scraper=scraper, base_path=base_path)
 
-    # @task
-    # def get_caselist_since_date_raw_airflow(
-    #     scraper: Any, after_date: datetime, base_path: str
-    # ) -> List[Any]:
-    #     return get_new_caselist_since_date(
-    #         scraper=scraper, after_date=after_date, base_path=base_path
-    #     )
-
     @task
     def process_case_airflow(scraper: Any, case: Any, base_path: str) -> Any:
         return process_case(scraper=scraper, case=case, base_path=base_path)
@@ -52,14 +40,16 @@ def all_cases_dag():
     scraper = scraper_type()
     base_path = generate_intermediate_object_save_path(scraper)
     cases = get_all_caselist_raw_airflow(scraper=scraper, base_path=base_path)
-    for case in cases:
-        process_case_airflow(scraper=scraper, case=case, base_path=base_path)
+    processed_cases = []
+    # Getting an error on this line that
+    # TypeError: 'XComArg' object is not iterable
 
-    # partial_process_case = partial(
-    #     process_case_airflow, scraper=scraper, base_path=base_path
-    # )
-    # for case in cases:
-    #     partial_process_case(case=case)
+    for case in cases:
+        processed_case = process_case_airflow(
+            scraper=scraper, case=case, base_path=base_path
+        )
+        processed_cases.append(processed_case)
+    return processed_cases
 
 
 all_cases_workflow = all_cases_dag()
