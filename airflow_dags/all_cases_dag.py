@@ -40,16 +40,11 @@ def all_cases_dag():
     scraper = scraper_type()
     base_path = generate_intermediate_object_save_path(scraper)
     cases = get_all_caselist_raw_airflow(scraper=scraper, base_path=base_path)
-    processed_cases = []
-    # Getting an error on this line that
-    # TypeError: 'XComArg' object is not iterable
 
-    for case in cases:
-        processed_case = process_case_airflow(
-            scraper=scraper, case=case, base_path=base_path
-        )
-        processed_cases.append(processed_case)
-    return processed_cases
+    # Process cases using Airflow's dynamic task mapping
+    return process_case_airflow.expand(
+        scraper=[scraper], case=cases, base_path=[base_path]
+    )
 
 
 all_cases_workflow = all_cases_dag()
