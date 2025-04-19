@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.filing import GenericFiling
+from openpuc_scrapers.models.timestamp import date_to_rfctime
 from openpuc_scrapers.scrapers.base import GenericScraper
 
 
@@ -282,7 +283,9 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
             description=state_data.case_title,
             industry=state_data.industry_affected,
             petitioner=state_data.organization,
-            opened_date=datetime.strptime(state_data.date_filed, "%m/%d/%Y").date(),
+            opened_date=date_to_rfctime(
+                datetime.strptime(state_data.date_filed, "%m/%d/%Y").date()
+            ),
             extra_metadata={
                 "matter_type": state_data.matter_type,
                 "matter_subtype": state_data.matter_subtype,
@@ -301,7 +304,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
 
         return GenericFiling(
             # case_number=self.docket_id,
-            filed_date=filed_date_obj,
+            filed_date=date_to_rfctime(filed_date_obj),
             party_name=state_data.filing_on_behalf_of,
             filing_type=state_data.filing_type,
             description=state_data.description_of_filing,

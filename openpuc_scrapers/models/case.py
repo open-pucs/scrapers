@@ -28,7 +28,7 @@ class GenericCase(BaseModel):
     industry: Optional[str] = None
     petitioner: Optional[str] = None
     hearing_officer: Optional[str] = None
-    opened_date: Optional[date] = None
+    opened_date: Optional[RFC3339Time] = None
     closed_date: Optional[date] = None
     filings: Optional[list[GenericFiling]] = None
     extra_metadata: Dict[str, Any] = {}

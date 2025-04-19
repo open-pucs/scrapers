@@ -1,6 +1,6 @@
 import json
 from typing import Annotated, Union
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from pydantic import BeforeValidator, PlainSerializer
 
@@ -88,3 +88,7 @@ def rfc_time_from_mmddyyyy(date_str: str) -> RFC3339Time:
         return parsed_date
     except ValueError as e:
         raise ValueError(f"Failed to parse date: {e}")
+
+
+def date_to_rfctime(date: date) -> RFC3339Time:
+    return datetime.combine(date, datetime.min.time()).replace(tzinfo=timezone.utc)
