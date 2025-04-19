@@ -1,13 +1,10 @@
-from datetime import datetime, timezone
 from typing import Any, List, Optional
-import pugsql
 from pydantic import BaseModel
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.constants import OPENSCRAPERS_SQL_DB_SCONNECTION
 from openpuc_scrapers.models.filing import GenericFiling
 
 
-from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
