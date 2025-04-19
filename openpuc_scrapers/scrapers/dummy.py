@@ -96,6 +96,16 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
             if c.opened_date > after_date
         ]
 
+    def enrich_filing_data_intermediate(
+        self, filing_data: DummyFilingData
+    ) -> Dict[str, Any]:
+        return {}
+
+    def enrich_filing_data_from_intermediate_intermediate(
+        self, filing_data: DummyFilingData, intermediate: Dict[str, Any]
+    ) -> DummyFilingData:
+        return filing_data
+
     def into_generic_case_data(self, state_data: DummyCaseData) -> GenericCase:
         return GenericCase(
             case_number=state_data.case_number,

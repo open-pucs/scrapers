@@ -13,3 +13,4 @@ psycopg2-binary>=2.9.10
 pymupdf4llm>=0.0.19
 selenium>=4.29.0
 faker>=37.1.0
+boto3>=1.37.37

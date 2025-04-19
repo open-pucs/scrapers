@@ -311,3 +311,13 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
             attachments=attachments,
             extra_metadata={},
         )
+
+    def enrich_filing_data_intermediate(
+        self, filing_data: NYPUCFiling
+    ) -> Dict[str, Any]:
+        return {}
+
+    def enrich_filing_data_from_intermediate_intermediate(
+        self, filing_data: NYPUCFiling, intermediate: Dict[str, Any]
+    ) -> NYPUCFiling:
+        return filing_data
