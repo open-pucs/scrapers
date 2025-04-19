@@ -95,7 +95,7 @@ async def get_last_updated_cases(
             country=row.country,
             state=row.state,
             jurisdiction_name=row.juristiction_name,
-            indexed_at=RFC3339Time(row.indexed_at),
+            indexed_at=row.indexed_at,
         )
 
     indexed_after_datetime = indexed_after.time
