@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import BaseModel
 
 
-from openpuc_scrapers.pipelines.s3_utils import S3FileManager
+from openpuc_scrapers.db.s3_utils import S3FileManager
 
 
 # Helper functions
