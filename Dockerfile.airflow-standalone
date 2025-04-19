@@ -8,6 +8,9 @@ RUN pip install --no-cache-dir uv
 WORKDIR /app
 
 USER root 
+RUN apt-get update && \
+  apt-get install -y socat netcat-traditional && \
+  rm -rf /var/lib/apt/lists/*
 RUN chown -R airflow /app
 USER airflow
 
@@ -16,7 +19,9 @@ COPY pyproject.toml uv.lock /app/
 
 
 
-RUN uv pip compile pyproject.toml --output-file requirements.txt
+# RUN uv pip compile pyproject.toml --output-file requirements.txt
+# Testing new dependancy resolution stuff
+COPY ./airflow-requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY openpuc_scrapers/ /app/openpuc_scrapers/
@@ -27,9 +32,6 @@ RUN chown -R airflow /app
 WORKDIR /home/airflow
 # TODO: Move to beginning of file to prevent reinstalling every time dependancies change.
 # Install socat and netcat (for port checking)
-RUN apt-get update && \
-  apt-get install -y socat netcat-traditional && \
-  rm -rf /var/lib/apt/lists/*
 COPY standalone-entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 USER airflow

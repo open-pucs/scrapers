@@ -1,5 +1,3 @@
-import flytekit as fl
-
 from typing import Any, List
 from datetime import date, datetime, timezone
 from pydantic import BaseModel

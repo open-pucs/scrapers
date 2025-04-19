@@ -9,11 +9,7 @@ until pg_isready -h airflow-postgres -p 5432 -U airflow; do
   sleep 1
 done
 
-# Wait for Redis to be ready
-# until redis-cli -h redis -p 6379 ping; do
-#   echo "Waiting for Redis..."
-#   sleep 1
-# done
+export PYTHONPATH=$PYTHONPATH:/app
 
 # Initialize the database
 airflow db init
@@ -38,4 +34,3 @@ airflow celery worker &
 
 # Start socat in the foreground to maintain container lifetime
 exec socat TCP-LISTEN:8081,fork,reuseaddr TCP:localhost:8080
-
