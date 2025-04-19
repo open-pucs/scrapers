@@ -16,9 +16,9 @@ def save_to_disk_and_s3(path: str, bucket: str, content: str) -> None:
 def save_json(path: str, bucket: str, data: Any) -> None:
     if isinstance(data, dict):
         json_data = data
-    if isinstance(data, BaseModel):
+    elif isinstance(data, BaseModel):
         json_data = data.model_dump()
-    if isinstance(data, list):
+    elif isinstance(data, list):
         json_data = [item.model_dump() for item in data]
     else:
         raise Exception("Data is not a list, dict, or BaseModel")
