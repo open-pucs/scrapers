@@ -17,7 +17,7 @@ COPY pyproject.toml uv.lock /app/
 
 
 RUN uv pip compile pyproject.toml --output-file requirements.txt
-# RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY openpuc_scrapers/ /app/openpuc_scrapers/
 
