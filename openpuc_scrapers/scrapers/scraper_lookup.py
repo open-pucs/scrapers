@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Optional
 
 from openpuc_scrapers.scrapers.base import GenericScraper
+from openpuc_scrapers.scrapers.dummy import DummyScraper
 from openpuc_scrapers.scrapers.ny_puc import NYPUCScraper
 
 
@@ -23,6 +24,8 @@ def get_scraper_type_from_name(name: ScraperName) -> type[GenericScraper]:
             raise ValueError("Not implemented")
         case ScraperName.CO_PUC:
             raise ValueError("Not implemented")
+        case ScraperName.TEST:
+            return DummyScraper
 
         # case _:
         #     raise ValueError("Scraper not Found")
@@ -34,3 +37,10 @@ def get_scraper_type_from_name_unvalidated(name: str) -> type[GenericScraper]:
     except ValueError:
         raise ValueError(f"Invalid scraper name: {name}") from None
     return get_scraper_type_from_name(scraper_name)
+
+
+def get_scraper_type_from_name_default_dummy(name: str) -> type[GenericScraper]:
+    try:
+        return get_scraper_type_from_name_unvalidated(name)
+    except Exception:
+        return DummyScraper

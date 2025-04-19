@@ -7,6 +7,7 @@ from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
     process_case,
 )
 from openpuc_scrapers.scrapers.scraper_lookup import (
+    get_scraper_type_from_name_default_dummy,
     get_scraper_type_from_name_unvalidated,
 )
 
@@ -44,7 +45,7 @@ def new_cases_since_date_dag():
 
     # DAG structure
     scraper_name = "{{ params.scraper_name }}"
-    scraper_type = get_scraper_type_from_name_unvalidated(scraper_name)
+    scraper_type = get_scraper_type_from_name_default_dummy(scraper_name)
     scraper = scraper_type()
     base_path = generate_intermediate_object_save_path(scraper)
 
