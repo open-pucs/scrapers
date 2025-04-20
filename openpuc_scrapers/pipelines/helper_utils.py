@@ -11,17 +11,23 @@ def save_to_disk_and_s3(path: str, bucket: str, content: str) -> None:
     S3FileManager(bucket).save_string_to_remote_file(path, content)
 
 
-# FIXME: isnt working due to the higher order types sadly, also the last case can choke with recursive unjsonifiable types like RFCDatetimes and HttpUrl
-def create_json_string(data: Any) -> str:
+# Takes in a dict, a pydantic BaseModel, or a List[BaseModel]
+def create_json_string(data) -> str:
+    def _serialize(obj):
+        if isinstance(obj, BaseModel):
+            return obj.model_dump(mode="json")
+        return obj
+
+    if isinstance(data, BaseModel):
+        return data.model_dump_json(indent=2)
+
+    if isinstance(data, list):
+        return json.dumps([_serialize(item) for item in data], indent=2)
+
     if isinstance(data, dict):
-        json_data = data
-    elif isinstance(data, BaseModel):
-        return data.model_dump_json()
-    elif isinstance(data, list):
-        json_data = [item.model_dump() for item in data]
-    else:
-        raise Exception("Data is not a list, dict, or BaseModel")
-    return json.dumps(json_data, indent=2)
+        return json.dumps({k: _serialize(v) for k, v in data.items()}, indent=2)
+
+    raise ValueError(f"Unsupported data type: {type(data)}")
 
 
 def save_json(path: str, bucket: str, data: Any) -> None:
