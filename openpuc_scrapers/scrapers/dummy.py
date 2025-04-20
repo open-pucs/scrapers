@@ -1,6 +1,8 @@
 from datetime import date, datetime
 from typing import Any, Dict, List
-from pydantic import BaseModel, HttpUrl
+
+from pydantic import HttpUrl
+from openpuc_scrapers.db.airflow_basemodel import AirflowBaseModel
 from random import randint, choice
 from faker import Faker
 
@@ -13,14 +15,14 @@ from openpuc_scrapers.scrapers.base import GenericScraper
 fake = Faker()
 
 
-class DummyAttachment(BaseModel):
+class DummyAttachment(AirflowBaseModel):
     document_title: str
     url: HttpUrl
     file_format: str = "pdf"
     document_type: str = "filing"
 
 
-class DummyFilingData(BaseModel):
+class DummyFilingData(AirflowBaseModel):
     filing_id: str
     case_number: str
     date_filed: RFC3339Time
@@ -29,7 +31,7 @@ class DummyFilingData(BaseModel):
     filing_type: str = "test_filing"
 
 
-class DummyCaseData(BaseModel):
+class DummyCaseData(AirflowBaseModel):
     case_number: str
     description: str
     opened_date: RFC3339Time

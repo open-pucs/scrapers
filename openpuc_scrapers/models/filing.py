@@ -1,13 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
-from pydantic import BaseModel
+from openpuc_scrapers.db.airflow_basemodel import AirflowBaseModel
 
 from openpuc_scrapers.models.timestamp import RFC3339Time
 
 from .attachment import GenericAttachment
 
 
-class GenericFiling(BaseModel):
+class GenericFiling(AirflowBaseModel):
     """Model representing filing data within a case.
 
     Attributes:

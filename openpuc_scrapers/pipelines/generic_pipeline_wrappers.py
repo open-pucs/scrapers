@@ -1,6 +1,4 @@
 from typing import Any, List
-from datetime import date, datetime, timezone
-from pydantic import BaseModel
 
 from openpuc_scrapers.db.s3_utils import push_case_to_s3_and_db
 from openpuc_scrapers.models.constants import (
