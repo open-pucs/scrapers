@@ -1,12 +1,10 @@
-from pydantic import HttpUrl
 from openpuc_scrapers.models.attachment import GenericAttachment
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from openpuc_scrapers.db.airflow_basemodel import AirflowBaseModel
-
+from pydantic import BaseModel, HttpUrl
 from typing import Any, Dict, List, Tuple
 import time
 from datetime import datetime
@@ -18,7 +16,7 @@ from openpuc_scrapers.models.timestamp import RFC3339Time, date_to_rfctime
 from openpuc_scrapers.scrapers.base import GenericScraper
 
 
-class NYPUCAttachment(AirflowBaseModel):
+class NYPUCAttachment(BaseModel):
     document_title: str = ""
     url: HttpUrl
     file_format: str = ""
@@ -26,7 +24,7 @@ class NYPUCAttachment(AirflowBaseModel):
     file_name: str = ""
 
 
-class NYPUCFiling(AirflowBaseModel):
+class NYPUCFiling(BaseModel):
     attachments: List[NYPUCAttachment] = []
     filing_type: str = ""
     case_number: str = ""
@@ -38,7 +36,7 @@ class NYPUCFiling(AirflowBaseModel):
     response_to: str = ""
 
 
-class NYPUCDocket(AirflowBaseModel):
+class NYPUCDocket(BaseModel):
     case_number: str  # 24-C-0663
     matter_type: str  # Complaint
     matter_subtype: str  # Appeal of an Informal Hearing Decision

@@ -1,8 +1,6 @@
 import json
 from typing import Any
-
 from pydantic import BaseModel
-from openpuc_scrapers.db.airflow_basemodel import AirflowBaseModel
 
 
 from openpuc_scrapers.db.s3_utils import S3FileManager

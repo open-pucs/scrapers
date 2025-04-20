@@ -1,10 +1,10 @@
 from typing import Any, List
 import asyncio
 import aiohttp
-from openpuc_scrapers.db.airflow_basemodel import AirflowBaseModel
+from pydantic import BaseModel
 
 
-class RequestData(AirflowBaseModel):
+class RequestData(BaseModel):
     url: str
     data: Any
 

@@ -1,5 +1,5 @@
 from typing import Any, List, Optional
-from openpuc_scrapers.db.airflow_basemodel import AirflowBaseModel
+from pydantic import BaseModel
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.constants import OPENSCRAPERS_SQL_DB_SCONNECTION
 from openpuc_scrapers.models.filing import GenericFiling
@@ -78,7 +78,7 @@ async def set_case_as_updated(
         await session.commit()
 
 
-class Caseinfo(AirflowBaseModel):
+class Caseinfo(BaseModel):
     country: str
     state: str
     jurisdiction_name: str

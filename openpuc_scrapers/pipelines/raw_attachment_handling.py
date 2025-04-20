@@ -2,6 +2,7 @@ from enum import Enum
 from hmac import new
 from pathlib import Path
 from typing import List, Optional
+from pydantic import BaseModel
 
 from openpuc_scrapers.db.s3_wrapper import rand_filepath
 from openpuc_scrapers.models.attachment import GenericAttachment

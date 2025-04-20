@@ -1,11 +1,10 @@
-from pydantic import HttpUrl
-from openpuc_scrapers.db.airflow_basemodel import AirflowBaseModel
+from pydantic import BaseModel, HttpUrl
 from typing import Any, Dict, Optional
 
 from openpuc_scrapers.models.hashes import Blake2bHash
 
 
-class GenericAttachment(AirflowBaseModel):
+class GenericAttachment(BaseModel):
     name: str
     url: HttpUrl
     document_type: Optional[str] = None

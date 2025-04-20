@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import json
 from pathlib import Path
 from typing import Any, Dict, Generic, TypeVar, List, Type
-from openpuc_scrapers.db.airflow_basemodel import AirflowBaseModel
+from pydantic import BaseModel
 
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
@@ -79,8 +79,8 @@ Both of those methods have default definitions that do nothing and just pass the
 """
 
 
-StateCaseData = TypeVar("StateCaseData", bound=AirflowBaseModel)
-StateFilingData = TypeVar("StateFilingData", bound=AirflowBaseModel)
+StateCaseData = TypeVar("StateCaseData", bound=BaseModel)
+StateFilingData = TypeVar("StateFilingData", bound=BaseModel)
 
 
 class GenericScraper(ABC, Generic[StateCaseData, StateFilingData]):

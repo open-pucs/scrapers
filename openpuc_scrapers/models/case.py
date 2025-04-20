@@ -1,4 +1,4 @@
-from openpuc_scrapers.db.airflow_basemodel import AirflowBaseModel
+from pydantic import BaseModel
 from typing import Any, Dict, Optional
 
 from openpuc_scrapers.models.timestamp import RFC3339Time, rfc_time_now
@@ -6,7 +6,7 @@ from openpuc_scrapers.models.timestamp import RFC3339Time, rfc_time_now
 from .filing import GenericFiling
 
 
-class GenericCase(AirflowBaseModel):
+class GenericCase(BaseModel):
     """Model representing case data.
 
     Attributes:

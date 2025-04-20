@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List
 
-from openpuc_scrapers.db.airflow_basemodel import AirflowBaseModel
+from pydantic import BaseModel
 
 from openpuc_scrapers.models.hashes import Blake2bHash
 from openpuc_scrapers.models.timestamp import RFC3339Time
@@ -13,14 +13,14 @@ class AttachmentTextQuality(Enum):
     high = 100
 
 
-class RawAttachmentText(AirflowBaseModel):
+class RawAttachmentText(BaseModel):
     quality: AttachmentTextQuality
     language: str
     text: str
     timestamp: RFC3339Time
 
 
-class RawAttachment(AirflowBaseModel):
+class RawAttachment(BaseModel):
     hash: Blake2bHash
     name: str
     extension: str
