@@ -11,16 +11,19 @@ def save_to_disk_and_s3(path: str, bucket: str, content: str) -> None:
     S3FileManager(bucket).save_string_to_remote_file(path, content)
 
 
-# isnt working due to the higher order types sadly
-# def save_json(path: str, data: BaseModel | List[BaseModel]) -> None:
-def save_json(path: str, bucket: str, data: Any) -> None:
+# FIXME: isnt working due to the higher order types sadly, also the last case can choke with recursive unjsonifiable types like RFCDatetimes and HttpUrl
+def create_json_string(data: Any) -> str:
     if isinstance(data, dict):
         json_data = data
     elif isinstance(data, BaseModel):
-        json_data = data.model_dump()
+        return data.model_dump_json()
     elif isinstance(data, list):
         json_data = [item.model_dump() for item in data]
     else:
         raise Exception("Data is not a list, dict, or BaseModel")
-    json_str = json.dumps(json_data, indent=2)
+    return json.dumps(json_data, indent=2)
+
+
+def save_json(path: str, bucket: str, data: Any) -> None:
+    json_str = create_json_string(data)
     save_to_disk_and_s3(path, bucket, json_str)
