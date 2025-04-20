@@ -2,11 +2,11 @@ from abc import ABC, abstractmethod
 import json
 from pathlib import Path
 from typing import Any, Dict, Generic, TypeVar, List, Type
-from datetime import date, datetime, timezone
 from pydantic import BaseModel
 
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
+from openpuc_scrapers.models.timestamp import RFC3339Time
 
 
 """
@@ -115,13 +115,15 @@ class GenericScraper(ABC, Generic[StateCaseData, StateFilingData]):
 
     # Updated cases methods
     @abstractmethod
-    def updated_cases_since_date_intermediate(self, after_date: date) -> Dict[str, Any]:
+    def updated_cases_since_date_intermediate(
+        self, after_date: RFC3339Time
+    ) -> Dict[str, Any]:
         """Get intermediate for cases updated after given date"""
         pass
 
     @abstractmethod
     def updated_cases_since_date_from_intermediate(
-        self, intermediate: Dict[str, Any], after_date: date
+        self, intermediate: Dict[str, Any], after_date: RFC3339Time
     ) -> List[StateCaseData]:
         """Convert intermediate to updated case data objects"""
         pass

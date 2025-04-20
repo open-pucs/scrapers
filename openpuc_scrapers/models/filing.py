@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 from pydantic import BaseModel
-from datetime import date
 
 from openpuc_scrapers.models.timestamp import RFC3339Time
 

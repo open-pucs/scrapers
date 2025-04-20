@@ -10,7 +10,7 @@ from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
 
 
-from openpuc_scrapers.models.timestamp import rfc_time_now
+from openpuc_scrapers.models.timestamp import RFC3339Time, rfc_time_now
 from openpuc_scrapers.pipelines.helper_utils import save_json
 from openpuc_scrapers.pipelines.raw_attachment_handling import process_generic_filing
 from openpuc_scrapers.scrapers.base import (
@@ -103,7 +103,7 @@ def get_all_caselist_raw(
 
 def get_new_caselist_since_date(
     scraper: GenericScraper[StateCaseData, StateFilingData],
-    after_date: date,
+    after_date: RFC3339Time,
     base_path: str,
 ) -> List[StateCaseData]:
     # Get and save updated cases

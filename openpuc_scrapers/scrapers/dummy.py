@@ -7,7 +7,7 @@ from faker import Faker
 from openpuc_scrapers.models.attachment import GenericAttachment
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.filing import GenericFiling
-from openpuc_scrapers.models.timestamp import date_to_rfctime
+from openpuc_scrapers.models.timestamp import RFC3339Time, date_to_rfctime
 from openpuc_scrapers.scrapers.base import GenericScraper
 
 fake = Faker()
@@ -23,7 +23,7 @@ class DummyAttachment(BaseModel):
 class DummyFilingData(BaseModel):
     filing_id: str
     case_number: str
-    date_filed: date
+    date_filed: RFC3339Time
     description: str
     attachments: List[DummyAttachment] = []
     filing_type: str = "test_filing"
@@ -32,7 +32,7 @@ class DummyFilingData(BaseModel):
 class DummyCaseData(BaseModel):
     case_number: str
     description: str
-    opened_date: date
+    opened_date: RFC3339Time
     status: str = "open"
     industry: str = "utilities"
 
@@ -45,14 +45,14 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
         return DummyCaseData(
             case_number=f"DUMMY-{randint(1000, 9999)}",
             description=fake.sentence(),
-            opened_date=fake.date_this_decade(),
+            opened_date=date_to_rfctime(fake.date_this_decade()),
         )
 
     def _generate_dummy_filing(self, case: DummyCaseData) -> DummyFilingData:
         return DummyFilingData(
             filing_id=f"FILING-{randint(10000, 99999)}",
             case_number=case.case_number,
-            date_filed=fake.date_this_year(),
+            date_filed=date_to_rfctime(fake.date_this_year()),
             description=fake.sentence(),
             attachments=[
                 DummyAttachment(
