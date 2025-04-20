@@ -42,59 +42,59 @@ x-openscraper-env-variables:
 
 services:
   # OpenScrapers Services
-  # openscrapers-postgres:
-  #   image: postgres:17.4-alpine
-  #   restart: always
-  #   environment:
-  #     - POSTGRES_USER=postgres
-  #     - POSTGRES_PASSWORD=dolphins
-  #     - POSTGRES_DB=postgres
-  #     - PGDATA=/var/lib/postgresql/data/pgdata
-  #   volumes:
-  #     - ./volumes/openscrapers/pgdata:/var/lib/postgresql/data
-  #   expose:
-  #     - 5432
-  #
-  # openscrapers-api:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.server
-  #   depends_on:
-  #     - openscrapers-postgres
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.namespace=openscrapers"
-  #     - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)"
-  #     - "traefik.http.routers.blog.tls.domains[0].main=${DOMAIN}"
-  #     - "traefik.http.routers.frontend.entrypoints=websecure"
-  #     - "traefik.http.routers.frontend.tls.certresolver=myresolver"
-  #     - "traefik.http.routers.whoami.rule=Host(`${DOMAIN}`)"
-  #     - "traefik.http.routers.whoami.entrypoints=websecure"
-  #     - "traefik.http.routers.whoami.tls.certresolver=myresolver"
-  #   volumes:
-  #     - ./openpuc_scrapers:/app/openpuc_scrapers
-  #   expose:
-  #     - 8000
-  #   environment:
-  #     <<: *openscraper-env-variables
-  # reverse-proxy:
-  #   image: traefik:v3.0
-  #   command:
-  #     - "--api.insecure=true"
-  #     - "--providers.docker=true"
-  #     - "--providers.docker.constraints=Label(`traefik.namespace`,`openscrapers`)"
-  #     - "--providers.docker.exposedbydefault=false"
-  #     - "--entryPoints.websecure.address=:443"
-  #     - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-  #     - "--certificatesresolvers.myresolver.acme.email=mbright@kessler.xyz"
-  #     - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #     - "8083:8080"
-  #   volumes:
-  #     - "./volumes/letsencrypt:/letsencrypt"
-  #     - /var/run/docker.sock:/var/run/docker.sock
+  openscrapers-postgres:
+    image: postgres:17.4-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=dolphins
+      - POSTGRES_DB=postgres
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ./volumes/openscrapers/pgdata:/var/lib/postgresql/data
+    expose:
+      - 5432
+
+  openscrapers-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    depends_on:
+      - openscrapers-postgres
+    labels:
+      - "traefik.enable=true"
+      - "traefik.namespace=openscrapers"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.blog.tls.domains[0].main=${DOMAIN}"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      - "traefik.http.routers.whoami.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.whoami.entrypoints=websecure"
+      - "traefik.http.routers.whoami.tls.certresolver=myresolver"
+    volumes:
+      - ./openpuc_scrapers:/app/openpuc_scrapers
+    expose:
+      - 8000
+    environment:
+      <<: *openscraper-env-variables
+  reverse-proxy:
+    image: traefik:v3.0
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.constraints=Label(`traefik.namespace`,`openscrapers`)"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=mbright@kessler.xyz"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8083:8080"
+    volumes:
+      - "./volumes/letsencrypt:/letsencrypt"
+      - /var/run/docker.sock:/var/run/docker.sock
   # # Airflow Services
   airflow-postgres:
     # image: postgres:13

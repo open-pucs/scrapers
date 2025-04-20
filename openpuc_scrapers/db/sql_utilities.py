@@ -17,7 +17,7 @@ from openpuc_scrapers.models.timestamp import RFC3339Time
 # Setup async engine and session
 
 
-INITIALIZE_DB = """
+INITIALIZE_LAST_UPDATED = """
 CREATE TABLE IF NOT EXISTS public.object_last_updated (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     indexed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS public.object_last_updated (
     object_type VARCHAR NOT NULL,
     object_name VARCHAR NOT NULL
 );
+"""
+INITIALIZE_ATTACHMENT_TEXT = """
 CREATE TABLE IF NOT EXISTS public.attachment_text_reprocessed (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     indexed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -81,7 +83,8 @@ engine = create_async_engine(OPENSCRAPERS_SQL_DB_SCONNECTION, echo=True)
 
 async def hackishly_initialize_db() -> None:
     async with engine.begin() as session:
-        await session.execute(text(UPSERT_LAST_UPDATED))
+        await session.execute(text(INITIALIZE_LAST_UPDATED))
+        await session.execute(text(INITIALIZE_ATTACHMENT_TEXT))
         await session.commit()
 
 
