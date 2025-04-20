@@ -17,6 +17,27 @@ from openpuc_scrapers.models.timestamp import RFC3339Time
 # Setup async engine and session
 
 
+INITIALIZE_DB = """
+CREATE TABLE IF NOT EXISTS public.object_last_updated (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    indexed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    country VARCHAR NOT NULL,
+    state VARCHAR NOT NULL,
+    juristiction_name VARCHAR NOT NULL,
+    object_type VARCHAR NOT NULL,
+    object_name VARCHAR NOT NULL
+);
+CREATE TABLE IF NOT EXISTS public.attachment_text_reprocessed (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    indexed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    attachment_hash VARCHAR NOT NULL,
+    update_type VARCHAR NOT NULL,
+    object_type VARCHAR NOT NULL,
+    object_name VARCHAR NOT NULL
+);
+"""
+
+
 # SQL Queries as constants with corrected juristiction spelling
 UPSERT_LAST_UPDATED = """
 INSERT INTO public.object_last_updated (
@@ -58,9 +79,16 @@ Base = declarative_base()
 engine = create_async_engine(OPENSCRAPERS_SQL_DB_SCONNECTION, echo=True)
 
 
+async def hackishly_initialize_db() -> None:
+    async with engine.begin() as session:
+        await session.execute(text(UPSERT_LAST_UPDATED))
+        await session.commit()
+
+
 async def set_case_as_updated(
     case: GenericCase, jurisdiction: str, state: str, country: str = "usa"
 ) -> None:
+    await hackishly_initialize_db()
     async with engine.begin() as session:
         await session.execute(
             text(UPSERT_LAST_UPDATED),
