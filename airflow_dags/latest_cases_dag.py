@@ -41,6 +41,7 @@ def new_cases_since_date_dag():
     # Reuse existing processing task
     @task
     def process_case_airflow(scraper: Any, case: Any, base_path: str) -> Any:
+        print("Testing airflow creation!")
         return process_case(scraper=scraper, case=case, base_path=base_path)
 
     # DAG structure
