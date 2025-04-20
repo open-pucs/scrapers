@@ -10,6 +10,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.11.14",
+    "aiosqlite>=0.21.0",
     "asyncpg>=0.30.0",
     "beautifulsoup4>=4.13.3",
     "boto3>=1.37.37",
