@@ -12,10 +12,11 @@ def save_to_disk_and_s3(path: str, bucket: str, content: str) -> None:
 
 
 # Takes in a dict, a pydantic BaseModel, or a List[BaseModel]
-def create_json_string(data) -> str:
+def create_json_string(data: Any) -> str:
     def _serialize(obj):
         if isinstance(obj, BaseModel):
-            return obj.model_dump(mode="json")
+            # return obj.model_dump(mode="json")
+            return json.loads(obj.model_dump_json())
         return obj
 
     if isinstance(data, BaseModel):
