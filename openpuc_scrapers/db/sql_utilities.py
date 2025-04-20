@@ -55,14 +55,13 @@ LIMIT :limit;
 
 
 Base = declarative_base()
+engine = create_async_engine(OPENSCRAPERS_SQL_DB_SCONNECTION, echo=True)
 
 
 async def set_case_as_updated(
     case: GenericCase, jurisdiction: str, state: str, country: str = "usa"
 ) -> None:
-    engine = create_async_engine(OPENSCRAPERS_SQL_DB_SCONNECTION, echo=True)
-    async_session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-    async with async_session() as session:
+    async with engine.begin() as session:
         await session.execute(
             text(UPSERT_LAST_UPDATED),
             {
@@ -98,7 +97,7 @@ async def get_last_updated_cases(
 
     indexed_after_datetime = indexed_after.time
 
-    async with MakeAsyncSession() as session:
+    async with engine.begin() as session:
         if match_jurisdiction:
             result = await session.execute(
                 text(LIST_NEWEST_JURISDICTION),
