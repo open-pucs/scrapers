@@ -4,7 +4,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from typing import Any, Dict, List, Tuple
 import time
 from datetime import datetime
@@ -18,7 +18,7 @@ from openpuc_scrapers.scrapers.base import GenericScraper
 
 class NYPUCAttachment(BaseModel):
     document_title: str = ""
-    url: HttpUrl
+    url: str
     file_format: str = ""
     document_type: str = ""
     file_name: str = ""
@@ -152,7 +152,7 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFiling]:
                 attachments=[
                     NYPUCAttachment(
                         document_title=link.get_text(strip=True),
-                        url=HttpUrl(link["href"]),
+                        url=link["href"],
                         file_name=cells[6].get_text(strip=True),
                         document_type=cells[2].get_text(strip=True),
                         file_format=(
@@ -300,7 +300,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         filed_date_obj = datetime.strptime(state_data.date_filed, "%m/%d/%Y").date()
 
         attachments = [
-            GenericAttachment(name=att.document_title, url=HttpUrl(att.url))
+            GenericAttachment(name=att.document_title, url=att.url)
             for att in state_data.attachments
         ]
 

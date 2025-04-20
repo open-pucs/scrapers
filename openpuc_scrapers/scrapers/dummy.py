@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import Any, Dict, List
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from random import randint, choice
 from faker import Faker
 
@@ -15,7 +15,7 @@ fake = Faker()
 
 class DummyAttachment(BaseModel):
     document_title: str
-    url: HttpUrl
+    url: str
     file_format: str = "pdf"
     document_type: str = "filing"
 
@@ -57,8 +57,8 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
             attachments=[
                 DummyAttachment(
                     document_title=fake.catch_phrase(),
-                    url=HttpUrl(f"https://dummy.com/docs/{randint(1000,9999)}.pdf"),
-                )
+                    url=f"https://dummy.com/docs/{randint(1000,9999)}.pdf",
+                ),
             ],
         )
 
