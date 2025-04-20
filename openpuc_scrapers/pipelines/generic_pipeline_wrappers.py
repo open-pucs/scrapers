@@ -93,7 +93,8 @@ def process_case_jsonified(
     case: str,
     base_path: str,
 ) -> str:
-    case_data = StateCaseData.model_validate_json(case)
+    case_type = scraper.state_case_type
+    case_data = case_type.model_validate_json(case)
 
     processed_case = process_case(scraper=scraper, case=case_data, base_path=base_path)
     return processed_case.model_dump_json()

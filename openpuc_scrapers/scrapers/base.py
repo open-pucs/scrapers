@@ -87,6 +87,16 @@ class GenericScraper(ABC, Generic[StateCaseData, StateFilingData]):
     state: str
     jurisdiction_name: str
 
+    @property
+    def state_case_type(self) -> Type[StateCaseData]:
+        """Get the concrete StateCaseData type for this scraper"""
+        return self.__class__.__orig_bases__[0].__args__[0]
+
+    @property
+    def state_filing_type(self) -> Type[StateFilingData]:
+        """Get the concrete StateFilingData type for this scraper"""
+        return self.__class__.__orig_bases__[0].__args__[1]
+
     # Universal case list methods
     @abstractmethod
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
