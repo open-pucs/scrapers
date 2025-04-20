@@ -38,14 +38,14 @@ async def process_generic_filing(filing: GenericFiling) -> GenericFiling:
 async def process_and_shipout_initial_attachment(
     att: GenericAttachment,
 ) -> GenericAttachment:
-    if att.document_type is None or att.document_type == "":
-        raise ValueError("Cannot Process Attachment if document_type is None or empty")
+    if att.document_extension is None or att.document_extension == "":
+        raise ValueError("Cannot Process Attachment if document_extension is None or empty")
     str_url = str(att.url)
     tmp_filepath = await download_file_from_url_to_path(str_url)
     hash = blake2b_hash_from_file(tmp_filepath)
     att.hash = hash
     raw_attach = RawAttachment(
-        hash=hash, name=att.name, extension=att.document_type, text_objects=[]
+        hash=hash, name=att.name, extension=att.document_extension, text_objects=[]
     )
 
     async def generate_initial_attachment_text(

@@ -17,7 +17,7 @@ class DummyAttachment(BaseModel):
     document_title: str
     url: str
     file_format: str = "pdf"
-    document_type: str = "filing"
+    document_extension: str = "filing"
 
 
 class DummyFilingData(BaseModel):
@@ -57,7 +57,9 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
             attachments=[
                 DummyAttachment(
                     document_title=fake.catch_phrase(),
-                    url=f"https://dummy.com/docs/{randint(1000,9999)}.pdf",
+                    # url=f"https://dummy.com/docs/{randint(1000,9999)}.pdf",
+                    url="https://www.adobe.com/support/products/enterprise/knowledgecenter/media/c4611_sample_explain.pdf",
+                    document_extension="pdf",
                 ),
             ],
         )
@@ -123,7 +125,11 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
             filing_type=state_data.filing_type,
             description=state_data.description,
             attachments=[
-                GenericAttachment(name=a.document_title, url=a.url)
+                GenericAttachment(
+                    name=a.document_title,
+                    url=a.url,
+                    document_extension=a.document_extension,
+                )
                 for a in state_data.attachments
             ],
             extra_metadata={"filing_id": state_data.filing_id},

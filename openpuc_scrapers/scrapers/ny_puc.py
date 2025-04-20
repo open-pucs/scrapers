@@ -1,3 +1,4 @@
+from annotated_types import doc
 from openpuc_scrapers.models.attachment import GenericAttachment
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -20,7 +21,7 @@ class NYPUCAttachment(BaseModel):
     document_title: str = ""
     url: str
     file_format: str = ""
-    document_type: str = ""
+    document_extension: str = ""
     file_name: str = ""
 
 
@@ -154,7 +155,7 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFiling]:
                         document_title=link.get_text(strip=True),
                         url=link["href"],
                         file_name=cells[6].get_text(strip=True),
-                        document_type=cells[2].get_text(strip=True),
+                        document_extension=cells[2].get_text(strip=True),
                         file_format=(
                             cells[6].get_text(strip=True).split(".")[-1]
                             if cells[6].get_text(strip=True)
@@ -300,7 +301,11 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         filed_date_obj = datetime.strptime(state_data.date_filed, "%m/%d/%Y").date()
 
         attachments = [
-            GenericAttachment(name=att.document_title, url=att.url)
+            GenericAttachment(
+                name=att.document_title,
+                url=att.url,
+                document_extension=att.document_extension,
+            )
             for att in state_data.attachments
         ]
 
