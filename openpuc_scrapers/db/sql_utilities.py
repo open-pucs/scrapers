@@ -1,15 +1,13 @@
 from typing import Any, List, Optional
+
 from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.constants import OPENSCRAPERS_SQL_DB_SCONNECTION
 from openpuc_scrapers.models.filing import GenericFiling
-
-
-from typing import List, Optional
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-
 from openpuc_scrapers.models.timestamp import RFC3339Time
 
 # from sqlalchemy.orm import sessionmaker
@@ -60,9 +58,31 @@ MakeAsyncSession = sessionmaker(
 )
 
 
+# File "/usr/local/lib/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+#     return future.result()
+#            ^^^^^^^^^^^^^^^
+#   File "/app/openpuc_scrapers/pipelines/generic_pipeline_wrappers.py", line 80, in async_shit
+#     await push_case_to_s3_and_db(
+#   File "/app/openpuc_scrapers/db/s3_utils.py", line 77, in push_case_to_s3_and_db
+#     await set_case_as_updated(
+#   File "/app/openpuc_scrapers/db/sql_utilities.py", line 66, in set_case_as_updated
+#     async with MakeAsyncSession() as session:
+#                ^^^^^^^^^^^^^^^^^^
+#   File "/home/airflow/.local/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4279, in __call__
+#     return self.class_(**local_kw)
+#            ^^^^^^^^^^^^^^^^^^^^^^^
+#   File "/home/airflow/.local/lib/python3.12/site-packages/sqlalchemy/ext/asyncio/session.py", line 107, in __init__
+#     self.sync_session_class(bind=bind, binds=binds, **kw)
+# TypeError: Session.__init__() got an unexpected keyword argument 'engine'
 async def set_case_as_updated(
     case: GenericCase, jurisdiction: str, state: str, country: str = "usa"
 ) -> None:
+    # This async with line has the following errors as well
+    # Diagnostics:
+    # 1. Object of type "Session" cannot be used with "async with" because it does not correctly implement __aenter__
+    #      Attribute "__aenter__" is unknown [reportGeneralTypeIssues]
+    # 2. Object of type "Session" cannot be used with "with" because it does not correctly implement __aexit__
+    #      Attribute "__aexit__" is unknown [reportGeneralTypeIssues]
     async with MakeAsyncSession() as session:
         # Note: Fixed juristiction_name spelling and removed extra indexed_before
         await session.execute(
