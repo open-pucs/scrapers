@@ -16,7 +16,6 @@ RUN chown -R airflow /app
 USER airflow
 
 # Copy package structure
-COPY pyproject.toml uv.lock /app/
 
 
 

@@ -9,6 +9,7 @@ pymupdf>=1.25.5
 
 # Stage 3
 asyncpg>=0.30.0
+sqlalchemy>=2.0.40
 psycopg2-binary>=2.9.10
 pymupdf4llm>=0.0.19
 selenium>=4.29.0
