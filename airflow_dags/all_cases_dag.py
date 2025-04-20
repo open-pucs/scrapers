@@ -3,8 +3,8 @@ from typing import Any, List
 from airflow.decorators import dag, task
 from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
     generate_intermediate_object_save_path,
-    get_all_caselist_raw,
-    process_case,
+    get_all_caselist_raw_jsonified,
+    process_case_jsonified,
 )
 from openpuc_scrapers.scrapers.scraper_lookup import (
     get_scraper_type_from_name_default_dummy,
@@ -27,12 +27,12 @@ def all_cases_dag():
     # TODO: Add the types for this later, rn I am wanting to do things as simply as possible to avoid weird shit
 
     @task
-    def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[Any]:
-        return get_all_caselist_raw(scraper=scraper, base_path=base_path)
+    def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[str]:
+        return get_all_caselist_raw_jsonified(scraper=scraper, base_path=base_path)
 
     @task
-    def process_case_airflow(scraper: Any, case: Any, base_path: str) -> Any:
-        return process_case(scraper=scraper, case=case, base_path=base_path)
+    def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:
+        return process_case_jsonified(scraper=scraper, case=case, base_path=base_path)
 
     # DAG structure
     scraper_name = "{{ params.scraper_name }}"

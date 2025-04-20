@@ -10,7 +10,11 @@ from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
 
 
-from openpuc_scrapers.models.timestamp import RFC3339Time, rfc_time_now
+from openpuc_scrapers.models.timestamp import (
+    RFC3339Time,
+    rfc_time_from_string,
+    rfc_time_now,
+)
 from openpuc_scrapers.pipelines.helper_utils import save_json
 from openpuc_scrapers.pipelines.raw_attachment_handling import process_generic_filing
 from openpuc_scrapers.scrapers.base import (
@@ -84,6 +88,17 @@ def process_case(
     return return_generic_case
 
 
+def process_case_jsonified(
+    scraper: GenericScraper[StateCaseData, StateFilingData],
+    case: str,
+    base_path: str,
+) -> str:
+    case_data = StateCaseData.model_validate_json(case)
+
+    processed_case = process_case(scraper=scraper, case=case_data, base_path=base_path)
+    return processed_case.model_dump_json()
+
+
 def get_all_caselist_raw(
     scraper: GenericScraper[StateCaseData, StateFilingData], base_path: str
 ) -> List[StateCaseData]:
@@ -99,6 +114,14 @@ def get_all_caselist_raw(
     # Process cases
     state_cases = scraper.universal_caselist_from_intermediate(caselist_intermediate)
     return state_cases
+
+
+def get_all_caselist_raw_jsonified(
+    scraper: GenericScraper[StateCaseData, StateFilingData], base_path: str
+) -> List[str]:
+    """JSON-serializable version for Airflow XComs"""
+    cases = get_all_caselist_raw(scraper, base_path)
+    return [case.model_dump_json() for case in cases]
 
 
 def get_new_caselist_since_date(
@@ -120,3 +143,14 @@ def get_new_caselist_since_date(
         updated_intermediate, after_date
     )
     return state_cases
+
+
+def get_new_caselist_since_date_jsonified(
+    scraper: GenericScraper[StateCaseData, StateFilingData],
+    after_date: str,
+    base_path: str,
+) -> List[str]:
+    """JSON-serializable version for Airflow XComs"""
+    validated_date = rfc_time_from_string(after_date)
+    cases = get_new_caselist_since_date(scraper, validated_date, base_path)
+    return [case.model_dump_json() for case in cases]

@@ -32,15 +32,19 @@ default_args = {
 )
 def new_cases_since_date_dag():
     @task
-    def get_caselist_since_date_task(scraper: Any, base_path: str) -> List[Any]:
+    def get_caselist_since_date_task(scraper: Any, base_path: str) -> List[str]:
         after_date = datetime.fromisoformat("{{ params.after_date }}")
-        return get_new_caselist_since_date(
+        cases_data = get_new_caselist_since_date(
             scraper=scraper, after_date=after_date, base_path=base_path
         )
+        case_json = []
+        for case in cases_data:
+            case_json.append(case.model_dump_json())
+        return case_json
 
     # Reuse existing processing task
     @task
-    def process_case_airflow(scraper: Any, case: Any, base_path: str) -> Any:
+    def process_case_airflow(scraper: Any, case: str, base_path: str) -> Any:
         print("Testing airflow creation!")
         return process_case(scraper=scraper, case=case, base_path=base_path)
 
