@@ -47,15 +47,16 @@ INSERT INTO public.object_last_updated (
     state,
     juristiction_name,
     object_type,
-    object_name
+    object_name,
+    indexed_at
 ) VALUES (
     :country,
     :state,
     :juristiction_name,
     :object_type,
-    :object_name
-)
-DO UPDATE SET indexed_at = NOW();
+    :object_name,
+    NOW()
+);
 """
 
 LIST_NEWEST_ALL = """
