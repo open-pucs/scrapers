@@ -67,10 +67,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.namespace=openscrapers"
-      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.openscrapers-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)"
       - "traefik.http.routers.blog.tls.domains[0].main=${DOMAIN}"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      - "traefik.http.routers.openscrapers-api.entrypoints=websecure"
+      - "traefik.http.routers.openscrapers-api.tls.certresolver=myresolver"
       - "traefik.http.routers.whoami.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.whoami.entrypoints=websecure"
       - "traefik.http.routers.whoami.tls.certresolver=myresolver"
@@ -134,6 +134,19 @@ services:
     <<: *airflow-common
     ports:
       - "3030:8081"
+    expose:
+      - 8081
+    labels:
+      - "traefik.enable=true"
+      - "traefik.namespace=openscrapers"
+      - "traefik.http.routers.blog.tls.domains[0].main=${AIRFLOW_DOMAIN}"
+      - "traefik.http.routers.openscrapers-airflow.rule=Host(`${AIRFLOW_DOMAIN}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.openscrapers-airflow.entrypoints=websecure"
+      - "traefik.http.routers.openscrapers-airflow.tls.certresolver=myresolver"
+      - "traefik.http.services.openscrapers-api.loadbalancer.server.port=8081"
+      - "traefik.http.routers.whoami.rule=Host(`${AIRFLOW_DOMAIN}`)"
+      - "traefik.http.routers.whoami.entrypoints=websecure"
+      - "traefik.http.routers.whoami.tls.certresolver=myresolver"
     # network_mode: "host"
     # command: "./entrypoint.sh"
 
