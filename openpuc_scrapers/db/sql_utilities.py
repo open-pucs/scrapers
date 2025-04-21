@@ -82,6 +82,8 @@ engine = create_async_engine(OPENSCRAPERS_SQL_DB_SCONNECTION, echo=True)
 
 
 async def hackishly_initialize_db() -> None:
+    print("INITIALIZING DATABASE WITH NEW TABLES")
+    print(f"DATABASE CONNECTION STRING: {OPENSCRAPERS_SQL_DB_SCONNECTION}")
     async with engine.begin() as session:
         await session.execute(text(INITIALIZE_LAST_UPDATED))
         await session.execute(text(INITIALIZE_ATTACHMENT_TEXT))
