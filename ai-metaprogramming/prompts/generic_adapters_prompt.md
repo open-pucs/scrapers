@@ -8,7 +8,7 @@ Take these following pydantic python objects
 {% endif %}
 ```
 
-And write adapter functions that convert each of them into one of the approprtiate generic types.
+And write adapter functions that convert each of them into one of the appropriate generic types.
 ```py
 class GenericCase(BaseModel):
     """Model representing case data.
