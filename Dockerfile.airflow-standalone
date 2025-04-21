@@ -9,11 +9,9 @@ RUN pip install --no-cache-dir uv
 WORKDIR /app
 
 USER root 
-RUN apt-get update && \
-  apt-get install -y socat netcat-traditional && \
-  rm -rf /var/lib/apt/lists/*
-# Install selenium requirements
-RUN apt-get install -y --no-install-recommends \
+RUN apt-get update
+RUN apt-get install -y \ 
+  socat netcat-traditional \ 
   ca-certificates \
   wget \
   unzip \
@@ -27,20 +25,22 @@ RUN apt-get install -y --no-install-recommends \
   libappindicator1 \
   libnspr4 \
   libgbm1 \
+  libatk-bridge2.0-0 \
+  libxkbcommon-x11-0 \
   && rm -rf /var/lib/apt/lists/*
 
 # Set Chrome version (update this as needed)
 ARG CHROME_VERSION="119.0.6045.105"
 
 # Download and install Chrome for Testing
-RUN wget -O /tmp/chrome.zip \
+RUN wget --progress=dot:giga -O /tmp/chrome.zip \
   "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROME_VERSION}/linux64/chrome-linux64.zip" && \
   unzip /tmp/chrome.zip -d /usr/local/ && \
   ln -s /usr/local/chrome-linux64/chrome /usr/local/bin/chrome && \
   rm /tmp/chrome.zip
 
 # Download and install ChromeDriver
-RUN wget -O /tmp/chromedriver.zip \
+RUN wget --progress=dot:giga -O /tmp/chromedriver.zip \
   "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROME_VERSION}/linux64/chromedriver-linux64.zip" && \
   unzip /tmp/chromedriver.zip -d /usr/local/ && \
   ln -s /usr/local/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
