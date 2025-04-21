@@ -13,20 +13,44 @@ RUN apt-get update && \
   apt-get install -y socat netcat-traditional && \
   rm -rf /var/lib/apt/lists/*
 # Install selenium requirements
-RUN apt-get update && \
-  apt-get install -y -q \
+RUN apt-get install -y --no-install-recommends \
+  ca-certificates \
   wget \
-  gnupg \
-  && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-  && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
-  && apt-get update && \
-  apt-get install -y -q \
-  google-chrome-stable=114.0.5735.90-1 \
-  && wget -O /tmp/chromedriver.zip https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/114.0.5735.90/linux64/chromedriver-linux64.zip \
-  && unzip /tmp/chromedriver.zip -d /usr/bin/ \
-  && chmod +x /usr/bin/chromedriver-linux64/chromedriver \
-  && ln -s /usr/bin/chromedriver-linux64/chromedriver /usr/bin/chromedriver \
-  && rm /tmp/chromedriver.zip
+  unzip \
+  # Chrome dependencies
+  libnss3 \
+  libgconf-2-4 \
+  libxss1 \
+  libasound2 \
+  libxtst6 \
+  fonts-liberation \
+  libappindicator1 \
+  libnspr4 \
+  libgbm1 \
+  && rm -rf /var/lib/apt/lists/*
+
+# Set Chrome version (update this as needed)
+ARG CHROME_VERSION="119.0.6045.105"
+
+# Download and install Chrome for Testing
+RUN wget -O /tmp/chrome.zip \
+  "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROME_VERSION}/linux64/chrome-linux64.zip" && \
+  unzip /tmp/chrome.zip -d /usr/local/ && \
+  ln -s /usr/local/chrome-linux64/chrome /usr/local/bin/chrome && \
+  rm /tmp/chrome.zip
+
+# Download and install ChromeDriver
+RUN wget -O /tmp/chromedriver.zip \
+  "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROME_VERSION}/linux64/chromedriver-linux64.zip" && \
+  unzip /tmp/chromedriver.zip -d /usr/local/ && \
+  ln -s /usr/local/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
+  rm /tmp/chromedriver.zip
+
+# Verify installations
+RUN chmod +x /usr/local/bin/chrome && \
+  chmod +x /usr/local/bin/chromedriver && \
+  chrome --version && \
+  chromedriver --version
 RUN chown -R airflow /app
 USER airflow
 
