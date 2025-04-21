@@ -139,14 +139,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.namespace=openscrapers"
-      - "traefik.http.routers.blog.tls.domains[0].main=${AIRFLOW_DOMAIN}"
       - "traefik.http.routers.openscrapers-airflow.rule=Host(`${AIRFLOW_DOMAIN}`) && PathPrefix(`/`)"
       - "traefik.http.routers.openscrapers-airflow.entrypoints=websecure"
       - "traefik.http.routers.openscrapers-airflow.tls.certresolver=myresolver"
-      - "traefik.http.services.openscrapers-api.loadbalancer.server.port=8081"
-      - "traefik.http.routers.whoami.rule=Host(`${AIRFLOW_DOMAIN}`)"
-      - "traefik.http.routers.whoami.entrypoints=websecure"
-      - "traefik.http.routers.whoami.tls.certresolver=myresolver"
+      - "traefik.http.services.openscrapers-airflow.loadbalancer.server.port=8081"
     # network_mode: "host"
     # command: "./entrypoint.sh"
 
