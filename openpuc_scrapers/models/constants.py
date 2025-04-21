@@ -20,9 +20,13 @@ OPENSCRAPERS_S3_ENDPOINT = os.environ.get(
 OPENSCRAPERS_S3_OBJECT_BUCKET = os.environ.get(
     "OPENSCRAPERS_S3_OBJECT_BUCKET", "opescrapers"
 )
+DEFAULT_OPENSCRAPERS_SQL_CONNECTION = (
+    "postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow"
+)
 
-OPENSCRAPERS_SQL_DB_SCONNECTION = os.environ.get(
-    "OPENSCRAPERS_SQL_DB_SCONNECTION", "sqlite+aiosqlite:///db.sqlite3"
+# DEFAULT_OPENSCRAPERS_SQL_CONNECTION = "sqlite+aiosqlite:///db.sqlite3"
+OPENSCRAPERS_SQL_DB_CONNECTION = os.environ.get(
+    "OPENSCRAPERS_SQL_DB_CONNECTION", DEFAULT_OPENSCRAPERS_SQL_CONNECTION
 )
 
 

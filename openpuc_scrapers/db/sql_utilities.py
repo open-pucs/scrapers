@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from openpuc_scrapers.models.case import GenericCase
-from openpuc_scrapers.models.constants import OPENSCRAPERS_SQL_DB_SCONNECTION
+from openpuc_scrapers.models.constants import OPENSCRAPERS_SQL_DB_CONNECTION
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.timestamp import RFC3339Time
 
@@ -78,12 +78,12 @@ LIMIT :limit;
 
 
 Base = declarative_base()
-engine = create_async_engine(OPENSCRAPERS_SQL_DB_SCONNECTION, echo=True)
+engine = create_async_engine(OPENSCRAPERS_SQL_DB_CONNECTION, echo=True)
 
 
 async def hackishly_initialize_db() -> None:
     print("INITIALIZING DATABASE WITH NEW TABLES")
-    print(f"DATABASE CONNECTION STRING: {OPENSCRAPERS_SQL_DB_SCONNECTION}")
+    print(f"DATABASE CONNECTION STRING: {OPENSCRAPERS_SQL_DB_CONNECTION}")
     async with engine.begin() as session:
         await session.execute(text(INITIALIZE_LAST_UPDATED))
         await session.execute(text(INITIALIZE_ATTACHMENT_TEXT))
