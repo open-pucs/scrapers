@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import BaseModel
 
 
-from openpuc_scrapers.pipelines.s3_utils import S3FileManager
+from openpuc_scrapers.db.s3_utils import S3FileManager
 
 
 # Helper functions
@@ -11,16 +11,26 @@ def save_to_disk_and_s3(path: str, bucket: str, content: str) -> None:
     S3FileManager(bucket).save_string_to_remote_file(path, content)
 
 
-# isnt working due to the higher order types sadly
-# def save_json(path: str, data: BaseModel | List[BaseModel]) -> None:
-def save_json(path: str, bucket: str, data: Any) -> None:
-    if isinstance(data, dict):
-        json_data = data
+# Takes in a dict, a pydantic BaseModel, or a List[BaseModel]
+def create_json_string(data: Any) -> str:
+    def _serialize(obj):
+        if isinstance(obj, BaseModel):
+            return obj.model_dump(mode="json")
+            # return json.loads(obj.model_dump_json())
+        return obj
+
     if isinstance(data, BaseModel):
-        json_data = data.model_dump()
+        return data.model_dump_json(indent=2)
+
     if isinstance(data, list):
-        json_data = [item.model_dump() for item in data]
-    else:
-        raise Exception("Data is not a list, dict, or BaseModel")
-    json_str = json.dumps(json_data, indent=2)
+        return json.dumps([_serialize(item) for item in data], indent=2)
+
+    if isinstance(data, dict):
+        return json.dumps({k: _serialize(v) for k, v in data.items()}, indent=2)
+
+    raise ValueError(f"Unsupported data type: {type(data)}")
+
+
+def save_json(path: str, bucket: str, data: Any) -> None:
+    json_str = create_json_string(data)
     save_to_disk_and_s3(path, bucket, json_str)

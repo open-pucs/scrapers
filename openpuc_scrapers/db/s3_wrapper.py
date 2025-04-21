@@ -12,12 +12,12 @@ from tempfile import TemporaryFile
 
 from urllib.parse import urlparse
 
-from models.constants import (
+from openpuc_scrapers.models.constants import (
     LOCAL_CACHE_DIR,
-    S3_CLOUD_REGION,
-    S3_SECRET_KEY,
-    S3_ACCESS_KEY,
-    S3_ENDPOINT,
+    OPENSCRAPERS_S3_CLOUD_REGION,
+    OPENSCRAPERS_S3_SECRET_KEY,
+    OPENSCRAPERS_S3_ACCESS_KEY,
+    OPENSCRAPERS_S3_ENDPOINT,
     TMP_DIR,
 )
 
@@ -50,11 +50,9 @@ await asyncio.to_thread(<sync s3 function>)
 
 
 class S3FileManager:
-    def __init__(self, bucket: str, logger: Optional[Any] = None) -> None:
-        if logger is None:
-            logger = default_logger
-        self.endpoint = S3_ENDPOINT
-        self.logger = logger
+    def __init__(self, bucket: str) -> None:
+        self.endpoint = OPENSCRAPERS_S3_ENDPOINT
+        self.logger = default_logger
 
         self.tmpdir = TMP_DIR
 
@@ -63,22 +61,18 @@ class S3FileManager:
         self.s3 = boto3.client(
             "s3",
             endpoint_url=self.endpoint,
-            aws_access_key_id=S3_ACCESS_KEY,
-            aws_secret_access_key=S3_SECRET_KEY,
-            region_name=S3_CLOUD_REGION,
+            aws_access_key_id=OPENSCRAPERS_S3_ACCESS_KEY,
+            aws_secret_access_key=OPENSCRAPERS_S3_SECRET_KEY,
+            region_name=OPENSCRAPERS_S3_CLOUD_REGION,
         )
         self.bucket = bucket
         if LOCAL_CACHE_DIR is not None:
             self.s3_cache_directory = LOCAL_CACHE_DIR / Path(self.bucket)
         else:
-            self.s3_cache_directory = None
+            self.s3_cache_directory = TMP_DIR / Path("s3_cache") / Path(self.bucket)
 
     def get_local_dir_from_key(self, key: str) -> Path:
-        if self.s3_cache_directory is not None:
-            return self.s3_cache_directory / Path(key)
-        else:
-            raise ValueError("S3 Cache directory is not set")
-        # return None
+        return self.s3_cache_directory / Path(key)
 
     def save_string_to_remote_file(self, key: str, content: str):
         local_path = self.get_local_dir_from_key(key)
@@ -146,8 +140,9 @@ class S3FileManager:
             return f.read()
 
     def download_file_from_s3_url(self, s3_url: str) -> Optional[Path]:
-        domain = urlparse(s3_url).hostname
-        s3_key = urlparse(s3_url).path
+        url_parsed = urlparse(s3_url)
+        domain = url_parsed.hostname
+        s3_key = url_parsed.path
         if domain is None or s3_key is None:
             raise ValueError("Invalid URL")
         s3_bucket = domain.split(".")[0]
@@ -200,10 +195,10 @@ class S3FileManager:
     ) -> str:
         if bucket is None:
             bucket = self.bucket
-        if self.s3_cache_directory is not None:
+        local_cache_filepath = self.get_local_dir_from_key(file_upload_key)
+        if filepath != local_cache_filepath:
             try:
-                local_cache = self.get_local_dir_from_key(file_upload_key)
-                shutil.copyfile(filepath, local_cache)
+                shutil.copyfile(filepath, local_cache_filepath)
             except Exception as e:
                 default_logger.warning(f"Encountered error copying file to cache: {e}")
         return self.s3.upload_file(str(filepath), bucket, file_upload_key)

@@ -4,11 +4,13 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import unicodedata
 
-from .base import AbstractScraper
+from openpuc_scrapers.scrapers.base import GenericScraper
+
+
 from ..models import GenericCase, GenericFiling, GenericAttachment
 
 
-class MassachusettsDPU(AbstractScraper):
+class MassachusettsDPU(GenericScraper):
     """Interface for interacting with and parsing Massachusetts DPU data."""
 
     INDUSTRIES = [

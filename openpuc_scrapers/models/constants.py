@@ -9,18 +9,25 @@ def Maybe(f: Callable) -> Callable:
     return lambda x: f(x) if x is not None else None
 
 
-S3_CLOUD_REGION = os.environ.get("S3_CLOUD_REGION", "sfo3")
-S3_ENDPOINT = os.environ.get("S3_ENDPOINT", "https://sfo3.digitaloceanspaces.com")
-S3_SCRAPER_INTERMEDIATE_BUCKET = os.environ.get(
-    "S3_SCRAPER_INTERMEDIATE_BUCKET", "opescraper-intermediates"
+OPENSCRAPERS_S3_CLOUD_REGION = os.environ.get("OPENSCRAPERS_S3_CLOUD_REGION", "sfo3")
+OPENSCRAPERS_S3_ENDPOINT = os.environ.get(
+    "OPENSCRAPERS_S3_ENDPOINT", "https://sfo3.digitaloceanspaces.com"
+)
+# OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET = os.environ.get(
+#     "OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET", "opescraper-intermediates"
+# )
+
+OPENSCRAPERS_S3_OBJECT_BUCKET = os.environ.get(
+    "OPENSCRAPERS_S3_OBJECT_BUCKET", "opescrapers"
+)
+DEFAULT_OPENSCRAPERS_SQL_CONNECTION = (
+    "postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow"
 )
 
-S3_OBJECT_BUCKET = os.environ.get("S3_OBJECT_BUCKET", "opescraper-objects")
-S3_RAW_ATTACHMENT_BUCKET = os.environ.get(
-    "S3_RAW_ATTACHMENT_BUCKET", "opescraper-raw-attachments"
+# DEFAULT_OPENSCRAPERS_SQL_CONNECTION = "sqlite+aiosqlite:///db.sqlite3"
+OPENSCRAPERS_SQL_DB_CONNECTION = os.environ.get(
+    "OPENSCRAPERS_SQL_DB_CONNECTION", DEFAULT_OPENSCRAPERS_SQL_CONNECTION
 )
-
-SQL_DB_CONNECTION = os.environ.get("SQL_DB_CONNECTION", "sqlite:///db.sqlite3")
 
 
 TMP_DIR = Path(os.environ.get("TMP_DIR", "/tmp/open_scrapers"))
@@ -32,5 +39,5 @@ LOCAL_CACHE_DIR: Optional[Path] = (
     else Path(os.environ.get("LOCAL_CACHE_DIR"))
 )
 
-S3_ACCESS_KEY = os.environ["S3_ACCESS_KEY"]
-S3_SECRET_KEY = os.environ["S3_SECRET_KEY"]
+OPENSCRAPERS_S3_ACCESS_KEY = os.environ["OPENSCRAPERS_S3_ACCESS_KEY"]
+OPENSCRAPERS_S3_SECRET_KEY = os.environ["OPENSCRAPERS_S3_SECRET_KEY"]

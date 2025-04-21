@@ -1,24 +1,28 @@
-FROM python:3.10-slim
+# Maybe its worth replacing with a custom docker image,
+# Based on python3.x-alpine:
+#
+#     ghcr.io/astral-sh/uv:python3.13-alpine
+#     ghcr.io/astral-sh/uv:python3.12-alpine
+#     ghcr.io/astral-sh/uv:python3.11-alpine
+#     ghcr.io/astral-sh/uv:python3.10-alpine
+#     ghcr.io/astral-sh/uv:python3.9-alpine
+#     ghcr.io/astral-sh/uv:python3.8-alpine
+FROM python:3.12-slim
 
 WORKDIR /app
 
-# System dependencies
-RUN apt-get update && apt-get install -y \
-  gcc \
-  python3-dev \
-  && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir uv
 
 # Copy package structure
-COPY pyproject.toml poetry.lock* ./
-COPY openpuc_scrapers/ ./openpuc_scrapers/
+COPY pyproject.toml uv.lock ./
 
+RUN uv pip compile pyproject.toml --extra server --output-file requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 # Install Python dependencies
-RUN pip install --upgrade pip && \
-  pip install poetry && \
-  poetry config virtualenvs.create false && \
-  poetry install --only main
 
-WORKDIR /app/openpuc_scrapers/server
+COPY openpuc_scrapers/ ./openpuc_scrapers/
+# WORKDIR /app/openpuc_scrapers/server
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "openpuc_scrapers.server.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
+# uvicorn openpuc_scrapers.server.main:app --host 0.0.0.0 --port 8000 --reload

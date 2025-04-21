@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 from pydantic import BaseModel
-from datetime import date
+
+from openpuc_scrapers.models.timestamp import RFC3339Time
 
 from .attachment import GenericAttachment
 
@@ -18,7 +19,7 @@ class GenericFiling(BaseModel):
         attachments (Optional[list[Attachment]]): A list of associateda ttachments.
     """
 
-    filed_date: date
+    filed_date: RFC3339Time
     party_name: str
     filing_type: str
     description: str

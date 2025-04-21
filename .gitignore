@@ -1,4 +1,5 @@
 # Project Specific Stuff 
+volumes/
 ai-metaprogramming/outputs/
 # Byte-compiled / optimized / DLL files
 __pycache__/

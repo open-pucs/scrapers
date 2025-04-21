@@ -2,15 +2,11 @@ from abc import ABC, abstractmethod
 import json
 from pathlib import Path
 from typing import Any, Dict, Generic, TypeVar, List, Type
-from datetime import date, datetime, timezone
 from pydantic import BaseModel
 
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
-from openpuc_scrapers.models.misc import (
-    RequestData,
-    post_list_to_endpoint_split,
-)
+from openpuc_scrapers.models.timestamp import RFC3339Time
 
 
 """
@@ -91,6 +87,16 @@ class GenericScraper(ABC, Generic[StateCaseData, StateFilingData]):
     state: str
     jurisdiction_name: str
 
+    @property
+    def state_case_type(self) -> Type[StateCaseData]:
+        """Get the concrete StateCaseData type for this scraper"""
+        return self.__class__.__orig_bases__[0].__args__[0]
+
+    @property
+    def state_filing_type(self) -> Type[StateFilingData]:
+        """Get the concrete StateFilingData type for this scraper"""
+        return self.__class__.__orig_bases__[0].__args__[1]
+
     # Universal case list methods
     @abstractmethod
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
@@ -119,13 +125,15 @@ class GenericScraper(ABC, Generic[StateCaseData, StateFilingData]):
 
     # Updated cases methods
     @abstractmethod
-    def updated_cases_since_date_intermediate(self, after_date: date) -> Dict[str, Any]:
+    def updated_cases_since_date_intermediate(
+        self, after_date: RFC3339Time
+    ) -> Dict[str, Any]:
         """Get intermediate for cases updated after given date"""
         pass
 
     @abstractmethod
     def updated_cases_since_date_from_intermediate(
-        self, intermediate: Dict[str, Any], after_date: date
+        self, intermediate: Dict[str, Any], after_date: RFC3339Time
     ) -> List[StateCaseData]:
         """Convert intermediate to updated case data objects"""
         pass

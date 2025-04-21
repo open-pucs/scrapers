@@ -1,21 +1,12 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from typing import Any, Dict, Optional
 
 from openpuc_scrapers.models.hashes import Blake2bHash
 
 
 class GenericAttachment(BaseModel):
-    """Model representing an attachment associated with a filing.
-
-    Attributes:
-        name (str): The name of the attachment.
-        url (HttpUrl): The URL of the attachment.
-        document_type (Optional[str]): The type of document (e.g., PDF, XLSX).
-        full_text (Optional[str]): The full text content of the attachment.
-    """
-
     name: str
-    url: HttpUrl
-    document_type: Optional[str] = None
+    url: str
+    document_extension: Optional[str] = None
     extra_metadata: Dict[str, Any] = {}
     hash: Optional[Blake2bHash] = None

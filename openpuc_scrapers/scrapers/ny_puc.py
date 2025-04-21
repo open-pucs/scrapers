@@ -1,25 +1,27 @@
+from annotated_types import doc
 from openpuc_scrapers.models.attachment import GenericAttachment
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from typing import Any, Dict, List, Tuple
 import time
-from datetime import date, datetime
+from datetime import datetime
 from bs4 import BeautifulSoup
 
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.filing import GenericFiling
+from openpuc_scrapers.models.timestamp import RFC3339Time, date_to_rfctime
 from openpuc_scrapers.scrapers.base import GenericScraper
 
 
 class NYPUCAttachment(BaseModel):
     document_title: str = ""
-    url: HttpUrl
+    url: str
     file_format: str = ""
-    document_type: str = ""
+    document_extension: str = ""
     file_name: str = ""
 
 
@@ -151,9 +153,9 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFiling]:
                 attachments=[
                     NYPUCAttachment(
                         document_title=link.get_text(strip=True),
-                        url=HttpUrl(link["href"]),
+                        url=link["href"],
                         file_name=cells[6].get_text(strip=True),
-                        document_type=cells[2].get_text(strip=True),
+                        document_extension=cells[2].get_text(strip=True),
                         file_format=(
                             cells[6].get_text(strip=True).split(".")[-1]
                             if cells[6].get_text(strip=True)
@@ -266,11 +268,13 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         docket_id, html = intermediate
         return extract_rows(html, docket_id)
 
-    def updated_cases_since_date_intermediate(self, after_date: date) -> Dict[str, Any]:
+    def updated_cases_since_date_intermediate(
+        self, after_date: RFC3339Time
+    ) -> Dict[str, Any]:
         raise Exception("Not Impelemented")
 
     def updated_cases_since_date_from_intermediate(
-        self, intermediate: Dict[str, Any], after_date: date
+        self, intermediate: Dict[str, Any], after_date: RFC3339Time
     ) -> List[NYPUCDocket]:
         raise Exception("Not Impelemented")
 
@@ -282,7 +286,9 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
             description=state_data.case_title,
             industry=state_data.industry_affected,
             petitioner=state_data.organization,
-            opened_date=datetime.strptime(state_data.date_filed, "%m/%d/%Y").date(),
+            opened_date=date_to_rfctime(
+                datetime.strptime(state_data.date_filed, "%m/%d/%Y").date()
+            ),
             extra_metadata={
                 "matter_type": state_data.matter_type,
                 "matter_subtype": state_data.matter_subtype,
@@ -295,16 +301,30 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         filed_date_obj = datetime.strptime(state_data.date_filed, "%m/%d/%Y").date()
 
         attachments = [
-            GenericAttachment(name=att.document_title, url=HttpUrl(att.url))
+            GenericAttachment(
+                name=att.document_title,
+                url=att.url,
+                document_extension=att.document_extension,
+            )
             for att in state_data.attachments
         ]
 
         return GenericFiling(
             # case_number=self.docket_id,
-            filed_date=filed_date_obj,
+            filed_date=date_to_rfctime(filed_date_obj),
             party_name=state_data.filing_on_behalf_of,
             filing_type=state_data.filing_type,
             description=state_data.description_of_filing,
             attachments=attachments,
             extra_metadata={},
         )
+
+    def enrich_filing_data_intermediate(
+        self, filing_data: NYPUCFiling
+    ) -> Dict[str, Any]:
+        return {}
+
+    def enrich_filing_data_from_intermediate_intermediate(
+        self, filing_data: NYPUCFiling, intermediate: Dict[str, Any]
+    ) -> NYPUCFiling:
+        return filing_data

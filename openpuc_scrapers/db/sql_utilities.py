@@ -1,23 +1,43 @@
-from datetime import datetime, timezone
 from typing import Any, List, Optional
-import pugsql
+
 from pydantic import BaseModel
-from openpuc_scrapers.models.case import GenericCase
-from openpuc_scrapers.models.constants import SQL_DB_CONNECTION
-from openpuc_scrapers.models.filing import GenericFiling
-
-
-from datetime import datetime, timezone
-from typing import List, Optional
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 
+from openpuc_scrapers.models.case import GenericCase
+from openpuc_scrapers.models.constants import OPENSCRAPERS_SQL_DB_CONNECTION
+from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.timestamp import RFC3339Time
 
 # from sqlalchemy.orm import sessionmaker
 
 # Setup async engine and session
+
+
+INITIALIZE_LAST_UPDATED = """
+CREATE TABLE IF NOT EXISTS public.object_last_updated (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    indexed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    country VARCHAR NOT NULL,
+    state VARCHAR NOT NULL,
+    juristiction_name VARCHAR NOT NULL,
+    object_type VARCHAR NOT NULL,
+    object_name VARCHAR NOT NULL
+);
+"""
+INITIALIZE_ATTACHMENT_TEXT = """
+CREATE TABLE IF NOT EXISTS public.attachment_text_reprocessed (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    indexed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    attachment_hash VARCHAR NOT NULL,
+    update_type VARCHAR NOT NULL,
+    object_type VARCHAR NOT NULL,
+    object_name VARCHAR NOT NULL
+);
+"""
 
 
 # SQL Queries as constants with corrected juristiction spelling
@@ -27,16 +47,16 @@ INSERT INTO public.object_last_updated (
     state,
     juristiction_name,
     object_type,
-    object_name
+    object_name,
+    indexed_at
 ) VALUES (
     :country,
     :state,
     :juristiction_name,
     :object_type,
-    :object_name
-)
-ON CONFLICT (country, state, juristiction_name, object_type, object_name)
-DO UPDATE SET indexed_at = NOW();
+    :object_name,
+    NOW()
+);
 """
 
 LIST_NEWEST_ALL = """
@@ -56,18 +76,25 @@ ORDER BY updated_at ASC
 LIMIT :limit;
 """
 
-engine = create_async_engine(SQL_DB_CONNECTION)
 
-MakeAsyncSession = sessionmaker(
-    engine=engine, class_=AsyncSession, expire_on_commit=False
-)
+Base = declarative_base()
+engine = create_async_engine(OPENSCRAPERS_SQL_DB_CONNECTION, echo=True)
+
+
+async def hackishly_initialize_db() -> None:
+    print("INITIALIZING DATABASE WITH NEW TABLES")
+    print(f"DATABASE CONNECTION STRING: {OPENSCRAPERS_SQL_DB_CONNECTION}")
+    async with engine.begin() as session:
+        await session.execute(text(INITIALIZE_LAST_UPDATED))
+        await session.execute(text(INITIALIZE_ATTACHMENT_TEXT))
+        await session.commit()
 
 
 async def set_case_as_updated(
     case: GenericCase, jurisdiction: str, state: str, country: str = "usa"
 ) -> None:
-    async with MakeAsyncSession() as session:
-        # Note: Fixed juristiction_name spelling and removed extra indexed_before
+    await hackishly_initialize_db()
+    async with engine.begin() as session:
         await session.execute(
             text(UPSERT_LAST_UPDATED),
             {
@@ -98,12 +125,12 @@ async def get_last_updated_cases(
             country=row.country,
             state=row.state,
             jurisdiction_name=row.juristiction_name,
-            indexed_at=RFC3339Time(row.indexed_at),
+            indexed_at=row.indexed_at,
         )
 
     indexed_after_datetime = indexed_after.time
 
-    async with MakeAsyncSession() as session:
+    async with engine.begin() as session:
         if match_jurisdiction:
             result = await session.execute(
                 text(LIST_NEWEST_JURISDICTION),

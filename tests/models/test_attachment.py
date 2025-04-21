@@ -11,12 +11,12 @@ class TestAttachmentModel(unittest.TestCase):
         attachment = GenericAttachment(
             name="Test Document",
             url="http://example.com/attachment.pdf",
-            document_type="PDF",
+            document_extension="pdf",
             full_text="Full content of the attachment",
         )
         self.assertEqual(attachment.name, "Test Document")
         self.assertEqual(str(attachment.url), "http://example.com/attachment.pdf")
-        self.assertEqual(attachment.document_type, "PDF")
+        self.assertEqual(attachment.document_extension, "pdf")
 
     def test_missing_optional_fields(self):
         """Test attachment with missing optional fields."""
@@ -26,13 +26,15 @@ class TestAttachmentModel(unittest.TestCase):
         )
         self.assertEqual(attachment.name, "Test Document")
         self.assertEqual(str(attachment.url), "http://example.com/attachment.pdf")
-        self.assertIsNone(attachment.document_type)
+        self.assertIsNone(attachment.document_extension)
         self.assertIsNone(attachment.full_text)
 
     def test_invalid_url(self):
         """Test invalid URL in the attachment."""
         with self.assertRaises(ValidationError):
-            GenericAttachment(filing_id="98765", name="Test Document", url="not-a-valid-url")
+            GenericAttachment(
+                filing_id="98765", name="Test Document", url="not-a-valid-url"
+            )
 
 
 if __name__ == "__main__":
