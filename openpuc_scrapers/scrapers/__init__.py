@@ -1,4 +1,13 @@
-# from openpuc_scrapers.scrapers.ma_puc import MassachusettsDPU
-from openpuc_scrapers.scrapers.ny_puc import NYPUCScraper
 
-__all__ = ["NYPUCScraper"]
+"""Scrapers for various public utility commission websites."""
+
+from typing import Dict, List, Optional, Union
+
+from .base import GenericScraper
+from .il import IllinoisICCScraper
+
+__all__ = [
+    'GenericScraper',
+    'IllinoisICCScraper',
+    "NYPUCScraper",
+]

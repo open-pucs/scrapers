@@ -175,3 +175,12 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Custom Documentation / Notes
+docs/scrapers/
+
+# Temporary debugging files
+debug_imports.py
+
+# Output data from scrapers
+output/
