@@ -4,6 +4,7 @@ x-airflow-common: &airflow-common
     dockerfile: Dockerfile.airflow-standalone
 
   environment: &airflow-common-env
+    AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD}
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_SQL_DB_PASSWORD}@airflow-postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
