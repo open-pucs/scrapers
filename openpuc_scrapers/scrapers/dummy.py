@@ -3,6 +3,10 @@ from typing import Any, Dict, List
 from pydantic import BaseModel
 from random import randint, choice
 from faker import Faker
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 from openpuc_scrapers.models.attachment import GenericAttachment
 from openpuc_scrapers.models.case import GenericCase
@@ -37,6 +41,17 @@ class DummyCaseData(BaseModel):
     industry: str = "utilities"
 
 
+def test_selenium_connection() -> bool:
+    """Test Selenium connectivity by visiting google.com"""
+    driver = webdriver.Chrome()
+    try:
+        driver.get("https://www.google.com")
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "q")))
+        return True
+    finally:
+        driver.quit()
+
+
 class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
     state: str = "dummy"
     jurisdiction_name: str = "dummy_puc"
@@ -65,7 +80,19 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
         )
 
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
-        return {"cases": [self._generate_dummy_case().model_dump() for _ in range(10)]}
+        """Include Selenium connectivity test results with dummy data"""
+        selenium_works = test_selenium_connection()
+        return {
+            "cases": [self._generate_dummy_case().model_dump() for _ in range(10)],
+            "selenium_test": {
+                "success": selenium_works,
+                "message": (
+                    "Successfully connected to google.com"
+                    if selenium_works
+                    else "Failed Selenium connection test"
+                ),
+            },
+        }
 
     def universal_caselist_from_intermediate(
         self, intermediate: Dict[str, Any]
