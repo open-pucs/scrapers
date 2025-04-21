@@ -55,7 +55,6 @@ INSERT INTO public.object_last_updated (
     :object_type,
     :object_name
 )
-ON CONFLICT (country, state, juristiction_name, object_type, object_name)
 DO UPDATE SET indexed_at = NOW();
 """
 

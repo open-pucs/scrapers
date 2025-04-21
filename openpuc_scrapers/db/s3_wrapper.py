@@ -195,9 +195,10 @@ class S3FileManager:
     ) -> str:
         if bucket is None:
             bucket = self.bucket
-        try:
-            local_cache = self.get_local_dir_from_key(file_upload_key)
-            shutil.copyfile(filepath, local_cache)
-        except Exception as e:
-            default_logger.warning(f"Encountered error copying file to cache: {e}")
+        local_cache_filepath = self.get_local_dir_from_key(file_upload_key)
+        if filepath != local_cache_filepath:
+            try:
+                shutil.copyfile(filepath, local_cache_filepath)
+            except Exception as e:
+                default_logger.warning(f"Encountered error copying file to cache: {e}")
         return self.s3.upload_file(str(filepath), bucket, file_upload_key)
