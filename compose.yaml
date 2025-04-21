@@ -6,7 +6,7 @@ x-airflow-common: &airflow-common
   environment: &airflow-common-env
     AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD}
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_SQL_DB_PASSWORD}@airflow-postgres/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
 
@@ -107,7 +107,7 @@ services:
     image: postgres:17.4-alpine
     environment:
       POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: ${AIRFLOW_SQL_DB_PASSWORD}
+      POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     volumes:
       - ./volumes/airflow-postgres:/var/lib/postgresql/data
