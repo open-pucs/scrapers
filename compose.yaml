@@ -5,11 +5,11 @@ x-airflow-common: &airflow-common
 
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_SQL_DB_PASSWORD}@airflow-postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
 
-    OPENSCRAPERS_SQL_DB_CONNECTION: postgresql+asyncpg://postgres:dolphins@openscrapers-postgres:5432/public
+    OPENSCRAPERS_SQL_DB_CONNECTION: postgresql+asyncpg://postgres:${OPENSCRAPERS_SQL_PASSWORD}@openscrapers-postgres:5432/public
     OPENSCRAPERS_S3_OBJECT_BUCKET: ${OPENSCRAPERS_S3_OBJECT_BUCKET}
     OPENSCRAPERS_S3_ACCESS_KEY: ${OPENSCRAPERS_S3_ACCESS_KEY}
     OPENSCRAPERS_S3_SECRET_KEY: ${OPENSCRAPERS_S3_SECRET_KEY}
@@ -35,7 +35,7 @@ x-airflow-common: &airflow-common
 
 x-openscraper-env-variables:
   &openscraper-env-variables # - OPENSCRAPERS_SQL_DB_CONNECTION: postgresql://postgres:dolphins@openscrapers-postgres:5432/postgres
-  OPENSCRAPERS_SQL_DB_CONNECTION: postgresql+asyncpg://postgres:dolphins@openscrapers-postgres:5432/public
+  OPENSCRAPERS_SQL_DB_CONNECTION: postgresql+asyncpg://postgres:${OPENSCRAPERS_SQL_PASSWORD}@openscrapers-postgres:5432/public
   OPENSCRAPERS_S3_OBJECT_BUCKET: ${OPENSCRAPERS_S3_OBJECT_BUCKET}
   OPENSCRAPERS_S3_ACCESS_KEY: ${OPENSCRAPERS_S3_ACCESS_KEY}
   OPENSCRAPERS_S3_SECRET_KEY: ${OPENSCRAPERS_S3_SECRET_KEY}
@@ -47,7 +47,7 @@ services:
     restart: always
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=dolphins
+      - POSTGRES_PASSWORD=${OPENSCRAPERS_SQL_PASSWORD}
       - POSTGRES_DB=public
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
@@ -104,7 +104,7 @@ services:
     image: postgres:17.4-alpine
     environment:
       POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
+      POSTGRES_PASSWORD: ${AIRFLOW_SQL_DB_PASSWORD}
       POSTGRES_DB: airflow
     volumes:
       - ./volumes/airflow-postgres:/var/lib/postgresql/data
