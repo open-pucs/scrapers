@@ -52,8 +52,8 @@ def create_scraper_newcases_dag(scraper_info: ScraperInfoObject):
     @dag(
         default_args=default_args,
         schedule_interval="@daily",  # Can be adjusted based on needs
+        dag_id=f"{scraper_info.id}_new_cases",
         params={
-            "scraper_name": "unknown",
             "after_date": "2023-01-01",  # Default date, will be overridden at runtime
         },
         tags=["scrapers", "incremental", scraper_info.id],
