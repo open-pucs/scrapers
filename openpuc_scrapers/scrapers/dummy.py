@@ -41,12 +41,23 @@ class DummyCaseData(BaseModel):
     industry: str = "utilities"
 
 
+# Broken DAG: [/opt/airflow/dags/generate_all_dags.py]
+# Traceback (most recent call last):
+#   File "/home/airflow/.local/lib/python3.12/site-packages/selenium/webdriver/remote/webdriver.py", line 429, in execute
+#     self.error_handler.check_response(response)
+#   File "/home/airflow/.local/lib/python3.12/site-packages/selenium/webdriver/remote/errorhandler.py", line 232, in check_response
+#     raise exception_class(message, screen, stacktrace)
+# selenium.common.exceptions.SessionNotCreatedException: Message: session not created: Chrome failed to start: exited normally.
+#   (session not created: DevToolsActivePort file doesn't exist)
+#   (The process started from chrome location /usr/local/bin/chrome is no longer running, so ChromeDriver is assuming that Chrome has crashed.)
+# Stacktrace:
 def test_selenium_connection() -> bool:
     """Test Selenium connectivity with enhanced error handling"""
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless=new")
+    options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
     options.add_argument("--remote-debugging-port=9222")
 
     try:
