@@ -270,7 +270,9 @@ class MassachusettsDPUScraper(GenericScraper[GenericCase, GenericFiling]):
 
         return case
 
-    def _parse_filings(self, soup: BeautifulSoup, case: GenericCase) -> list[Filing]:
+    def _parse_filings(
+        self, soup: BeautifulSoup, case: GenericCase
+    ) -> list[GenericFiling]:
         """Parse the filings from the webpage.
 
         Args:
@@ -310,7 +312,7 @@ class MassachusettsDPUScraper(GenericScraper[GenericCase, GenericFiling]):
 
             # Create the filing if it doesn't already exist
             filing = GenericFiling(
-                filed_date=filed_date,
+                filed_date=date_to_rfctime(filed_date),
                 party_name=filer,
                 filing_type=filing_type,
                 description=description,
