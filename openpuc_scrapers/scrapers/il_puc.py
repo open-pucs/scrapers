@@ -1,27 +1,19 @@
-from pydantic import BaseModel, HttpUrl, Field, field_validator
-from typing import List, Optional, Any, Dict, Type, Tuple, Union
-from datetime import date, datetime
 import time
-import re
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+from bs4 import BeautifulSoup
+from pydantic import BaseModel
 
 # Selenium Imports (Ensure these are installed: pip install selenium webdriver-manager)
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait, Select
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-
-# from webdriver_manager.chrome import ChromeDriverManager # Optional
-from bs4 import BeautifulSoup
 
 
 # Project Imports
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.filing import GenericFiling
-from openpuc_scrapers.models.attachment import GenericAttachment
 
 # Import scraper base class
 from openpuc_scrapers.scrapers.base import GenericScraper
-
 
 # --- Illinois Specific Models ---
 
@@ -272,6 +264,12 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
         stop_at_case_identifier: Optional[str] = None,
         after_date: Optional[date] = None,
     ) -> Dict[str, Any]:
+
+        from selenium.common.exceptions import TimeoutException
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.support.ui import WebDriverWait
+
         """
         Constructs search URL, navigates, handles pagination, and extracts
         (case_url, case_number) tuples directly using Selenium until
@@ -303,7 +301,7 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
         stop_processing = False  # Flag to break outer loop
 
         try:
-            print(f"Navigating directly to search results URL...")
+            print("Navigating directly to search results URL...")
             driver.get(target_url)
             wait = WebDriverWait(driver, 30)
             list_item_selector = "li.soi-icc-card-list-item"
@@ -523,6 +521,12 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
         return cases
 
     def filing_data_intermediate(self, data: ILICCCaseData) -> Dict[str, Any]:
+
+        from selenium.common.exceptions import TimeoutException
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.support.ui import WebDriverWait
+
         driver = self._get_driver()
         intermediate_result = data.model_dump()  # Start with existing data
         try:
@@ -659,6 +663,9 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
         if "error" in intermediate:
             print(f"Error in intermediate data: {intermediate['error']}")
             return []
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.support.ui import WebDriverWait
 
         filings: List[ILICCFilingData] = []
 

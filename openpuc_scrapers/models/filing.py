@@ -11,7 +11,6 @@ class GenericFiling(BaseModel, extra=Extra.allow):
     """Model representing filing data within a case.
 
     Attributes:
-        case_number (str): The unique case number associated with the filing.
         filed_date (date): The date the filing was made.
         party_name (str): The name of the party submitting the filing.
         filing_type (str): The type of filing (e.g., brief, testimony).
