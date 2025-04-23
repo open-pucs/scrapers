@@ -15,28 +15,44 @@ RUN apt-get install -y \
   ca-certificates \
   wget \
   unzip \
-  # Firefox dependencies
-  libgtk-3-0 \
-  libdbus-glib-1-2 \
-  libxt6 \
+  # Chrome dependencies
+  libnss3 \
+  libgconf-2-4 \
+  libxss1 \
+  libasound2 \
+  libxtst6 \
+  fonts-liberation \
+  libappindicator1 \
+  libnspr4 \
+  libgbm1 \
+  libatk-bridge2.0-0 \
+  libxkbcommon-x11-0 \
   && rm -rf /var/lib/apt/lists/*
 
-# Install Firefox ESR
-RUN apt-get update && apt-get install -y \
-  firefox-esr \
-  && rm -rf /var/lib/apt/lists/*
+# Set Chrome version (update this as needed)
+# ARG CHROME_VERSION="135.0.7049.114"
+ARG CHROME_VERSION="134.0.6998.165"
+# ARG CHROME_VERSION="120.0.6099.129"
 
-# Install GeckoDriver
-ARG GECKODRIVER_VERSION="v0.34.0"
-RUN wget --progress=dot:giga -O /tmp/geckodriver.tar.gz \
-  "https://github.com/mozilla/geckodriver/re/${G/${GECKODRIVER_VERSION}/geckodriver-${GECKODRIVER_VERSION}-linux64.tar.gz" && \
-  tar -xzf /tmp/geckodriver.tar.gz -C /usr/local/bin/ && \
-  rm /tmp/geckodriver.tar.gz
+# Download and install Chrome for Testing
+RUN wget --progress=dot:giga -O /tmp/chrome.zip \
+  "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROME_VERSION}/linux64/chrome-linux64.zip" && \
+  unzip /tmp/chrome.zip -d /usr/local/ && \
+  ln -s /usr/local/chrome-linux64/chrome /usr/local/bin/chrome && \
+  rm /tmp/chrome.zip
+
+# Download and install ChromeDriver
+RUN wget --progress=dot:giga -O /tmp/chromedriver.zip \
+  "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROME_VERSION}/linux64/chromedriver-linux64.zip" && \
+  unzip /tmp/chromedriver.zip -d /usr/local/ && \
+  ln -s /usr/local/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
+  rm /tmp/chromedriver.zip
 
 # Verify installations
-RUN chmod +x /usr/local/bin/geckodriver && \
-  firefox --version && \
-  geckodriver --version
+RUN chmod +x /usr/local/bin/chrome && \
+  chmod +x /usr/local/bin/chromedriver && \
+  chrome --version && \
+  chromedriver --version
 RUN chown -R airflow /app
 USER airflow
 
@@ -67,7 +83,6 @@ WORKDIR /home/airflow
 COPY standalone-entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 USER airflow
-RUN python -c "from selenium import webdriver; options = webdriver.FirefoxOptions(); options.add_argument('--headless'); driver = webdriver.Firefox(options=options); driver.get('https://www.google.com'); driver.quit(); print('\n\n*** Firefox driver test successful! ***\n')"
 
 ENTRYPOINT [ "/bin/bash" ]
 CMD ["./entrypoint.sh"]
