@@ -1,5 +1,3 @@
-from selenium import webdriver
-from selenium.webdriver.support.wait import WebDriverWait
 import subprocess
 
 
@@ -11,6 +9,10 @@ def test_selenium_connection_exec() -> None:
 
 
 def test_selenium_connection() -> bool:
+    # If this works I am going to <REDACTED>
+    from selenium import webdriver
+    from selenium.webdriver.support.wait import WebDriverWait
+
     """Test Selenium connectivity with enhanced error handling"""
     options = webdriver.FirefoxOptions()
     options.add_argument("--headless")
