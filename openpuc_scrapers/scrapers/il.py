@@ -801,47 +801,66 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
 
     def into_generic_case_data(self, state_data: ILICCCaseData) -> GenericCase:
         """Convert Illinois case data to generic case format."""
+        extra_metadata = {
+            "illinois_specific": {
+                "case_category": state_data.category,
+                "service_list": [
+                    entry.model_dump() for entry in state_data.service_list
+                ],
+                "schedule": [entry.model_dump() for entry in state_data.schedule],
+                "documents": [doc.model_dump() for doc in state_data.documents],
+                "docket_sheet": [
+                    entry.model_dump() for entry in state_data.docket_sheet
+                ],
+            }
+        }
+
+        if state_data.case_details:
+            extra_metadata["illinois_specific"].update(
+                {
+                    "case_status": state_data.case_details.status,
+                    "judge_names": state_data.case_details.judge_names,
+                    "filing_date": state_data.case_details.filing_date,
+                }
+            )
+
         return GenericCase(
             case_number=state_data.case_number,
-            case_title=(
+            case_name=(
                 state_data.case_details.title if state_data.case_details else None
             ),
             case_url=state_data.case_url,
-            category=state_data.category,
-            service_type=None,  # Not available in Illinois data
-            judge_name=(
-                state_data.case_details.judge_names if state_data.case_details else None
-            ),
             filing_date=(
                 self._parse_date(state_data.case_details.filing_date)
                 if state_data.case_details
                 else None
             ),
-            case_status=(
-                state_data.case_details.status if state_data.case_details else None
-            ),
-            case_description=None,  # Not available in Illinois data
-            applicant=None,  # Not available in Illinois data
-            industry=None,  # Not available in Illinois data
-            documents=[doc.url for doc in state_data.documents],
-            service_list=[entry.model_dump() for entry in state_data.service_list],
-            schedule=[entry.model_dump() for entry in state_data.schedule],
+            extra_metadata=extra_metadata,
         )
 
     def into_generic_filing_data(self, state_data: ILICCFilingData) -> GenericFiling:
         """Convert Illinois filing data to generic filing format."""
+        extra_metadata = {
+            "illinois_specific": {
+                "filing_documents": [
+                    doc.model_dump() for doc in state_data.filing_documents
+                ],
+                "document_url": (
+                    state_data.filing_documents[0].url
+                    if state_data.filing_documents
+                    else None
+                ),
+            }
+        }
+
         return GenericFiling(
             case_number=state_data.case_id,
             filed_date=self._parse_date(state_data.filing_date),
             party_name=state_data.filing_party,
             filing_type=state_data.filing_type,
             description=state_data.filing_description,
-            attachments=[doc.model_dump() for doc in state_data.filing_documents],
-            document_url=(
-                state_data.filing_documents[0].url
-                if state_data.filing_documents
-                else ""
-            ),
+            attachments=[],  # Maintain empty list for base model compliance
+            extra_metadata=extra_metadata,
         )
 
     def enrich_filing_data_intermediate(
@@ -891,4 +910,3 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
             return None
 
     # ... (rest of the helper methods remain unchanged)
-

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Extra
 from typing import Any, Dict, Optional
 
 from openpuc_scrapers.models.timestamp import RFC3339Time, rfc_time_now
@@ -13,7 +13,7 @@ from openpuc_scrapers.models.timestamp import RFC3339Time, rfc_time_now
 from .filing import GenericFiling
 
 
-class GenericCase(BaseModel):
+class GenericCase(BaseModel, extra=Extra.allow):
     """Model representing case data.
 
     Attributes:
@@ -28,9 +28,9 @@ class GenericCase(BaseModel):
         filings (Optional[list[Filing]]): A list of filings associated with the case.
     """
 
-    model_config = ConfigDict(extra="allow")
-
     case_number: str
+    case_name: str = ""
+    case_url: str = ""
     case_type: Optional[str] = None
     description: Optional[str] = None
     industry: Optional[str] = None
