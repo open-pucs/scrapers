@@ -1,5 +1,13 @@
 from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
+import subprocess
+
+
+# This works and introduces no fucking errors
+def test_selenium_connection_exec() -> None:
+    subprocess.run(
+        """python -c "from selenium import webdriver; options = webdriver.FirefoxOptions(); options.add_argument('--headless'); driver = webdriver.Firefox(options=options); driver.get('https://www.google.com'); driver.quit(); print('\n\n*** Firefox driver test successful! ***\n')"""
+    )
 
 
 def test_selenium_connection() -> bool:

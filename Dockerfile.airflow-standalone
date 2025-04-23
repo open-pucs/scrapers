@@ -27,9 +27,10 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 # Install GeckoDriver
-ARG GECKODRIVER_VERSION="v0.34.0"
+ARG GECKODRIVER_VERSION="v0.36.0"
 RUN wget --progress=dot:giga -O /tmp/geckodriver.tar.gz \
-  "https://github.com/mozilla/geckodriver/re/${G/${GECKODRIVER_VERSION}/geckodriver-${GECKODRIVER_VERSION}-linux64.tar.gz" && \
+  "https://github.com/mozilla/geckodriver/releases/download/${GECKODRIVER_VERSION}/geckodriver-${GECKODRIVER_VERSION}-linux64.tar.gz" && \
+  # https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-linux64.tar.gz
   tar -xzf /tmp/geckodriver.tar.gz -C /usr/local/bin/ && \
   rm /tmp/geckodriver.tar.gz
 
@@ -51,7 +52,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Test Chrome driver installation
 # RUN python -c "raise ValueError()" # Ran once as validation to see if any exceptions in python got bubbled up to the shell
-RUN python -c "from selenium import webdriver; options = webdriver.ChromeOptions(); options.add_argument('--headless=new'); options.add_argument('--no-sandbox'); options.add_argument('--disable-dev-shm-usage'); options.add_argument('--user-data-dir=/tmp/chrome-docker-test'); driver = webdriver.Chrome(options=options); driver.get('https://www.google.com'); driver.quit(); print('\n\n*** Chrome driver test successful! ***\n')"
+RUN python -c "from selenium import webdriver; options = webdriver.FirefoxOptions(); options.add_argument('--headless'); driver = webdriver.Firefox(options=options); driver.get('https://www.google.com'); driver.quit(); print('\n\n*** Firefox driver test successful! ***\n')"
 
 
 COPY openpuc_scrapers/ /app/openpuc_scrapers/
