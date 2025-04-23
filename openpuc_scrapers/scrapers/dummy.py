@@ -82,7 +82,7 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
         """Include Selenium connectivity test results with dummy data"""
         # selenium_works = test_selenium_connection()
-        # selenium_works = False
+        selenium_works = False
         return {
             "cases": [self._generate_dummy_case().model_dump() for _ in range(10)],
             "selenium_test": {

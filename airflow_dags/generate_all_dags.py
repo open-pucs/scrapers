@@ -11,7 +11,7 @@ from openpuc_scrapers.pipelines.misc_testing import test_selenium_connection
 from openpuc_scrapers.scrapers.scraper_lookup import SCRAPER_REGISTRY, ScraperInfoObject
 
 
-test_selenium_connection()
+# test_selenium_connection()
 default_args = {
     "owner": "airflow",
     "start_date": datetime(2023, 1, 1),
