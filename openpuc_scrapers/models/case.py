@@ -5,6 +5,13 @@ from openpuc_scrapers.models.timestamp import RFC3339Time, rfc_time_now
 
 from .filing import GenericFiling
 
+from pydantic import BaseModel, ConfigDict
+from typing import Any, Dict, Optional
+
+from openpuc_scrapers.models.timestamp import RFC3339Time, rfc_time_now
+
+from .filing import GenericFiling
+
 
 class GenericCase(BaseModel):
     """Model representing case data.
@@ -21,6 +28,8 @@ class GenericCase(BaseModel):
         filings (Optional[list[Filing]]): A list of filings associated with the case.
     """
 
+    model_config = ConfigDict(extra="allow")
+
     case_number: str
     case_type: Optional[str] = None
     description: Optional[str] = None
@@ -32,3 +41,7 @@ class GenericCase(BaseModel):
     filings: Optional[list[GenericFiling]] = None
     extra_metadata: Dict[str, Any] = {}
     indexed_at: RFC3339Time = rfc_time_now()
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.model_extra:
+            self.extra_metadata.update(self.model_extra)
