@@ -17,7 +17,7 @@ class ScraperInfoObject(BaseModel):
 SCRAPER_REGISTRY: List[ScraperInfoObject] = [
     ScraperInfoObject(id="ny_puc", name="New York PUC", object_type=NYPUCScraper),
     ScraperInfoObject(id="dummy", name="Dummy Scraper", object_type=DummyScraper),
-    # ScraperInfoObject(id="il_puc", name="Illinois ICC", object_type=IllinoisICCScraper),
+    ScraperInfoObject(id="il_puc", name="Illinois ICC", object_type=IllinoisICCScraper),
     ScraperInfoObject(
         id="ma_puc", name="Massachusetts PUC", object_type=MassachusettsDPUScraper
     ),
