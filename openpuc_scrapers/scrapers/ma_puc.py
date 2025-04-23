@@ -4,6 +4,11 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import unicodedata
 
+from openpuc_scrapers.models.timestamp import (
+    RFC3339Time,
+    date_to_rfctime,
+    to_rfc339_time,
+)
 from openpuc_scrapers.scrapers.base import GenericScraper
 
 
@@ -168,6 +173,8 @@ class MassachusettsDPUScraper(GenericScraper[GenericCase, GenericFiling]):
                     opened_date = datetime.strptime(date_str, "%m/%d/%Y").date()
                 except ValueError:
                     opened_date = None
+            if opened_date is not None:
+                opened_date = date_to_rfctime(opened_date)
 
             case = GenericCase(
                 case_number=cells[0].get_text(strip=True),
