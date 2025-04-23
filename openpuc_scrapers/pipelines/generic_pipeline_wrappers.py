@@ -148,10 +148,9 @@ def get_new_caselist_since_date(
 
 def get_new_caselist_since_date_jsonified(
     scraper: GenericScraper[StateCaseData, StateFilingData],
-    after_date: str,
+    after_date: RFC3339Time,
     base_path: str,
 ) -> List[str]:
-    """JSON-serializable version for Airflow XComs"""
-    validated_date = rfc_time_from_string(after_date)
+    validated_date = after_date
     cases = get_new_caselist_since_date(scraper, validated_date, base_path)
     return [case.model_dump_json() for case in cases]

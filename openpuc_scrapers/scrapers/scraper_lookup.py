@@ -1,46 +1,25 @@
-from enum import Enum
-from typing import Optional
+from typing import List
+from pydantic import BaseModel
 
 from openpuc_scrapers.scrapers.base import GenericScraper
 from openpuc_scrapers.scrapers.dummy import DummyScraper
+from openpuc_scrapers.scrapers.il_puc import IllinoisICCScraper
+from openpuc_scrapers.scrapers.ma_puc import MassachusettsDPUScraper
 from openpuc_scrapers.scrapers.ny_puc import NYPUCScraper
 
 
-class ScraperName(str, Enum):
-    NY_PUC = "ny_puc"
-    MA_PUC = "ma_puc"
-    IL_PUC = "il_puc"
-    CO_PUC = "co_puc"
-    TEST = "test"
+class ScraperInfoObject(BaseModel):
+    id: str
+    name: str
+    object_type: type[GenericScraper]
 
 
-def get_scraper_type_from_name(name: ScraperName) -> type[GenericScraper]:
-    match name:
-        case ScraperName.NY_PUC:
-            return NYPUCScraper
-        case ScraperName.MA_PUC:
-            raise ValueError("Not implemented")
-        case ScraperName.IL_PUC:
-            raise ValueError("Not implemented")
-        case ScraperName.CO_PUC:
-            raise ValueError("Not implemented")
-        case ScraperName.TEST:
-            return DummyScraper
-
-        # case _:
-        #     raise ValueError("Scraper not Found")
-
-
-def get_scraper_type_from_name_unvalidated(name: str) -> type[GenericScraper]:
-    try:
-        scraper_name = ScraperName(name)
-    except ValueError:
-        raise ValueError(f"Invalid scraper name: {name}") from None
-    return get_scraper_type_from_name(scraper_name)
-
-
-def get_scraper_type_from_name_default_dummy(name: str) -> type[GenericScraper]:
-    try:
-        return get_scraper_type_from_name_unvalidated(name)
-    except Exception:
-        return DummyScraper
+SCRAPER_REGISTRY: List[ScraperInfoObject] = [
+    ScraperInfoObject(id="ny_puc", name="New York PUC", object_type=NYPUCScraper),
+    ScraperInfoObject(id="dummy", name="Dummy Scraper", object_type=DummyScraper),
+    ScraperInfoObject(id="il_puc", name="Illinois ICC", object_type=IllinoisICCScraper),
+    ScraperInfoObject(
+        id="ma_puc", name="Massachusetts PUC", object_type=MassachusettsDPUScraper
+    ),
+    # ScraperInfoObject(id="co_puc", name="Colorado PUC", object_type=COPUCScraper),
+]

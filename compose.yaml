@@ -4,12 +4,13 @@ x-airflow-common: &airflow-common
     dockerfile: Dockerfile.airflow-standalone
 
   environment: &airflow-common-env
+    AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD}
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
 
-    OPENSCRAPERS_SQL_DB_CONNECTION: postgresql+asyncpg://postgres:dolphins@openscrapers-postgres:5432/public
+    OPENSCRAPERS_SQL_DB_CONNECTION: postgresql+asyncpg://postgres:${OPENSCRAPERS_SQL_PASSWORD}@openscrapers-postgres:5432/public
     OPENSCRAPERS_S3_OBJECT_BUCKET: ${OPENSCRAPERS_S3_OBJECT_BUCKET}
     OPENSCRAPERS_S3_ACCESS_KEY: ${OPENSCRAPERS_S3_ACCESS_KEY}
     OPENSCRAPERS_S3_SECRET_KEY: ${OPENSCRAPERS_S3_SECRET_KEY}
@@ -35,7 +36,7 @@ x-airflow-common: &airflow-common
 
 x-openscraper-env-variables:
   &openscraper-env-variables # - OPENSCRAPERS_SQL_DB_CONNECTION: postgresql://postgres:dolphins@openscrapers-postgres:5432/postgres
-  OPENSCRAPERS_SQL_DB_CONNECTION: postgresql+asyncpg://postgres:dolphins@openscrapers-postgres:5432/public
+  OPENSCRAPERS_SQL_DB_CONNECTION: postgresql+asyncpg://postgres:${OPENSCRAPERS_SQL_PASSWORD}@openscrapers-postgres:5432/public
   OPENSCRAPERS_S3_OBJECT_BUCKET: ${OPENSCRAPERS_S3_OBJECT_BUCKET}
   OPENSCRAPERS_S3_ACCESS_KEY: ${OPENSCRAPERS_S3_ACCESS_KEY}
   OPENSCRAPERS_S3_SECRET_KEY: ${OPENSCRAPERS_S3_SECRET_KEY}
@@ -47,7 +48,7 @@ services:
     restart: always
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=dolphins
+      - POSTGRES_PASSWORD=${OPENSCRAPERS_SQL_PASSWORD}
       - POSTGRES_DB=public
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
@@ -66,10 +67,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.namespace=openscrapers"
-      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.openscrapers-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)"
       - "traefik.http.routers.blog.tls.domains[0].main=${DOMAIN}"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      - "traefik.http.routers.openscrapers-api.entrypoints=websecure"
+      - "traefik.http.routers.openscrapers-api.tls.certresolver=myresolver"
       - "traefik.http.routers.whoami.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.whoami.entrypoints=websecure"
       - "traefik.http.routers.whoami.tls.certresolver=myresolver"
@@ -77,6 +78,8 @@ services:
       - ./openpuc_scrapers:/app/openpuc_scrapers
     expose:
       - 8000
+    ports:
+      - 8002:8000
     environment:
       <<: *openscraper-env-variables
   reverse-proxy:
@@ -131,6 +134,15 @@ services:
     <<: *airflow-common
     ports:
       - "3030:8081"
+    expose:
+      - 8081
+    labels:
+      - "traefik.enable=true"
+      - "traefik.namespace=openscrapers"
+      - "traefik.http.routers.openscrapers-airflow.rule=Host(`${AIRFLOW_DOMAIN}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.openscrapers-airflow.entrypoints=websecure"
+      - "traefik.http.routers.openscrapers-airflow.tls.certresolver=myresolver"
+      - "traefik.http.services.openscrapers-airflow.loadbalancer.server.port=8081"
     # network_mode: "host"
     # command: "./entrypoint.sh"
 

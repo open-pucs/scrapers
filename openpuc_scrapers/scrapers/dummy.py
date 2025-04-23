@@ -3,11 +3,16 @@ from typing import Any, Dict, List
 from pydantic import BaseModel
 from random import randint, choice
 from faker import Faker
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 from openpuc_scrapers.models.attachment import GenericAttachment
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.timestamp import RFC3339Time, date_to_rfctime
+from openpuc_scrapers.pipelines.misc_testing import test_selenium_connection
 from openpuc_scrapers.scrapers.base import GenericScraper
 
 fake = Faker()
@@ -35,6 +40,16 @@ class DummyCaseData(BaseModel):
     opened_date: RFC3339Time
     status: str = "open"
     industry: str = "utilities"
+
+
+# Broken DAG: [/opt/airflow/dags/generate_all_dags.py]
+# Traceback (most recent call last):
+#   File "/home/airflow/.local/lib/python3.12/site-packages/selenium/webdriver/remote/webdriver.py", line 429, in execute
+#     self.error_handler.check_response(response)
+#   File "/home/airflow/.local/lib/python3.12/site-packages/selenium/webdriver/remote/errorhandler.py", line 232, in check_response
+#     raise exception_class(message, screen, stacktrace)
+# selenium.common.exceptions.SessionNotCreatedException: Message: session not created: probably user data directory is already in use, please specify a unique value for --user-data-dir argument, or don't use --user-data-dir
+# Stacktrace:
 
 
 class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
@@ -65,7 +80,20 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
         )
 
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
-        return {"cases": [self._generate_dummy_case().model_dump() for _ in range(10)]}
+        """Include Selenium connectivity test results with dummy data"""
+        # selenium_works = test_selenium_connection()
+        selenium_works = False
+        return {
+            "cases": [self._generate_dummy_case().model_dump() for _ in range(10)],
+            "selenium_test": {
+                "success": selenium_works,
+                "message": (
+                    "Successfully connected to google.com"
+                    if selenium_works
+                    else "Failed Selenium connection test"
+                ),
+            },
+        }
 
     def universal_caselist_from_intermediate(
         self, intermediate: Dict[str, Any]

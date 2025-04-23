@@ -16,7 +16,10 @@ airflow db init
 
 # Create admin user if it doesn't exist
 AIRFLOW_USERNAME=admin
-AIRFLOW_PASSWORD=admin
+if [ -z "${AIRFLOW_PASSWORD}" ]; then
+  echo "Error: AIRFLOW_PASSWORD environment variable is not set." >&2
+  exit 1
+fi
 if ! airflow users list | grep -q "^${AIRFLOW_USERNAME} "; then
   airflow users create \
     --username "$AIRFLOW_USERNAME" \

@@ -3,7 +3,6 @@ from openpuc_scrapers.models.attachment import GenericAttachment
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from selenium import webdriver
 from selenium.webdriver.common.by import By
 from pydantic import BaseModel
 from typing import Any, Dict, List, Tuple
@@ -61,6 +60,8 @@ def combine_dockets(docket_lists: List[List[NYPUCDocket]]) -> List[NYPUCDocket]:
 
 def process_docket(docket: NYPUCDocket) -> str:
     """Task to process a single docket and return its files"""
+    from selenium import webdriver
+
     driver = webdriver.Chrome()
     try:
         url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={docket.case_number}"
@@ -202,6 +203,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
 
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
         """Return industry numbers to process"""
+        from selenium import webdriver
 
         def process_industry(industry_num: int) -> Dict[str, Any]:
             """Task to process a single industry number and return its dockets"""

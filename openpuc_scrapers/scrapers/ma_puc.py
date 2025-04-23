@@ -1,17 +1,94 @@
-from typing import List
+from typing import Any, Dict, List
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 import unicodedata
 
+from openpuc_scrapers.models.timestamp import (
+    RFC3339Time,
+    date_to_rfctime,
+    to_rfc339_time,
+)
 from openpuc_scrapers.scrapers.base import GenericScraper
 
 
 from ..models import GenericCase, GenericFiling, GenericAttachment
 
 
-class MassachusettsDPU(GenericScraper):
+class MassachusettsDPUScraper(GenericScraper[GenericCase, GenericFiling]):
+    state: str = "ma"
+    jurisdiction_name: str = "ma_puc"
     """Interface for interacting with and parsing Massachusetts DPU data."""
+
+    def universal_caselist_intermediate(self) -> Dict[str, Any]:
+        """Capture industry page HTML as intermediate data"""
+        intermediates = {}
+        for industry in self.INDUSTRIES:
+            response = requests.get(self._get_case_list_url(industry))
+            response.raise_for_status()
+            intermediates[industry] = response.text
+        return intermediates
+
+    def universal_caselist_from_intermediate(
+        self, intermediate: Dict[str, Any]
+    ) -> List[GenericCase]:
+        """Convert HTML intermediates to GenericCase objects"""
+        cases = []
+        for industry, html in intermediate.items():
+            soup = BeautifulSoup(html, "html.parser")
+            cases.extend(self._parse_case_list(soup, industry))
+        return cases
+
+    def filing_data_intermediate(self, data: GenericCase) -> Dict[str, Any]:
+        """Capture case details HTML as intermediate"""
+        response = requests.get(self._get_case_details_url(data.case_number))
+        response.raise_for_status()
+        return {
+            "case_number": data.case_number,
+            "html": response.text,
+            "existing_case": data.model_dump(),
+        }
+
+    def filing_data_from_intermediate(
+        self, intermediate: Dict[str, Any]
+    ) -> List[GenericFiling]:
+        """Convert HTML intermediate to GenericFiling objects"""
+        soup = BeautifulSoup(intermediate["html"], "html.parser")
+        return self._parse_filings(soup, GenericCase(**intermediate["existing_case"]))
+
+    def updated_cases_since_date_intermediate(
+        self, after_date: RFC3339Time
+    ) -> Dict[str, Any]:
+        raise NotImplementedError(
+            "Massachusetts DPU website doesn't support date-based filtering"
+        )
+
+    def updated_cases_since_date_from_intermediate(
+        self, intermediate: Dict[str, Any], after_date: RFC3339Time
+    ) -> List[GenericCase]:
+        raise NotImplementedError(
+            "Massachusetts DPU website doesn't support date-based filtering"
+        )
+
+    def enrich_filing_data_intermediate(
+        self, filing_data: GenericFiling
+    ) -> Dict[str, Any]:
+        """No enrichment needed - filings contain all data upfront"""
+        return {}
+
+    def enrich_filing_data_from_intermediate_intermediate(
+        self, filing_data: GenericFiling, intermediate: Dict[str, Any]
+    ) -> GenericFiling:
+        """No enrichment needed - return original data"""
+        return filing_data
+
+    def into_generic_case_data(self, state_data: GenericCase) -> GenericCase:
+        """Identity converter since we already use GenericCase"""
+        return state_data
+
+    def into_generic_filing_data(self, state_data: GenericFiling) -> GenericFiling:
+        """Identity converter since we already use GenericFiling"""
+        return state_data
 
     INDUSTRIES = [
         "CONS ADJ",
@@ -98,6 +175,8 @@ class MassachusettsDPU(GenericScraper):
                     opened_date = datetime.strptime(date_str, "%m/%d/%Y").date()
                 except ValueError:
                     opened_date = None
+            if opened_date is not None:
+                opened_date = date_to_rfctime(opened_date)
 
             case = GenericCase(
                 case_number=cells[0].get_text(strip=True),
@@ -193,7 +272,9 @@ class MassachusettsDPU(GenericScraper):
 
         return case
 
-    def _parse_filings(self, soup: BeautifulSoup, case: GenericCase) -> list[Filing]:
+    def _parse_filings(
+        self, soup: BeautifulSoup, case: GenericCase
+    ) -> list[GenericFiling]:
         """Parse the filings from the webpage.
 
         Args:
@@ -233,7 +314,7 @@ class MassachusettsDPU(GenericScraper):
 
             # Create the filing if it doesn't already exist
             filing = GenericFiling(
-                filed_date=filed_date,
+                filed_date=date_to_rfctime(filed_date),
                 party_name=filer,
                 filing_type=filing_type,
                 description=description,
