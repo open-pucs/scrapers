@@ -65,7 +65,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Test Chrome driver installation
 # RUN python -c "raise ValueError()" # Ran once as validation to see if any exceptions in python got bubbled up to the shell
-RUN python -c "from selenium import webdriver; options = webdriver.ChromeOptions(); options.add_argument('--headless=new'); options.add_argument('--no-sandbox'); options.add_argument('--disable-dev-shm-usage'); driver = webdriver.Chrome(options=options); driver.get('https://www.google.com'); driver.quit(); print('\n\n*** Chrome driver test successful! ***\n')"
+RUN python -c "from selenium import webdriver; options = webdriver.ChromeOptions(); options.add_argument('--headless=new'); options.add_argument('--no-sandbox'); options.add_argument('--disable-dev-shm-usage'); options.add_argument('--user-data-dir=/tmp/chrome-docker-test'); driver = webdriver.Chrome(options=options); driver.get('https://www.google.com'); driver.quit(); print('\n\n*** Chrome driver test successful! ***\n')"
 
 
 COPY openpuc_scrapers/ /app/openpuc_scrapers/

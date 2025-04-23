@@ -12,6 +12,7 @@ from openpuc_scrapers.models.attachment import GenericAttachment
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.timestamp import RFC3339Time, date_to_rfctime
+from openpuc_scrapers.pipelines.misc_testing import test_selenium_connection
 from openpuc_scrapers.scrapers.base import GenericScraper
 
 fake = Faker()
@@ -47,32 +48,8 @@ class DummyCaseData(BaseModel):
 #     self.error_handler.check_response(response)
 #   File "/home/airflow/.local/lib/python3.12/site-packages/selenium/webdriver/remote/errorhandler.py", line 232, in check_response
 #     raise exception_class(message, screen, stacktrace)
-# selenium.common.exceptions.SessionNotCreatedException: Message: session not created: Chrome failed to start: exited normally.
-#   (session not created: DevToolsActivePort file doesn't exist)
-#   (The process started from chrome location /usr/local/bin/chrome is no longer running, so ChromeDriver is assuming that Chrome has crashed.)
+# selenium.common.exceptions.SessionNotCreatedException: Message: session not created: probably user data directory is already in use, please specify a unique value for --user-data-dir argument, or don't use --user-data-dir
 # Stacktrace:
-def test_selenium_connection() -> bool:
-    """Test Selenium connectivity with enhanced error handling"""
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--remote-debugging-port=9222")
-
-    try:
-        driver = webdriver.Chrome(options=options)
-        driver.get("https://www.google.com")
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "q")))
-        driver.quit()
-        return True
-    except Exception as e:
-        print(f"Selenium error: {str(e)}")
-        try:
-            driver.quit()
-        except Exception:
-            pass
-        return False
 
 
 class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
@@ -104,7 +81,7 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
 
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
         """Include Selenium connectivity test results with dummy data"""
-        selenium_works = test_selenium_connection()
+        # selenium_works = test_selenium_connection()
         # selenium_works = False
         return {
             "cases": [self._generate_dummy_case().model_dump() for _ in range(10)],

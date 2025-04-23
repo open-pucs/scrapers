@@ -7,9 +7,11 @@ from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
     get_new_caselist_since_date_jsonified,
     process_case_jsonified,
 )
+from openpuc_scrapers.pipelines.misc_testing import test_selenium_connection
 from openpuc_scrapers.scrapers.scraper_lookup import SCRAPER_REGISTRY, ScraperInfoObject
 
 
+test_selenium_connection()
 default_args = {
     "owner": "airflow",
     "start_date": datetime(2023, 1, 1),
