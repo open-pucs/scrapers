@@ -10,7 +10,7 @@ from openpuc_scrapers.scrapers.base import GenericScraper
 from ..models import GenericCase, GenericFiling, GenericAttachment
 
 
-class MassachusettsDPU(GenericScraper[GenericCase, GenericFiling]):
+class MassachusettsDPUScraper(GenericScraper[GenericCase, GenericFiling]):
     """Interface for interacting with and parsing Massachusetts DPU data."""
 
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
