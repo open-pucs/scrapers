@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from openpuc_scrapers.scrapers.base import GenericScraper
 from openpuc_scrapers.scrapers.dummy import DummyScraper
-from openpuc_scrapers.scrapers.il import IllinoisICCScraper
+from openpuc_scrapers.scrapers.il_puc import IllinoisICCScraper
 from openpuc_scrapers.scrapers.ma_puc import MassachusettsDPUScraper
 from openpuc_scrapers.scrapers.ny_puc import NYPUCScraper
 
