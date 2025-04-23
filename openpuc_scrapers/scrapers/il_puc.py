@@ -201,6 +201,9 @@ def build_icc_search_url(
 class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
     """Scraper for Illinois ICC website."""
 
+    state: str = "il"
+    jurisdiction_name: str = "il_puc"
+
     def __init__(self):
         """Initialize the scraper."""
 
