@@ -13,6 +13,7 @@ from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.filing import GenericFiling
 
 # Import scraper base class
+from openpuc_scrapers.models.timestamp import date_to_rfctime
 from openpuc_scrapers.scrapers.base import GenericScraper
 
 # --- Illinois Specific Models ---
@@ -203,15 +204,15 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
     def __init__(self):
         """Initialize the scraper."""
 
-        from selenium import webdriver
+        # from selenium import webdriver
 
-        self.driver = webdriver.Chrome()
-        self.driver.implicitly_wait(10)
+        # self.driver = webdriver.Chrome()
+        # self.driver.implicitly_wait(10)
 
-    def __del__(self):
-        """Clean up resources."""
-        if hasattr(self, "driver"):
-            self.driver.quit()
+    # def __del__(self):
+    #     """Clean up resources."""
+    #     if hasattr(self, "driver"):
+    #         self.driver.quit()
 
     BASE_URL = "https://www.icc.illinois.gov"
 
@@ -223,7 +224,7 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
 
         from selenium import webdriver
 
-        options = self.driver_options or webdriver.ChromeOptions()
+        options = webdriver.ChromeOptions()
         # Add common useful options
         if "--headless" not in str(options.arguments):
             # Only add these if not already set in driver_options
@@ -663,9 +664,6 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
         if "error" in intermediate:
             print(f"Error in intermediate data: {intermediate['error']}")
             return []
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.support.ui import WebDriverWait
 
         filings: List[ILICCFilingData] = []
 
@@ -712,6 +710,9 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
             driver = self._get_driver()
             try:
                 documents = []
+                from selenium.webdriver.common.by import By
+                from selenium.webdriver.support import expected_conditions as EC
+                from selenium.webdriver.support.ui import WebDriverWait
 
                 # Process a limited number of documents if MAX_DOCUMENTS is set
                 if self.MAX_DOCUMENTS > 0:
@@ -831,17 +832,20 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
                 }
             )
 
+        parsed_beginning_date = None
+        if state_data.case_details is not None:
+            intermediate_date = self._parse_date(state_data.case_details.filing_date)
+            if intermediate_date is not None:
+                parsed_beginning_date = date_to_rfctime(intermediate_date)
+
         return GenericCase(
             case_number=state_data.case_number,
             case_name=(
                 state_data.case_details.title if state_data.case_details else None
-            ),
+            )
+            or "",
             case_url=state_data.case_url,
-            filing_date=(
-                self._parse_date(state_data.case_details.filing_date)
-                if state_data.case_details
-                else None
-            ),
+            opened_date=parsed_beginning_date,
             extra_metadata=extra_metadata,
         )
 
