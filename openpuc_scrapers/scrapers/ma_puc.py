@@ -16,6 +16,8 @@ from ..models import GenericCase, GenericFiling, GenericAttachment
 
 
 class MassachusettsDPUScraper(GenericScraper[GenericCase, GenericFiling]):
+    state: str = "ma"
+    jurisdiction_name: str = "ma_puc"
     """Interface for interacting with and parsing Massachusetts DPU data."""
 
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
