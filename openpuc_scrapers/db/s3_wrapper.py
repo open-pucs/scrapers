@@ -80,7 +80,12 @@ class S3FileManager:
     def get_local_dir_from_key(self, key: str) -> Path:
         return self.s3_cache_directory / Path(key)
 
-    def save_string_to_remote_file(self, key: str, content: str):
+    def save_string_to_remote_file(self, key: str, content: str) -> None:
+        if content is None or content == "":
+            default_logger.error(
+                f"Tried to upload to {key} with a nill string. Skipping."
+            )
+            return
         local_path = self.get_local_dir_from_key(key)
         if local_path is None:
             local_path = self.tmpdir / rand_filepath()
