@@ -1,7 +1,6 @@
 import os
 import boto3
 
-import hashlib
 
 from typing import Optional, Any
 
@@ -248,27 +247,17 @@ class S3FileManager:
                 f"Uploading {filepath} (Size: {filepath.stat().st_size} bytes) with Content-Type: {content_type}"
             )
 
-            # Generate MD5 hash for content verification
-
-            md5_hash = hashlib.md5(filepath.read_bytes()).hexdigest()
-
-            self.logger.debug(f"Full S3 URI: {self.generate_s3_uri(file_upload_key)}")
-            self.logger.debug(f"MD5 checksum: {md5_hash}")
-
-            # Use put_object instead of upload_file for better error visibility
-            return self.s3.put_object(
-                Bucket=bucket,
-                Key=file_upload_key,
-                Body=filepath.read_bytes(),
-                ContentType=content_type,
-                Metadata={
-                    "source-file": str(filepath.name),
-                    "upload-system": "open-scrapers",
-                    "content-md5": md5_hash,
+            return self.s3.upload_file(
+                str(filepath),
+                bucket,
+                file_upload_key,
+                ExtraArgs={
+                    "ContentType": content_type,
+                    "Metadata": {
+                        "source-file": str(filepath.name),
+                        "upload-system": "open-scrapers",
+                    },
                 },
-                # Some S3 implementations require these fields
-                ACL="public-read",
-                ContentMD5=md5_hash,
             )
         except Exception as e:
             self.logger.error(f"Failed to upload {file_upload_key} from {filepath}")
