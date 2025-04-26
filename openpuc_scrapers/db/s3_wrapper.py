@@ -54,6 +54,12 @@ class S3FileManager:
         self.endpoint = OPENSCRAPERS_S3_ENDPOINT
         self.logger = default_logger
 
+        # Validate S3 configuration on init
+        if not all([OPENSCRAPERS_S3_ACCESS_KEY, OPENSCRAPERS_S3_SECRET_KEY]):
+            raise ValueError("Missing S3 credentials in environment variables")
+        if not OPENSCRAPERS_S3_ENDPOINT:
+            raise ValueError("Missing S3 endpoint configuration")
+
         self.tmpdir = TMP_DIR
 
         # Create directories if they don't exist
@@ -221,5 +227,38 @@ class S3FileManager:
         if mutable or not self.does_file_exist_s3(key=file_upload_key, bucket=bucket):
             if not filepath.exists():
                 raise FileNotFoundError(f"Source file {filepath} does not exist")
-            return self.s3.upload_file(str(filepath), bucket, file_upload_key)
-        return file_upload_key
+            default_logger.info(
+                f"Uploading file {filepath}, to s3 key: {file_upload_key}"
+            )
+        try:
+            # Get MIME type and add validation
+            from mimetypes import guess_type
+
+            content_type = guess_type(file_upload_key)[0] or "application/octet-stream"
+            if file_upload_key.endswith(".json"):
+                content_type = "application/json"
+
+            self.logger.debug(
+                f"Uploading {filepath} (Size: {filepath.stat().st_size} bytes) with Content-Type: {content_type}"
+            )
+
+            return self.s3.upload_file(
+                str(filepath),
+                bucket,
+                file_upload_key,
+                ExtraArgs={
+                    "ContentType": content_type,
+                    "Metadata": {
+                        "source-file": str(filepath.name),
+                        "upload-system": "open-scrapers",
+                    },
+                },
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to upload {file_upload_key} from {filepath}")
+            self.logger.error(
+                f"File exists: {filepath.exists()}, size: {filepath.stat().st_size if filepath.exists() else 0}"
+            )
+            self.logger.error(f"Bucket: {bucket}, Key: {file_upload_key}")
+            raise e
+            return file_upload_key
