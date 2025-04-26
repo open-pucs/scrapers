@@ -204,13 +204,22 @@ class S3FileManager:
         if mutable or not local_cache_filepath.exists():
             if filepath != local_cache_filepath:
                 try:
-                    filepath.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(filepath, local_cache_filepath)
+                    # Ensure source exists and destination directory exists
+                    if not filepath.exists():
+                        raise FileNotFoundError(
+                            f"Source file {filepath} does not exist"
+                        )
+                    local_cache_filepath.parent.mkdir(parents=True, exist_ok=True)
+                    default_logger.info(f"Copying {filepath} to {local_cache_filepath}")
+                    shutil.copyfile(src=filepath, dst=local_cache_filepath)
+
                 except Exception as e:
                     default_logger.warning(
                         f"Encountered error copying file to cache: {e}"
                     )
                     raise e
         if mutable or not self.does_file_exist_s3(key=file_upload_key, bucket=bucket):
+            if not filepath.exists():
+                raise FileNotFoundError(f"Source file {filepath} does not exist")
             return self.s3.upload_file(str(filepath), bucket, file_upload_key)
         return file_upload_key
