@@ -31,11 +31,15 @@ def validate_length(v: bytes):
     return v
 
 
+def blake2b_to_str(v: bytes) -> str:
+    return base64.urlsafe_b64encode(v).decode("ascii")
+
+
 Blake2bHash = Annotated[
     bytes,
     BeforeValidator(decode_blake2b),
     AfterValidator(validate_length),
-    PlainSerializer(lambda x: base64.urlsafe_b64encode(x).decode("ascii")),
+    PlainSerializer(blake2b_to_str),
     WithJsonSchema({"type": "string"}, mode="serialization"),
 ]
 

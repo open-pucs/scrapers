@@ -15,6 +15,7 @@ from openpuc_scrapers.models.timestamp import (
     RFC3339Time,
     rfc_time_from_string,
     rfc_time_now,
+    rfctime_serializer,
 )
 from openpuc_scrapers.pipelines.helper_utils import save_json
 from openpuc_scrapers.pipelines.raw_attachment_handling import process_generic_filing
@@ -32,9 +33,7 @@ def generate_intermediate_object_save_path(
     scraper: GenericScraper[StateCaseData, StateFilingData],
 ) -> str:
     time_now = rfc_time_now()
-    base_path = (
-        f"intermediates/{scraper.state}/{scraper.jurisdiction_name}/{str(time_now)}"
-    )
+    base_path = f"intermediates/{scraper.state}/{scraper.jurisdiction_name}/{rfctime_serializer(time_now)}"
 
     return base_path
 
