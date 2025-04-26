@@ -204,7 +204,7 @@ class S3FileManager:
         if mutable or not local_cache_filepath.exists():
             if filepath != local_cache_filepath:
                 try:
-                    filepath.parent.mkdir(parents=True)
+                    filepath.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(filepath, local_cache_filepath)
                 except Exception as e:
                     default_logger.warning(
