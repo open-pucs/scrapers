@@ -56,7 +56,8 @@ async def push_raw_attach_to_s3_and_db(raw_att: RawAttachment, file_path: Path) 
     file_key = get_raw_attach_file_key(raw_att.hash)
     s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
     s3.save_string_to_remote_file(key=obj_key, content=dumped_data)
-    s3.push_file_to_s3(filepath=file_path, file_upload_key=file_key)
+    # Immutable is true for this line since any file will always get saved with the same hash.
+    s3.push_file_to_s3(filepath=file_path, file_upload_key=file_key, immutable=True)
     # TODO: Maybe update db that the file has been updated?
 
 

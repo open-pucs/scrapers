@@ -191,14 +191,25 @@ class S3FileManager:
         return self.download_file_to_path(url, savedir)
 
     def push_file_to_s3(
-        self, filepath: Path, file_upload_key: str, bucket: Optional[str] = None
+        self,
+        filepath: Path,
+        file_upload_key: str,
+        bucket: Optional[str] = None,
+        immutable: bool = False,
     ) -> str:
+        mutable = not immutable
         if bucket is None:
             bucket = self.bucket
         local_cache_filepath = self.get_local_dir_from_key(file_upload_key)
-        if filepath != local_cache_filepath:
-            try:
-                shutil.copyfile(filepath, local_cache_filepath)
-            except Exception as e:
-                default_logger.warning(f"Encountered error copying file to cache: {e}")
-        return self.s3.upload_file(str(filepath), bucket, file_upload_key)
+        if mutable or not local_cache_filepath.exists():
+            if filepath != local_cache_filepath:
+                try:
+                    shutil.copyfile(filepath, local_cache_filepath)
+                except Exception as e:
+                    default_logger.warning(
+                        f"Encountered error copying file to cache: {e}"
+                    )
+                    raise e
+        if mutable or not self.does_file_exist_s3(key=file_upload_key, bucket=bucket):
+            return self.s3.upload_file(str(filepath), bucket, file_upload_key)
+        return file_upload_key
