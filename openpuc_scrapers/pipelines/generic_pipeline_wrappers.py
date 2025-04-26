@@ -1,3 +1,4 @@
+import logging
 from typing import Any, List
 from datetime import date, datetime, timezone
 from pydantic import BaseModel
@@ -23,6 +24,8 @@ from openpuc_scrapers.scrapers.base import (
     StateFilingData,
 )
 import asyncio
+
+default_logger = logging.getLogger(__name__)
 
 
 def generate_intermediate_object_save_path(
@@ -70,12 +73,17 @@ def process_case(
         generic_filing = scraper.into_generic_filing_data(filing)
         case_specific_generic_cases.append(generic_filing)
 
+    default_logger.info("Starting Async Case Processing")
+
     async def async_shit() -> GenericCase:
         tasks = []
         for generic_filing in case_specific_generic_cases:
             # FIXME : What do I do about async with flyte????
+            default_logger.info("Adding Generic Filing Task")
             tasks.append(process_generic_filing(generic_filing))
+        default_logger.info("Begin Processing Filings")
         result_generic_cases = await asyncio.gather(*tasks)
+        default_logger.info("Finish Processing Filings")
         generic_case.filings = result_generic_cases
         await push_case_to_s3_and_db(
             case=generic_case,

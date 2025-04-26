@@ -18,6 +18,7 @@ class GenericFiling(BaseModel, extra=Extra.allow):
         attachments (Optional[list[Attachment]]): A list of associateda ttachments.
     """
 
+    name: str = ""
     filed_date: RFC3339Time
     party_name: str
     filing_type: str
