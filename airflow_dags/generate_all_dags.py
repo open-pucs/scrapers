@@ -97,9 +97,6 @@ def create_single_docket_test_dag(scraper_info: ScraperInfoObject) -> Any:
         tags=["scrapers", scraper_info.id],
     )
     def scraper_dag():
-        @task
-        def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[str]:
-            return get_all_caselist_raw_jsonified(scraper=scraper, base_path=base_path)
 
         @task
         def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:
@@ -110,10 +107,13 @@ def create_single_docket_test_dag(scraper_info: ScraperInfoObject) -> Any:
         # DAG structure - now uses fixed scraper name
         scraper = (scraper_info.object_type)()
         base_path = generate_intermediate_object_save_path(scraper)
+        case = scraper_info.test_singular_docket
+        assert case is not None
+        case_json = case.model_dump_json()
 
         return process_case_airflow.expand(
             scraper=[scraper],
-            case=[scraper_info.test_singular_docket],
+            case=[case_json],
             base_path=[base_path],
         )
 
