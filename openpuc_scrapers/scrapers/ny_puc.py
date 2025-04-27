@@ -127,13 +127,15 @@ def process_docket(docket: NYPUCDocket) -> str:
         return outer_html_table
 
     except Exception as e:
-        print(f"Error processing docket {docket.case_number}: {e}")
+        default_logger.error(f"Error processing docket {docket.case_number}: {e}")
         raise e
     finally:
         driver.quit()
 
 
-def extract_docket_info(intermediate: Dict[str, Any]) -> List[NYPUCDocket]:
+def extract_docket_info_from_caselisthtml(
+    intermediate: Dict[str, Any],
+) -> List[NYPUCDocket]:
     """
     Extract complete docket information from HTML table rows
     """
@@ -184,21 +186,27 @@ def extract_docket_info(intermediate: Dict[str, Any]) -> List[NYPUCDocket]:
     return docket_infos
 
 
-def extract_rows(table_html: str, case: str) -> List[NYPUCFiling]:
+def extract_filings_from_dockethtml(table_html: str, case: str) -> List[NYPUCFiling]:
     """Parse table HTML with BeautifulSoup and extract filing data."""
     default_logger.info(f"Extracting rows for case {case}")
     assert table_html, "Empty table HTML input"
     assert case, "Empty case number provided"
     soup = BeautifulSoup(table_html, "html.parser")
-    table = soup.find("table", id="tblPubDoc")
+    # table = soup.find("table", id="tblPubDoc")
+    #
+    # if not table:
+    #     default_logger.error("No table found with ID tblPubDoc found in HTML content")
+    #     return []
+    # else:
+    #     default_logger.debug(f"Found table with ID tblPubDoc")
 
-    if not table:
-        default_logger.error("No table found in HTML content")
+    body = soup.find("tbody")
+    if not body:
+        default_logger.error("No Tablebody found in html")
+        default_logger.error(body)
         return []
     else:
-        default_logger.debug(f"Found table with ID tblPubDoc")
-
-    body = table.find("tbody")
+        default_logger.info("Found Tablebody.")
     rows = body.find_all("tr") if body else []
     filing_data = []
 
@@ -327,7 +335,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         intermediate_list = intermediate["industry_intermediates"]
         caselist: List[NYPUCDocket] = []
         for industry_intermediate in intermediate_list:
-            docket_info = extract_docket_info(industry_intermediate)
+            docket_info = extract_docket_info_from_caselisthtml(industry_intermediate)
             caselist.extend(docket_info)
         return caselist
 
@@ -340,7 +348,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
     ) -> List[NYPUCFiling]:
         """Convert docket HTML to filing data"""
         docket_id, html = intermediate
-        return extract_rows(html, docket_id)
+        return extract_filings_from_dockethtml(html, docket_id)
 
     def updated_cases_since_date_intermediate(
         self, after_date: RFC3339Time

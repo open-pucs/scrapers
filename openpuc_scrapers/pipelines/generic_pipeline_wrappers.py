@@ -47,12 +47,12 @@ def process_case(
     case_num = generic_case.case_number
 
     # Save state-specific case data
-    case_path = f"{base_path}/cases/case_{case_num}.json"
+    case_path = f"{base_path}/initial_cases/case_{case_num}.json"
     save_json(path=case_path, bucket=OPENSCRAPERS_S3_OBJECT_BUCKET, data=case)
 
     # Process filings
     filings_intermediate = scraper.filing_data_intermediate(case)
-    filings_path = f"{base_path}/filings/case_{case_num}.json"
+    filings_path = f"{base_path}/intermediate_caseinfo/case_{case_num}.json"
     save_json(
         path=filings_path,
         bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
