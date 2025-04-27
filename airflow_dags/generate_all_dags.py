@@ -111,10 +111,10 @@ def create_single_docket_test_dag(scraper_info: ScraperInfoObject) -> Any:
         assert case is not None
         case_json = case.model_dump_json()
 
-        return process_case_airflow.expand(
-            scraper=[scraper],
-            case=[case_json],
-            base_path=[base_path],
+        return process_case_airflow(
+            scraper=scraper,
+            case=case_json,
+            base_path=base_path,
         )
 
     return scraper_dag()

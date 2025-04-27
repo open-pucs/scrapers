@@ -255,6 +255,7 @@ def deduplicate_individual_attachments_into_files(
 ) -> List[NYPUCFiling]:
     default_logger.info(f"Deduplicating {len(raw_files)} raw filings")
     assert raw_files, "Empty raw_files input"
+    assert len(raw_files) != 0, "No Raw Files to deduplicate"
 
     dict_nypuc = {}
 
@@ -272,7 +273,11 @@ def deduplicate_individual_attachments_into_files(
         if dict_nypuc.get(dedupestr) is not None:
             default_logger.debug(f"Merging attachments for existing key {dedupestr}")
             dict_nypuc[dedupestr].attachments.extend(file.attachments)
-    return_vals = dict_nypuc.values()
+    return_vals = list(dict_nypuc.values())
+    assert (
+        len(return_vals) != 0
+    ), "Somehow came in with multiple files and deduplicated them down to no files."
+
     return list(return_vals)
 
 
@@ -347,6 +352,12 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         self, intermediate: Dict[str, Any]
     ) -> List[NYPUCFiling]:
         """Convert docket HTML to filing data"""
+        assert all(
+            key in intermediate for key in ("docket_id", "html")
+        ), "Missing required keys in intermediate"
+        assert isinstance(intermediate["docket_id"], str), "docket_id must be a string"
+        assert isinstance(intermediate["html"], str), "html must be a string"
+
         docket_id = intermediate["docket_id"]
         html = intermediate["html"]
         return extract_filings_from_dockethtml(html, docket_id)
