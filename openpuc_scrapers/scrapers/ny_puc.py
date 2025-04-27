@@ -203,7 +203,7 @@ def extract_filings_from_dockethtml(table_html: str, case: str) -> List[NYPUCFil
     body = soup.find("tbody")
     if not body:
         default_logger.error("No Tablebody found in html")
-        default_logger.error(body)
+        default_logger.error(table_html)
         return []
     else:
         default_logger.info("Found Tablebody.")
@@ -347,7 +347,8 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         self, intermediate: Dict[str, Any]
     ) -> List[NYPUCFiling]:
         """Convert docket HTML to filing data"""
-        docket_id, html = intermediate
+        docket_id = intermediate["docket_id"]
+        html = intermediate["html"]
         return extract_filings_from_dockethtml(html, docket_id)
 
     def updated_cases_since_date_intermediate(
