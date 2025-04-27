@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, List
 from airflow.decorators import dag, task
 from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
@@ -25,15 +25,24 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         default_args=default_args,
         schedule_interval=None,
         dag_id=f"{scraper_info.id}_all_cases",
-        tags=["scrapers", scraper_info.id],
+        tags=["scrapers", "all_cases" scraper_info.id],
+        max_active_tasks=20,  # Overall DAG concurrency
+        concurrency=10,  # Match task concurrency
     )
     def scraper_dag():
         @task
         def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[str]:
             return get_all_caselist_raw_jsonified(scraper=scraper, base_path=base_path)
 
-        @task
+        @task(
+            max_active_tasks=10,  # Add semaphore-like behavior
+            execution_timeout=timedelta(minutes=15),  # Add safety timeout
+            retries=2,  # Add retry capability
+            retry_delay=timedelta(seconds=30),
+        )
         def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:
+            """Process individual case with concurrency limits and retries"""
+
             return process_case_jsonified(
                 scraper=scraper, case=case, base_path=base_path
             )
@@ -59,6 +68,8 @@ def create_scraper_newcases_dag(scraper_info: ScraperInfoObject) -> Any:
             "after_date": "2023-01-01",  # Default date, will be overridden at runtime
         },
         tags=["scrapers", "incremental", scraper_info.id],
+        max_active_tasks=20,  # Overall DAG concurrency
+        concurrency=10,  # Match task concurrency
     )
     def new_cases_since_date_dag():
         @task
@@ -68,7 +79,12 @@ def create_scraper_newcases_dag(scraper_info: ScraperInfoObject) -> Any:
                 scraper=scraper, after_date=after_date, base_path=base_path
             )
 
-        @task
+        @task(
+            max_active_tasks=10,  # Add semaphore-like behavior
+            execution_timeout=timedelta(minutes=15),  # Add safety timeout
+            retries=2,  # Add retry capability
+            retry_delay=timedelta(seconds=30),
+        )
         def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:
             return process_case_jsonified(
                 scraper=scraper, case=case, base_path=base_path
@@ -94,7 +110,7 @@ def create_single_docket_test_dag(scraper_info: ScraperInfoObject) -> Any:
         default_args=default_args,
         schedule_interval=None,
         dag_id=f"{scraper_info.id}_test_single_docket",
-        tags=["scrapers", scraper_info.id],
+        tags=["scrapers", "test", scraper_info.id],
     )
     def scraper_dag():
 
