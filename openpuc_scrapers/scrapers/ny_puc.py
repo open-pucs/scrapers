@@ -273,6 +273,8 @@ def deduplicate_individual_attachments_into_files(
         if dict_nypuc.get(dedupestr) is not None:
             default_logger.debug(f"Merging attachments for existing key {dedupestr}")
             dict_nypuc[dedupestr].attachments.extend(file.attachments)
+        else:
+            dict_nypuc[dedupestr] = file
     return_vals = list(dict_nypuc.values())
     assert (
         len(return_vals) != 0
