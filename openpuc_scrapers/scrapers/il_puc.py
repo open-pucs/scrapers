@@ -1,3 +1,4 @@
+from pathlib import Path
 import time
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -9,6 +10,7 @@ from pydantic import BaseModel
 
 
 # Project Imports
+from openpuc_scrapers.db.s3_wrapper import rand_string
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.filing import GenericFiling
 
@@ -226,25 +228,23 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
     def _get_driver(self):
 
         from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
 
-        options = webdriver.ChromeOptions()
-        # Add common useful options
-        if "--headless" not in str(options.arguments):
-            # Only add these if not already set in driver_options
-            options.add_argument("--headless")
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--disable-gpu")
-            options.add_argument("--log-level=3")
-            options.add_argument("--disable-extensions")
-            options.add_argument("--disable-infobars")
+        user_data_dir = Path("/tmp/", "selenium-userdir-" + rand_string())
+        user_data_dir.mkdir(parents=True, exist_ok=True)
+
+        chrome_options = Options()
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+        chrome_options.add_argument("--headless=new")  # Add headless mode
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--no-sandbox")
 
         try:
             # Consider using webdriver-manager for easier driver setup
             # from selenium.webdriver.chrome.service import Service
             # driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
             driver = webdriver.Chrome(
-                options=options
+                options=chrome_options
             )  # Assumes chromedriver is in PATH or managed by Selenium Manager
             driver.set_page_load_timeout(60)  # Set default timeout to 60 seconds
             return driver

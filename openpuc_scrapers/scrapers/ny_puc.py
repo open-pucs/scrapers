@@ -73,7 +73,6 @@ def process_docket(docket: NYPUCDocket) -> str:
 
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
-    import os
 
     # Validate input before proceeding
     assert docket.case_number, "Docket case number cannot be empty"
@@ -300,10 +299,21 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
         """Return industry numbers to process"""
         from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+
+        user_data_dir = Path("/tmp/", "selenium-userdir-" + rand_string())
+        user_data_dir.mkdir(parents=True, exist_ok=True)
+
+        chrome_options = Options()
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+        chrome_options.add_argument("--headless=new")  # Add headless mode
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--no-sandbox")
 
         def process_industry(industry_num: int) -> Dict[str, Any]:
             """Task to process a single industry number and return its dockets"""
-            driver = webdriver.Chrome()
+
+            driver = webdriver.Chrome(options=chrome_options)
 
             try:
                 url = f"https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA={industry_num}"
