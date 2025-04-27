@@ -5,7 +5,7 @@ from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.constants import (
     OPENSCRAPERS_S3_OBJECT_BUCKET,
 )
-from openpuc_scrapers.models.hashes import Blake2bHash
+from openpuc_scrapers.models.hashes import Blake2bHash, blake2b_to_str
 from openpuc_scrapers.models.raw_attachments import RawAttachment
 from openpuc_scrapers.models.timestamp import rfc_time_now
 
@@ -17,11 +17,11 @@ def get_case_s3_key(
 
 
 def get_raw_attach_obj_key(hash: Blake2bHash) -> str:
-    return f"raw/metadata/{str(hash)}.json"
+    return f"raw/metadata/{blake2b_to_str(hash)}.json"
 
 
 def get_raw_attach_file_key(hash: Blake2bHash) -> str:
-    return f"raw/file/{str(hash)}"
+    return f"raw/file/{blake2b_to_str(hash)}"
 
 
 async def fetch_case_filing_from_s3(
@@ -56,7 +56,8 @@ async def push_raw_attach_to_s3_and_db(raw_att: RawAttachment, file_path: Path) 
     file_key = get_raw_attach_file_key(raw_att.hash)
     s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
     s3.save_string_to_remote_file(key=obj_key, content=dumped_data)
-    s3.push_file_to_s3(filepath=file_path, file_upload_key=file_key)
+    # Immutable is true for this line since any file will always get saved with the same hash.
+    s3.push_file_to_s3(filepath=file_path, file_upload_key=file_key, immutable=True)
     # TODO: Maybe update db that the file has been updated?
 
 

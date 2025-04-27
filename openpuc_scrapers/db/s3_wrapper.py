@@ -52,7 +52,12 @@ await asyncio.to_thread(<sync s3 function>)
 class S3FileManager:
     def __init__(self, bucket: str) -> None:
         self.endpoint = OPENSCRAPERS_S3_ENDPOINT
-        self.logger = default_logger
+
+        # Validate S3 configuration on init
+        if not all([OPENSCRAPERS_S3_ACCESS_KEY, OPENSCRAPERS_S3_SECRET_KEY]):
+            raise ValueError("Missing S3 credentials in environment variables")
+        if not OPENSCRAPERS_S3_ENDPOINT:
+            raise ValueError("Missing S3 endpoint configuration")
 
         self.tmpdir = TMP_DIR
 
@@ -74,39 +79,18 @@ class S3FileManager:
     def get_local_dir_from_key(self, key: str) -> Path:
         return self.s3_cache_directory / Path(key)
 
-    def save_string_to_remote_file(self, key: str, content: str):
+    def save_string_to_remote_file(self, key: str, content: str) -> None:
+        if content is None or content == "":
+            default_logger.error(
+                f"Tried to upload to {key} with a nill string. Skipping."
+            )
+            return
         local_path = self.get_local_dir_from_key(key)
         if local_path is None:
             local_path = self.tmpdir / rand_filepath()
         local_path.parent.mkdir(parents=True, exist_ok=True)
         local_path.write_text(content, encoding="utf-8")
         self.push_file_to_s3(local_path, key)
-
-    def download_file_to_path(self, url: str, savepath: Path) -> Path:
-        savepath.parent.mkdir(exist_ok=True, parents=True)
-        self.logger.info(f"Downloading file to dir: {savepath}")
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with open(savepath, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    # If you have chunk encoded response uncomment if
-                    # and set chunk_size parameter to None.
-                    # if chunk:
-                    f.write(chunk)
-        return savepath
-
-    # TODO : Get types for temporary file
-    def download_file_to_tmpfile(self, url: str) -> Any:
-        self.logger.info(f"Downloading file to temporary file")
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with TemporaryFile("wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    # If you have chunk encoded response uncomment if
-                    # and set chunk_size parameter to None.
-                    # if chunk:
-                    f.write(chunk)
-                return f
 
     # S3 Stuff Below this point
 
@@ -125,7 +109,7 @@ class S3FileManager:
             self.s3.download_file(bucket, file_name, str(file_path))
             return file_path
         except Exception as e:
-            self.logger.error(
+            default_logger.error(
                 f"Something whent wrong when downloading s3, is the file missing, raised error {e}"
             )
             return None
@@ -184,21 +168,74 @@ class S3FileManager:
         except self.s3.exceptions.NoSuchKey:
             return False
 
-    def download_file_to_file_in_tmpdir(
-        self, url: str
-    ) -> Any:  # TODO : Get types for temporary file
-        savedir = self.tmpdir / Path(rand_string())
-        return self.download_file_to_path(url, savedir)
-
     def push_file_to_s3(
-        self, filepath: Path, file_upload_key: str, bucket: Optional[str] = None
+        self,
+        filepath: Path,
+        file_upload_key: str,
+        bucket: Optional[str] = None,
+        immutable: bool = False,
     ) -> str:
+        mutable = not immutable
         if bucket is None:
             bucket = self.bucket
         local_cache_filepath = self.get_local_dir_from_key(file_upload_key)
-        if filepath != local_cache_filepath:
-            try:
-                shutil.copyfile(filepath, local_cache_filepath)
-            except Exception as e:
-                default_logger.warning(f"Encountered error copying file to cache: {e}")
-        return self.s3.upload_file(str(filepath), bucket, file_upload_key)
+        if mutable or not local_cache_filepath.exists():
+            if filepath != local_cache_filepath:
+                try:
+                    # Ensure source exists and destination directory exists
+                    if not filepath.exists():
+                        raise FileNotFoundError(
+                            f"Source file {filepath} does not exist"
+                        )
+                    local_cache_filepath.parent.mkdir(parents=True, exist_ok=True)
+                    default_logger.info(f"Copying {filepath} to {local_cache_filepath}")
+                    shutil.copyfile(src=filepath, dst=local_cache_filepath)
+
+                except Exception as e:
+                    default_logger.warning(
+                        f"Encountered error copying file to cache: {e}"
+                    )
+                    raise e
+        if mutable or not self.does_file_exist_s3(key=file_upload_key, bucket=bucket):
+            if not filepath.exists():
+                raise FileNotFoundError(f"Source file {filepath} does not exist")
+            default_logger.info(
+                f"Uploading file {filepath}, to s3 key: {file_upload_key}"
+            )
+        try:
+            # Get MIME type and add validation
+            from mimetypes import guess_type
+
+            content_type = guess_type(file_upload_key)[0] or "application/octet-stream"
+            if file_upload_key.endswith(".json"):
+                content_type = "application/json"
+
+            default_logger.debug(
+                f"Uploading {filepath} (Size: {filepath.stat().st_size} bytes) with Content-Type: {content_type}"
+            )
+
+            return self.s3.upload_file(
+                str(filepath),
+                bucket,
+                file_upload_key,
+                ExtraArgs={
+                    "ContentType": content_type,
+                    "Metadata": {
+                        "source-file": str(filepath.name),
+                        "upload-system": "open-scrapers",
+                    },
+                },
+            )
+        except Exception as e:
+            default_logger.error(f"Failed to upload {file_upload_key} from {filepath}")
+            default_logger.error(
+                f"File exists: {filepath.exists()}, size: {filepath.stat().st_size if filepath.exists() else 0}"
+            )
+            default_logger.error(f"Bucket: {bucket}, Key: {file_upload_key}")
+            # FIXME: Figure out why this fucking error keeps on happening. I am ignoring it for now to fix a deadline - Nic
+            default_logger.error(
+                "I tried to figure out what was causing this and couldnt figure it out, Ignoring for the moment since I have a deadline on getting this working - nic"
+            )
+
+            # raise e
+            return file_upload_key

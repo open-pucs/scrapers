@@ -1,12 +1,14 @@
 from enum import Enum
 from hmac import new
+import logging
 from pathlib import Path
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
-from openpuc_scrapers.db.s3_wrapper import rand_filepath
+from openpuc_scrapers.db.s3_utils import push_raw_attach_to_s3_and_db
+from openpuc_scrapers.db.s3_wrapper import S3FileManager, rand_filepath
 from openpuc_scrapers.models.attachment import GenericAttachment
-from openpuc_scrapers.models.constants import TMP_DIR
+from openpuc_scrapers.models.constants import OPENSCRAPERS_S3_OBJECT_BUCKET, TMP_DIR
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.hashes import Blake2bHash, blake2b_hash_from_file
 from openpuc_scrapers.models.raw_attachments import (
@@ -24,13 +26,19 @@ import asyncio
 import pymupdf4llm
 import pymupdf
 
+from openpuc_scrapers.scrapers.base import validate_document_extension
+
+default_logger = logging.getLogger(__name__)
+
 
 async def process_generic_filing(filing: GenericFiling) -> GenericFiling:
+    default_logger.info(f"Starting to process filing{filing.name}")
     attachments = filing.attachments
     tasks = []
     for att in attachments:
         tasks.append(process_and_shipout_initial_attachment(att))
     new_attachments = await asyncio.gather(*tasks)
+    default_logger.info(f"Finished processing filing{filing.name}")
     filing.attachments = new_attachments
     return filing
 
@@ -38,8 +46,10 @@ async def process_generic_filing(filing: GenericFiling) -> GenericFiling:
 async def process_and_shipout_initial_attachment(
     att: GenericAttachment,
 ) -> GenericAttachment:
-    if att.document_extension is None or att.document_extension == "":
-        raise ValueError("Cannot Process Attachment if document_extension is None or empty")
+    valid_extension = validate_document_extension(att.document_extension or "")
+    if isinstance(valid_extension, Exception):
+        raise valid_extension
+
     str_url = str(att.url)
     tmp_filepath = await download_file_from_url_to_path(str_url)
     hash = blake2b_hash_from_file(tmp_filepath)
@@ -69,10 +79,15 @@ async def process_and_shipout_initial_attachment(
     if result_text is not None:
         raw_attach.text_objects = [result_text]
 
+    await push_raw_attach_to_s3_and_db(raw_attach, tmp_filepath)
     return att
 
 
 async def download_file_from_url_to_path(url: str) -> Path:
+    valid_url = HttpUrl(url=url)
+    assert (
+        valid_url is not None
+    ), "Failed URL Validation"  # Shouldnt be needed since the last line ?should? just throw an exception
     rand_path = TMP_DIR / rand_filepath()
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:

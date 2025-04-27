@@ -1,3 +1,4 @@
+import logging
 from typing import Any, List
 from datetime import date, datetime, timezone
 from pydantic import BaseModel
@@ -14,6 +15,7 @@ from openpuc_scrapers.models.timestamp import (
     RFC3339Time,
     rfc_time_from_string,
     rfc_time_now,
+    rfctime_serializer,
 )
 from openpuc_scrapers.pipelines.helper_utils import save_json
 from openpuc_scrapers.pipelines.raw_attachment_handling import process_generic_filing
@@ -24,14 +26,14 @@ from openpuc_scrapers.scrapers.base import (
 )
 import asyncio
 
+default_logger = logging.getLogger(__name__)
+
 
 def generate_intermediate_object_save_path(
     scraper: GenericScraper[StateCaseData, StateFilingData],
 ) -> str:
     time_now = rfc_time_now()
-    base_path = (
-        f"intermediates/{scraper.state}/{scraper.jurisdiction_name}/{str(time_now)}"
-    )
+    base_path = f"intermediates/{scraper.state}/{scraper.jurisdiction_name}/{rfctime_serializer(time_now)}"
 
     return base_path
 
@@ -45,12 +47,12 @@ def process_case(
     case_num = generic_case.case_number
 
     # Save state-specific case data
-    case_path = f"{base_path}/cases/case_{case_num}.json"
+    case_path = f"{base_path}/initial_cases/case_{case_num}.json"
     save_json(path=case_path, bucket=OPENSCRAPERS_S3_OBJECT_BUCKET, data=case)
 
     # Process filings
     filings_intermediate = scraper.filing_data_intermediate(case)
-    filings_path = f"{base_path}/filings/case_{case_num}.json"
+    filings_path = f"{base_path}/intermediate_caseinfo/case_{case_num}.json"
     save_json(
         path=filings_path,
         bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
@@ -64,27 +66,35 @@ def process_case(
         bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=filings,
     )
+    default_logger.info(
+        f"Finished processing case {generic_case.case_name} and found {len(filings)} filings."
+    )
 
     case_specific_generic_cases = []
     for filing in filings:
         generic_filing = scraper.into_generic_filing_data(filing)
         case_specific_generic_cases.append(generic_filing)
 
-    async def async_shit() -> GenericCase:
+    default_logger.info("Starting Async Case Processing")
+
+    async def async_shit(case: GenericCase) -> GenericCase:
         tasks = []
         for generic_filing in case_specific_generic_cases:
             # FIXME : What do I do about async with flyte????
+            default_logger.info("Adding Generic Filing Task")
             tasks.append(process_generic_filing(generic_filing))
-        result_generic_cases = await asyncio.gather(*tasks)
-        generic_case.filings = result_generic_cases
+        default_logger.info("Begin Processing Filings")
+        result_generic_filings = await asyncio.gather(*tasks)
+        default_logger.info("Finish Processing Filings")
+        case.filings = result_generic_filings
         await push_case_to_s3_and_db(
-            case=generic_case,
+            case=case,
             jurisdiction_name=scraper.jurisdiction_name,
             state=scraper.state,
         )
-        return generic_case
+        return case
 
-    return_generic_case = asyncio.run(async_shit())
+    return_generic_case = asyncio.run(async_shit(generic_case))
     return return_generic_case
 
 
