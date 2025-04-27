@@ -66,6 +66,9 @@ def process_case(
         bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=filings,
     )
+    default_logger.info(
+        f"Finished processing case {generic_case.case_name} and found {len(filings)} filings."
+    )
 
     case_specific_generic_cases = []
     for filing in filings:
@@ -74,24 +77,24 @@ def process_case(
 
     default_logger.info("Starting Async Case Processing")
 
-    async def async_shit() -> GenericCase:
+    async def async_shit(case: GenericCase) -> GenericCase:
         tasks = []
         for generic_filing in case_specific_generic_cases:
             # FIXME : What do I do about async with flyte????
             default_logger.info("Adding Generic Filing Task")
             tasks.append(process_generic_filing(generic_filing))
         default_logger.info("Begin Processing Filings")
-        result_generic_cases = await asyncio.gather(*tasks)
+        result_generic_filings = await asyncio.gather(*tasks)
         default_logger.info("Finish Processing Filings")
-        generic_case.filings = result_generic_cases
+        case.filings = result_generic_filings
         await push_case_to_s3_and_db(
-            case=generic_case,
+            case=case,
             jurisdiction_name=scraper.jurisdiction_name,
             state=scraper.state,
         )
-        return generic_case
+        return case
 
-    return_generic_case = asyncio.run(async_shit())
+    return_generic_case = asyncio.run(async_shit(generic_case))
     return return_generic_case
 
 
