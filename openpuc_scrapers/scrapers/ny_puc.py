@@ -66,10 +66,16 @@ def combine_dockets(docket_lists: List[List[NYPUCDocket]]) -> List[NYPUCDocket]:
 
 def process_docket(docket: NYPUCDocket) -> str:
     """Task to process a single docket and return its files"""
-    default_logger.warning("TEST MESSAGE TO DETERMINE IF RECOMPILATION WORKS.")
+    default_logger.info(f"Processing docket {docket.case_number} from {docket.date_filed}")
+    default_logger.debug(f"Docket metadata: {docket.model_dump_json()}")
+    
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
     import os
+
+    # Validate input before proceeding
+    assert docket.case_number, "Docket case number cannot be empty"
+    assert len(docket.case_number) >= 6, f"Invalid case number format: {docket.case_number}"
 
     # Create unique temp directory for user data
     user_data_dir = Path("/tmp/", "selenium-userdir-" + rand_string())
@@ -84,12 +90,19 @@ def process_docket(docket: NYPUCDocket) -> str:
     driver = webdriver.Chrome(options=chrome_options)
     try:
         url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={docket.case_number}"
+        default_logger.debug(f"Navigating to docket URL: {url}")
         driver.get(url)
+        default_logger.info(f"Loaded docket page for {docket.case_number}")
 
         # Custom wait logic
-        for _ in range(10):  # Reduced from 60 for demonstration
+        default_logger.debug("Waiting for page overlay to clear")
+        for attempt in range(10):
             overlay = driver.find_element(By.ID, "GridPlaceHolder_upUpdatePanelGrd")
-            if overlay.get_attribute("style") == "display: none;":
+            current_style = overlay.get_attribute("style")
+            default_logger.debug(f"Overlay status attempt {attempt+1}: {current_style}")
+            
+            if current_style == "display: none;":
+                default_logger.info("Page overlay cleared successfully")
                 break
             time.sleep(1)
         else:
@@ -97,7 +110,11 @@ def process_docket(docket: NYPUCDocket) -> str:
 
         table_element = driver.find_element(By.ID, "tblPubDoc")
         outer_html_table = table_element.get_attribute("outerHTML")
-        assert outer_html_table is not None
+        assert outer_html_table is not None, "Failed to retrieve table HTML content"
+        assert len(outer_html_table) > 1000, f"Unexpectedly small table HTML: {len(outer_html_table)} bytes"
+        
+        default_logger.info(f"Successfully retrieved table data for {docket.case_number} "
+                          f"({len(outer_html_table)} bytes)")
         driver.quit()
         return outer_html_table
 
@@ -111,26 +128,34 @@ def process_docket(docket: NYPUCDocket) -> str:
 def extract_docket_info(intermediate: Dict[str, Any]) -> List[NYPUCDocket]:
     """
     Extract complete docket information from HTML table rows
-
-    Args:
-        html_content (str): HTML string containing the table
-
-    Returns:
-        List[NYPUCDocket]: List of NYPUCDocket objects containing details for each docket
     """
+    default_logger.info("Beginning docket info extraction")
+    assert intermediate, "Empty intermediate input"
+    assert "html" in intermediate, "Missing HTML content in intermediate"
+    assert "industry" in intermediate, "Missing industry info in intermediate"
+    
+    html_content = intermediate["html"]
+    assert html_content, "Empty HTML content received"
     default_logger.info("Begin Processing docket.")
     html_content = intermediate["html"]
     soup = BeautifulSoup(html_content, "html.parser")
     rows = soup.find_all("tr", role="row")
+    default_logger.info(f"Found {len(rows)} table rows to process")
+    assert len(rows) > 0, "No table rows found in HTML content"
 
     docket_infos: List[NYPUCDocket] = []
 
     for row in rows:
         # Get all cells in the row
         cells = row.find_all("td")
-        if len(cells) >= 6:  # Ensure we have all required cells
-            try:
-                docket_info = NYPUCDocket(
+        default_logger.debug(f"Processing row with {len(cells)} cells")
+        assert len(cells) >= 6, f"Row only has {len(cells)} cells (needs 6)"
+        try:
+            # Validate core fields before creating object
+            case_number = cells[0].find("a").text.strip()
+            assert case_number, "Empty case number in row"
+            
+            docket_info = NYPUCDocket(
                     case_number=cells[0].find("a").text.strip(),
                     matter_type=cells[1].text.strip(),
                     matter_subtype=cells[2].text.strip(),
@@ -143,23 +168,27 @@ def extract_docket_info(intermediate: Dict[str, Any]) -> List[NYPUCDocket]:
                     ],  # Initialize with the main organization
                 )
                 docket_infos.append(docket_info)
-            except Exception as e:
+        except Exception as e:
                 # Skip malformed rows
                 default_logger.error(f"Error processing row: {e}")
                 # continue
-        else 
-            default_logger.error("Apparently this row has less than 6 cells.")
 
     return docket_infos
 
 
 def extract_rows(table_html: str, case: str) -> List[NYPUCFiling]:
     """Parse table HTML with BeautifulSoup and extract filing data."""
+    default_logger.info(f"Extracting rows for case {case}")
+    assert table_html, "Empty table HTML input"
+    assert case, "Empty case number provided"
     soup = BeautifulSoup(table_html, "html.parser")
     table = soup.find("table", id="tblPubDoc")
 
     if not table:
+        default_logger.error("No table found in HTML content")
         return []
+    else:
+        default_logger.debug(f"Found table with ID tblPubDoc")
 
     body = table.find("tbody")
     rows = body.find_all("tr") if body else []
@@ -208,14 +237,24 @@ def extract_rows(table_html: str, case: str) -> List[NYPUCFiling]:
 def deduplicate_individual_attachments_into_files(
     raw_files: List[NYPUCFiling],
 ) -> List[NYPUCFiling]:
+    default_logger.info(f"Deduplicating {len(raw_files)} raw filings")
+    assert raw_files, "Empty raw_files input"
+    
     dict_nypuc = {}
 
     def make_dedupe_string(file: NYPUCFiling) -> str:
         return f"filing-{file.filing_no}-case-{file.case_number}"
 
     for file in raw_files:
+        assert file.filing_no, "Filing missing filing_no"
+        assert file.case_number, "Filing missing case_number"
+        assert file.attachments, "Filing has no attachments"
+        
         dedupestr = make_dedupe_string(file)
+        default_logger.debug(f"Processing dedupe key: {dedupestr}")
+        
         if dict_nypuc.get(dedupestr) is not None:
+            default_logger.debug(f"Merging attachments for existing key {dedupestr}")
             dict_nypuc[dedupestr].attachments.extend(file.attachments)
     return_vals = dict_nypuc.values()
     return list(return_vals)
