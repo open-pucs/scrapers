@@ -51,6 +51,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         scraper = (scraper_info.object_type)()
         base_path = generate_intermediate_object_save_path(scraper)
         cases = get_all_caselist_raw_airflow(scraper=scraper, base_path=base_path)
+        # break this into
 
         return process_case_airflow.expand(
             scraper=[scraper], case=cases, base_path=[base_path]
