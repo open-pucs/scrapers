@@ -1,4 +1,7 @@
+import logging
+from pathlib import Path
 from annotated_types import doc
+from openpuc_scrapers.db.s3_wrapper import rand_string
 from openpuc_scrapers.models.attachment import GenericAttachment
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -14,6 +17,9 @@ from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.timestamp import RFC3339Time, date_to_rfctime
 from openpuc_scrapers.scrapers.base import GenericScraper
+
+
+default_logger = logging.getLogger(__name__)
 
 
 class NYPUCAttachment(BaseModel):
@@ -60,9 +66,22 @@ def combine_dockets(docket_lists: List[List[NYPUCDocket]]) -> List[NYPUCDocket]:
 
 def process_docket(docket: NYPUCDocket) -> str:
     """Task to process a single docket and return its files"""
+    default_logger.warning("TEST MESSAGE TO DETERMINE IF RECOMPILATION WORKS.")
     from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    import os
 
-    driver = webdriver.Chrome()
+    # Create unique temp directory for user data
+    user_data_dir = Path("/tmp/", "selenium-userdir-" + rand_string())
+    user_data_dir.mkdir(parents=True, exist_ok=True)
+
+    chrome_options = Options()
+    chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+    chrome_options.add_argument("--headless=new")  # Add headless mode
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+
+    driver = webdriver.Chrome(options=chrome_options)
     try:
         url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={docket.case_number}"
         driver.get(url)
@@ -77,7 +96,10 @@ def process_docket(docket: NYPUCDocket) -> str:
             raise TimeoutError("Page load timed out")
 
         table_element = driver.find_element(By.ID, "tblPubDoc")
-        return table_element.get_attribute("outerHTML")
+        outer_html_table = table_element.get_attribute("outerHTML")
+        assert outer_html_table is not None
+        driver.quit()
+        return outer_html_table
 
     except Exception as e:
         print(f"Error processing docket {docket.case_number}: {e}")
@@ -96,6 +118,7 @@ def extract_docket_info(intermediate: Dict[str, Any]) -> List[NYPUCDocket]:
     Returns:
         List[NYPUCDocket]: List of NYPUCDocket objects containing details for each docket
     """
+    default_logger.info("Begin Processing docket.")
     html_content = intermediate["html"]
     soup = BeautifulSoup(html_content, "html.parser")
     rows = soup.find_all("tr", role="row")
@@ -122,8 +145,10 @@ def extract_docket_info(intermediate: Dict[str, Any]) -> List[NYPUCDocket]:
                 docket_infos.append(docket_info)
             except Exception as e:
                 # Skip malformed rows
-                print(f"Error processing row: {e}")
-                continue
+                default_logger.error(f"Error processing row: {e}")
+                # continue
+        else 
+            default_logger.error("Apparently this row has less than 6 cells.")
 
     return docket_infos
 
