@@ -25,7 +25,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         default_args=default_args,
         schedule_interval=None,
         dag_id=f"{scraper_info.id}_all_cases",
-        tags=["scrapers", "all_cases" scraper_info.id],
+        tags=["scrapers", "all_cases", scraper_info.id],
         max_active_tasks=20,  # Overall DAG concurrency
         concurrency=10,  # Match task concurrency
     )
