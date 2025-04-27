@@ -92,32 +92,6 @@ class S3FileManager:
         local_path.write_text(content, encoding="utf-8")
         self.push_file_to_s3(local_path, key)
 
-    def download_file_to_path(self, url: str, savepath: Path) -> Path:
-        savepath.parent.mkdir(exist_ok=True, parents=True)
-        default_logger.info(f"Downloading file to dir: {savepath}")
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with open(savepath, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    # If you have chunk encoded response uncomment if
-                    # and set chunk_size parameter to None.
-                    # if chunk:
-                    f.write(chunk)
-        return savepath
-
-    # TODO : Get types for temporary file
-    def download_file_to_tmpfile(self, url: str) -> Any:
-        default_logger.info(f"Downloading file to temporary file")
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with TemporaryFile("wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    # If you have chunk encoded response uncomment if
-                    # and set chunk_size parameter to None.
-                    # if chunk:
-                    f.write(chunk)
-                return f
-
     # S3 Stuff Below this point
 
     def download_s3_file_to_path(
@@ -193,12 +167,6 @@ class S3FileManager:
             return True
         except self.s3.exceptions.NoSuchKey:
             return False
-
-    def download_file_to_file_in_tmpdir(
-        self, url: str
-    ) -> Any:  # TODO : Get types for temporary file
-        savedir = self.tmpdir / Path(rand_string())
-        return self.download_file_to_path(url, savedir)
 
     def push_file_to_s3(
         self,

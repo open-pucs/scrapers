@@ -3,7 +3,7 @@ from hmac import new
 import logging
 from pathlib import Path
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 from openpuc_scrapers.db.s3_utils import push_raw_attach_to_s3_and_db
 from openpuc_scrapers.db.s3_wrapper import S3FileManager, rand_filepath
@@ -82,6 +82,10 @@ async def process_and_shipout_initial_attachment(
 
 
 async def download_file_from_url_to_path(url: str) -> Path:
+    valid_url = HttpUrl(url=url)
+    assert (
+        valid_url is not None
+    ), "Failed URL Validation"  # Shouldnt be needed since the last line ?should? just throw an exception
     rand_path = TMP_DIR / rand_filepath()
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:

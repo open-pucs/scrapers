@@ -7,7 +7,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from typing import Any, Dict, List, Tuple
 import time
 from datetime import datetime
@@ -133,12 +133,19 @@ def process_docket(docket: NYPUCDocket) -> str:
         driver.quit()
 
 
+def partialnypuc_to_universal_url(url: str) -> str:
+    removed_dots = url.removeprefix("../")
+    unvalidated_url = f"https://documents.dps.ny.gov/public/{removed_dots}"
+    return str(HttpUrl(unvalidated_url))
+
+
 def extract_docket_info_from_caselisthtml(
     intermediate: Dict[str, Any],
 ) -> List[NYPUCDocket]:
     """
     Extract complete docket information from HTML table rows
     """
+
     default_logger.info("Beginning docket info extraction")
     assert intermediate, "Empty intermediate input"
     assert "html" in intermediate, "Missing HTML content in intermediate"
@@ -224,7 +231,7 @@ def extract_filings_from_dockethtml(table_html: str, case: str) -> List[NYPUCFil
                 attachments=[
                     NYPUCAttachment(
                         document_title=link.get_text(strip=True),
-                        url=link["href"],
+                        url=partialnypuc_to_universal_url(link["href"]),
                         file_name=cells[6].get_text(strip=True),
                         document_extension=cells[2].get_text(strip=True),
                         file_format=(
@@ -253,7 +260,6 @@ def extract_filings_from_dockethtml(table_html: str, case: str) -> List[NYPUCFil
 def deduplicate_individual_attachments_into_files(
     raw_files: List[NYPUCFiling],
 ) -> List[NYPUCFiling]:
-    default_logger.info(f"Deduplicating {len(raw_files)} raw filings")
     assert raw_files, "Empty raw_files input"
     assert len(raw_files) != 0, "No Raw Files to deduplicate"
 
@@ -279,8 +285,11 @@ def deduplicate_individual_attachments_into_files(
     assert (
         len(return_vals) != 0
     ), "Somehow came in with multiple files and deduplicated them down to no files."
+    default_logger.info(
+        f"Deduplicated {len(raw_files)} raw filings into {len(return_vals)} final files."
+    )
 
-    return list(return_vals)
+    return return_vals
 
 
 class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
