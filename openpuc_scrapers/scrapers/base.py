@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Generic, TypeVar, List, Type
+from enum import Enum
+import logging
+from typing import Any, Dict, Generic, Optional, TypeVar, List, Type, Union
 from pydantic import BaseModel
 
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.timestamp import RFC3339Time
 
+default_logger = logging.getLogger(__name__)
 
 """
 To create a New State Specific Scraper.
@@ -158,3 +161,26 @@ class GenericScraper(ABC, Generic[StateCaseData, StateFilingData]):
     def into_generic_filing_data(self, state_data: StateFilingData) -> GenericFiling:
         """Convert state-specific filing data to generic format"""
         pass
+
+
+class ValidDocumentExtensions(str, Enum):
+    PDF = "pdf"
+    DOCX = "docx"
+    DOC = "doc"
+    XLS = "xls"
+    XLSX = "xlsx"
+    HTML = "html"
+    MD = "md"
+
+
+def validate_document_extension(string: str) -> Union[str, Exception]:
+    striped_lowercase = string.strip().lower()
+    try:
+        enumed_extension = ValidDocumentExtensions(striped_lowercase)
+        return str(enumed_extension)
+    except Exception as e:
+        error_string = (
+            f"Encountered invalid document extension, {striped_lowercase}: {e}"
+        )
+        default_logger.error(error_string)
+        return ValueError(error_string)

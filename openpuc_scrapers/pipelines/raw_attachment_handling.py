@@ -26,6 +26,8 @@ import asyncio
 import pymupdf4llm
 import pymupdf
 
+from openpuc_scrapers.scrapers.base import validate_document_extension
+
 default_logger = logging.getLogger(__name__)
 
 
@@ -44,10 +46,10 @@ async def process_generic_filing(filing: GenericFiling) -> GenericFiling:
 async def process_and_shipout_initial_attachment(
     att: GenericAttachment,
 ) -> GenericAttachment:
-    if att.document_extension is None or att.document_extension == "":
-        raise ValueError(
-            "Cannot Process Attachment if document_extension is None or empty"
-        )
+    valid_extension = validate_document_extension(att.document_extension or "")
+    if isinstance(valid_extension, Exception):
+        raise valid_extension
+
     str_url = str(att.url)
     tmp_filepath = await download_file_from_url_to_path(str_url)
     hash = blake2b_hash_from_file(tmp_filepath)

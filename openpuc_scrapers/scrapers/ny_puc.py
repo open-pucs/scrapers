@@ -233,8 +233,8 @@ def extract_filings_from_dockethtml(table_html: str, case: str) -> List[NYPUCFil
                         document_title=link.get_text(strip=True),
                         url=partialnypuc_to_universal_url(link["href"]),
                         file_name=cells[6].get_text(strip=True),
-                        document_extension=cells[2].get_text(strip=True),
-                        file_format=(
+                        # document_extension=cells[2].get_text(strip=True),
+                        document_extension=(
                             cells[6].get_text(strip=True).split(".")[-1]
                             if cells[6].get_text(strip=True)
                             else ""
