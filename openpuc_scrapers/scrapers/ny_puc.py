@@ -66,16 +66,20 @@ def combine_dockets(docket_lists: List[List[NYPUCDocket]]) -> List[NYPUCDocket]:
 
 def process_docket(docket: NYPUCDocket) -> str:
     """Task to process a single docket and return its files"""
-    default_logger.info(f"Processing docket {docket.case_number} from {docket.date_filed}")
+    default_logger.info(
+        f"Processing docket {docket.case_number} from {docket.date_filed}"
+    )
     default_logger.debug(f"Docket metadata: {docket.model_dump_json()}")
-    
+
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
     import os
 
     # Validate input before proceeding
     assert docket.case_number, "Docket case number cannot be empty"
-    assert len(docket.case_number) >= 6, f"Invalid case number format: {docket.case_number}"
+    assert (
+        len(docket.case_number) >= 6
+    ), f"Invalid case number format: {docket.case_number}"
 
     # Create unique temp directory for user data
     user_data_dir = Path("/tmp/", "selenium-userdir-" + rand_string())
@@ -100,7 +104,7 @@ def process_docket(docket: NYPUCDocket) -> str:
             overlay = driver.find_element(By.ID, "GridPlaceHolder_upUpdatePanelGrd")
             current_style = overlay.get_attribute("style")
             default_logger.debug(f"Overlay status attempt {attempt+1}: {current_style}")
-            
+
             if current_style == "display: none;":
                 default_logger.info("Page overlay cleared successfully")
                 break
@@ -111,10 +115,14 @@ def process_docket(docket: NYPUCDocket) -> str:
         table_element = driver.find_element(By.ID, "tblPubDoc")
         outer_html_table = table_element.get_attribute("outerHTML")
         assert outer_html_table is not None, "Failed to retrieve table HTML content"
-        assert len(outer_html_table) > 1000, f"Unexpectedly small table HTML: {len(outer_html_table)} bytes"
-        
-        default_logger.info(f"Successfully retrieved table data for {docket.case_number} "
-                          f"({len(outer_html_table)} bytes)")
+        assert (
+            len(outer_html_table) > 1000
+        ), f"Unexpectedly small table HTML: {len(outer_html_table)} bytes"
+
+        default_logger.info(
+            f"Successfully retrieved table data for {docket.case_number} "
+            f"({len(outer_html_table)} bytes)"
+        )
         driver.quit()
         return outer_html_table
 
@@ -133,7 +141,7 @@ def extract_docket_info(intermediate: Dict[str, Any]) -> List[NYPUCDocket]:
     assert intermediate, "Empty intermediate input"
     assert "html" in intermediate, "Missing HTML content in intermediate"
     assert "industry" in intermediate, "Missing industry info in intermediate"
-    
+
     html_content = intermediate["html"]
     assert html_content, "Empty HTML content received"
     default_logger.info("Begin Processing docket.")
@@ -154,24 +162,24 @@ def extract_docket_info(intermediate: Dict[str, Any]) -> List[NYPUCDocket]:
             # Validate core fields before creating object
             case_number = cells[0].find("a").text.strip()
             assert case_number, "Empty case number in row"
-            
+
             docket_info = NYPUCDocket(
-                    case_number=cells[0].find("a").text.strip(),
-                    matter_type=cells[1].text.strip(),
-                    matter_subtype=cells[2].text.strip(),
-                    date_filed=cells[3].text.strip(),
-                    case_title=cells[4].text.strip(),
-                    organization=cells[5].text.strip(),
-                    industry_affected=intermediate["industry"].strip(),
-                    party_list=[
-                        cells[5].text.strip()
-                    ],  # Initialize with the main organization
-                )
-                docket_infos.append(docket_info)
+                case_number=cells[0].find("a").text.strip(),
+                matter_type=cells[1].text.strip(),
+                matter_subtype=cells[2].text.strip(),
+                date_filed=cells[3].text.strip(),
+                case_title=cells[4].text.strip(),
+                organization=cells[5].text.strip(),
+                industry_affected=intermediate["industry"].strip(),
+                party_list=[
+                    cells[5].text.strip()
+                ],  # Initialize with the main organization
+            )
+            docket_infos.append(docket_info)
         except Exception as e:
-                # Skip malformed rows
-                default_logger.error(f"Error processing row: {e}")
-                # continue
+            # Skip malformed rows
+            default_logger.error(f"Error processing row: {e}")
+            # continue
 
     return docket_infos
 
@@ -239,7 +247,7 @@ def deduplicate_individual_attachments_into_files(
 ) -> List[NYPUCFiling]:
     default_logger.info(f"Deduplicating {len(raw_files)} raw filings")
     assert raw_files, "Empty raw_files input"
-    
+
     dict_nypuc = {}
 
     def make_dedupe_string(file: NYPUCFiling) -> str:
@@ -249,10 +257,10 @@ def deduplicate_individual_attachments_into_files(
         assert file.filing_no, "Filing missing filing_no"
         assert file.case_number, "Filing missing case_number"
         assert file.attachments, "Filing has no attachments"
-        
+
         dedupestr = make_dedupe_string(file)
         default_logger.debug(f"Processing dedupe key: {dedupestr}")
-        
+
         if dict_nypuc.get(dedupestr) is not None:
             default_logger.debug(f"Merging attachments for existing key {dedupestr}")
             dict_nypuc[dedupestr].attachments.extend(file.attachments)
