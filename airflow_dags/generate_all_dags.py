@@ -18,7 +18,7 @@ default_args = {
 }
 
 
-def create_scraper_allcases_dag(scraper_info: ScraperInfoObject):
+def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
     """Factory function to create DAG for a specific scraper"""
 
     @dag(
@@ -50,7 +50,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject):
     return scraper_dag()
 
 
-def create_scraper_newcases_dag(scraper_info: ScraperInfoObject):
+def create_scraper_newcases_dag(scraper_info: ScraperInfoObject) -> Any:
     @dag(
         default_args=default_args,
         schedule_interval="@daily",  # Can be adjusted based on needs
@@ -87,9 +87,47 @@ def create_scraper_newcases_dag(scraper_info: ScraperInfoObject):
     return new_cases_since_date_dag()
 
 
+def create_single_docket_test_dag(scraper_info: ScraperInfoObject) -> Any:
+    """Factory function to create DAG for a specific scraper"""
+
+    @dag(
+        default_args=default_args,
+        schedule_interval=None,
+        dag_id=f"{scraper_info.id}_test_single_docket",
+        tags=["scrapers", scraper_info.id],
+    )
+    def scraper_dag():
+        @task
+        def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[str]:
+            return get_all_caselist_raw_jsonified(scraper=scraper, base_path=base_path)
+
+        @task
+        def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:
+            return process_case_jsonified(
+                scraper=scraper, case=case, base_path=base_path
+            )
+
+        # DAG structure - now uses fixed scraper name
+        scraper = (scraper_info.object_type)()
+        base_path = generate_intermediate_object_save_path(scraper)
+
+        return process_case_airflow.expand(
+            scraper=[scraper],
+            case=[scraper_info.test_singular_docket],
+            base_path=[base_path],
+        )
+
+    return scraper_dag()
+
+
 # Generate DAGs for all scrapers
 for scraper_info in SCRAPER_REGISTRY:
     allcases_dag_id = f"{scraper_info.id}_allcases_dag"
     globals()[allcases_dag_id] = create_scraper_allcases_dag(scraper_info=scraper_info)
     newcases_dag_id = f"{scraper_info.id}_newcases_dag"
     globals()[newcases_dag_id] = create_scraper_newcases_dag(scraper_info=scraper_info)
+    if scraper_info.test_singular_docket is not None:
+        testsingulardocket_dag_id = f"{scraper_info.id}_singular_docket_test_dag"
+        globals()[testsingulardocket_dag_id] = create_single_docket_test_dag(
+            scraper_info=scraper_info
+        )
