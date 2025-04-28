@@ -6,6 +6,8 @@ from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
     get_all_caselist_raw_jsonified,
     get_new_caselist_since_date_jsonified,
     process_case_jsonified,
+    process_case_jsonified_bulk,
+    shuffle_split_string_list,
 )
 from openpuc_scrapers.pipelines.misc_testing import test_selenium_connection
 from openpuc_scrapers.scrapers.scraper_lookup import SCRAPER_REGISTRY, ScraperInfoObject
@@ -38,21 +40,27 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             max_active_tasks=10,  # Add semaphore-like behavior
             execution_timeout=timedelta(minutes=15),  # Add safety timeout
         )
-        def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:
+        def process_case_airflow_bulk(
+            scraper: Any, cases: List[str], base_path: str
+        ) -> List[str]:
             """Process individual case with concurrency limits and retries"""
 
-            return process_case_jsonified(
-                scraper=scraper, case=case, base_path=base_path
+            return process_case_jsonified_bulk(
+                scraper=scraper, cases=cases, base_path=base_path
             )
 
         # DAG structure - now uses fixed scraper name
         scraper = (scraper_info.object_type)()
         base_path = generate_intermediate_object_save_path(scraper)
         cases = get_all_caselist_raw_airflow(scraper=scraper, base_path=base_path)
+        concurrency_num = 10
+        randomized_subcaselist = shuffle_split_string_list(
+            biglist=cases, split_number=concurrency_num
+        )
         # break this into
 
-        return process_case_airflow.expand(
-            scraper=[scraper], case=cases, base_path=[base_path]
+        return process_case_airflow_bulk.expand(
+            scraper=[scraper], case=randomized_subcaselist, base_path=[base_path]
         )
 
     return scraper_dag()
@@ -78,7 +86,7 @@ def create_scraper_newcases_dag(scraper_info: ScraperInfoObject) -> Any:
             )
 
         @task(
-            max_active_tasks=10,  # Add semaphore-like behavior
+            # max_active_tasks=10,  # Add semaphore-like behavior
             execution_timeout=timedelta(minutes=15),  # Add safety timeout
         )
         def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:

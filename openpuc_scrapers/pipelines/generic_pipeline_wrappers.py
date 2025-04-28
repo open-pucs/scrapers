@@ -1,4 +1,5 @@
 import logging
+import random
 from typing import Any, List, Optional
 from datetime import date, datetime, timezone
 from pydantic import BaseModel
@@ -36,6 +37,18 @@ def generate_intermediate_object_save_path(
     base_path = f"intermediates/{scraper.state}/{scraper.jurisdiction_name}/{rfctime_serializer(time_now)}"
 
     return base_path
+
+
+def shuffle_split_string_list(biglist: List[str], split_number: int) -> List[List[str]]:
+    # Is this a clone or a move, it shouldnt matter, but python weird.
+    shuffled_big_list = biglist
+    random.shuffle(shuffled_big_list)
+    assert shuffled_big_list is not None, "Not at all sure how this could be Null"
+    list_list: List[List[str]] = []
+    chunk_size = (len(biglist) // split_number) + 1
+    for i in range(0, chunk_size, len(biglist)):
+        list_list.append(shuffled_big_list[i : i + chunk_size])
+    return list_list
 
 
 def process_case(
@@ -96,6 +109,19 @@ def process_case(
 
     return_generic_case = asyncio.run(async_shit(generic_case))
     return return_generic_case
+
+
+def process_case_jsonified_bulk(
+    scraper: GenericScraper[StateCaseData, StateFilingData],
+    cases: List[str],
+    base_path: str,
+) -> List[str]:
+    return_strings = []
+    for i in range(len(cases)):
+        return_strings.append(
+            process_case_jsonified(scraper=scraper, case=cases[i], base_path=base_path)
+        )
+    return return_strings
 
 
 def process_case_jsonified(
