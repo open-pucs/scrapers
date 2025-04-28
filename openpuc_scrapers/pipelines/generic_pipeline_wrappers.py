@@ -1,5 +1,5 @@
 import logging
-from typing import Any, List
+from typing import Any, List, Optional
 from datetime import date, datetime, timezone
 from pydantic import BaseModel
 
@@ -110,9 +110,54 @@ def process_case_jsonified(
     return processed_case.model_dump_json()
 
 
-def get_all_caselist_raw(
-    scraper: GenericScraper[StateCaseData, StateFilingData], base_path: str
+def filter_off_filings_before_date(
+    scraper: GenericScraper[StateCaseData, StateFilingData],
+    caselist: List[StateCaseData],
+    after_date: RFC3339Time,
 ) -> List[StateCaseData]:
+    """Filter cases to only those opened after specified date with validation"""
+    filtered_cases = []
+
+    for case in caselist:
+        generic_case = scraper.into_generic_case_data(case)
+        opened_date = generic_case.opened_date
+
+        if not opened_date:
+            default_logger.warning(
+                f"Case {generic_case.case_number} missing opened_date, excluding from results"
+            )
+            continue
+
+        if opened_date > after_date:
+            filtered_cases.append(case)
+            # default_logger.debug(
+            #     f"Including case {generic_case.case_number} "
+            #     f"(opened: {opened_date}, cutoff: {after_date})"
+            # )
+        else:
+            # default_logger.info(
+            #     f"Excluding case {generic_case.case_number} "
+            #     f"(opened: {opened_date} <= cutoff: {after_date})"
+            # )
+            pass
+
+    default_logger.info(
+        f"Date filtering complete - {len(filtered_cases)}/{len(caselist)} "
+        f"cases remain after {after_date}"
+    )
+    return filtered_cases
+
+
+def get_all_caselist_raw(
+    scraper: GenericScraper[StateCaseData, StateFilingData],
+    base_path: str,
+    cutoff_date: Optional[RFC3339Time] = None,
+) -> List[StateCaseData]:
+    """Get full caselist with 2020+ date filtering"""
+    # Validate date input
+    if cutoff_date is None:
+        cutoff_date = rfc_time_from_string("2020-01-01T00:00:00Z")
+
     # Get and save case list
     caselist_intermediate = scraper.universal_caselist_intermediate()
     caselist_path = f"{base_path}/caselist.json"
@@ -122,9 +167,17 @@ def get_all_caselist_raw(
         data=caselist_intermediate,
     )
 
-    # Process cases
+    # Process cases and apply date filter
     state_cases = scraper.universal_caselist_from_intermediate(caselist_intermediate)
-    return state_cases
+    filtered_cases = filter_off_filings_before_date(
+        scraper=scraper, caselist=state_cases, after_date=cutoff_date
+    )
+
+    default_logger.info(
+        f"Initial caselist filtered from {len(state_cases)} to {len(filtered_cases)} "
+        f"cases after {cutoff_date}"
+    )
+    return filtered_cases
 
 
 def get_all_caselist_raw_jsonified(
