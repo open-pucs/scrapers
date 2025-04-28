@@ -37,8 +37,6 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         @task(
             max_active_tasks=10,  # Add semaphore-like behavior
             execution_timeout=timedelta(minutes=15),  # Add safety timeout
-            retries=2,  # Add retry capability
-            retry_delay=timedelta(seconds=30),
         )
         def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:
             """Process individual case with concurrency limits and retries"""
@@ -70,7 +68,6 @@ def create_scraper_newcases_dag(scraper_info: ScraperInfoObject) -> Any:
         },
         tags=["scrapers", "incremental", scraper_info.id],
         max_active_tasks=20,  # Overall DAG concurrency
-        concurrency=10,  # Match task concurrency
     )
     def new_cases_since_date_dag():
         @task
@@ -83,8 +80,6 @@ def create_scraper_newcases_dag(scraper_info: ScraperInfoObject) -> Any:
         @task(
             max_active_tasks=10,  # Add semaphore-like behavior
             execution_timeout=timedelta(minutes=15),  # Add safety timeout
-            retries=2,  # Add retry capability
-            retry_delay=timedelta(seconds=30),
         )
         def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:
             return process_case_jsonified(

@@ -333,7 +333,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
                 industry_affected = industry_elem.text.replace(
                     "Industry Affected:", ""
                 ).strip()
-                time.sleep(40)  # Reduced from 30 for demonstration
+                time.sleep(20)  # Reduced from 30 for demonstration
 
                 table_elem = wait.until(
                     EC.presence_of_element_located(
