@@ -43,7 +43,6 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             return shuffle_split_string_list(biglist=biglist, split_number=split_number)
 
         @task(
-            max_active_tasks=10,  # Add semaphore-like behavior
             execution_timeout=timedelta(minutes=15),  # Add safety timeout
         )
         def process_case_airflow_bulk(
@@ -61,12 +60,12 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         cases = get_all_caselist_raw_airflow(scraper=scraper, base_path=base_path)
         concurrency_num = 10
         randomized_subcaselist = shuffle_split_string_list_airflow(
-            biglist=list(cases), split_number=concurrency_num
+            biglist=cases, split_number=concurrency_num
         )
         # break this into
 
         return process_case_airflow_bulk.expand(
-            scraper=[scraper], case=randomized_subcaselist, base_path=[base_path]
+            scraper=[scraper], cases=randomized_subcaselist, base_path=[base_path]
         )
 
     return scraper_dag()
@@ -92,7 +91,6 @@ def create_scraper_newcases_dag(scraper_info: ScraperInfoObject) -> Any:
             )
 
         @task(
-            # max_active_tasks=10,  # Add semaphore-like behavior
             execution_timeout=timedelta(minutes=15),  # Add safety timeout
         )
         def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:

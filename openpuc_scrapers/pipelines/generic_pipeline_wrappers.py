@@ -49,6 +49,12 @@ def shuffle_split_string_list(biglist: List[str], split_number: int) -> List[Lis
     chunk_size = (len(biglist) // split_number) + 1
     for i in range(0, chunk_size, len(biglist)):
         list_list.append(shuffled_big_list[i : i + chunk_size])
+    default_logger.info(
+        f"Sucessfully split original list of size {len(biglist)} into {len(list_list)} chunks."
+    )
+    for i in range(len(biglist)):
+        default_logger.info(f"List at {i}th position has {len(biglist[i])} elements.")
+
     return list_list
 
 
