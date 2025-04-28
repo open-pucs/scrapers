@@ -1,4 +1,6 @@
 import logging
+import traceback
+import time
 import random
 from typing import Any, List, Optional
 from datetime import date, datetime, timezone
@@ -137,9 +139,20 @@ def process_case_jsonified_bulk(
 ) -> List[str]:
     return_strings = []
     for i in range(len(cases)):
-        return_strings.append(
-            process_case_jsonified(scraper=scraper, case=cases[i], base_path=base_path)
-        )
+        try:
+            return_strings.append(
+                process_case_jsonified(
+                    scraper=scraper, case=cases[i], base_path=base_path
+                )
+            )
+        except Exception as e:
+            default_logger.error(f"Encountered error while processing case:{e}")
+            default_logger.error(traceback.format_exce())
+            seconds_time_wait = 10
+            default_logger.error(
+                f"Continuing next task after waiting {seconds_time_wait} seconds."
+            )
+            time.sleep(seconds_time_wait)
     return return_strings
 
 
