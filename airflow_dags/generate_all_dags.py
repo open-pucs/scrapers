@@ -36,6 +36,12 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[str]:
             return get_all_caselist_raw_jsonified(scraper=scraper, base_path=base_path)
 
+        @task
+        def shuffle_split_string_list_airflow(
+            biglist: List[str], split_number: int
+        ) -> List[List[str]]:
+            return shuffle_split_string_list(biglist=biglist, split_number=split_number)
+
         @task(
             max_active_tasks=10,  # Add semaphore-like behavior
             execution_timeout=timedelta(minutes=15),  # Add safety timeout
@@ -54,8 +60,8 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         base_path = generate_intermediate_object_save_path(scraper)
         cases = get_all_caselist_raw_airflow(scraper=scraper, base_path=base_path)
         concurrency_num = 10
-        randomized_subcaselist = shuffle_split_string_list(
-            biglist=cases, split_number=concurrency_num
+        randomized_subcaselist = shuffle_split_string_list_airflow(
+            biglist=list(cases), split_number=concurrency_num
         )
         # break this into
 

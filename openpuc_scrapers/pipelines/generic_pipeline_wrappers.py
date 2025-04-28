@@ -41,6 +41,7 @@ def generate_intermediate_object_save_path(
 
 def shuffle_split_string_list(biglist: List[str], split_number: int) -> List[List[str]]:
     # Is this a clone or a move, it shouldnt matter, but python weird.
+    assert isinstance(biglist, list)
     shuffled_big_list = biglist
     random.shuffle(shuffled_big_list)
     assert shuffled_big_list is not None, "Not at all sure how this could be Null"
