@@ -147,7 +147,7 @@ def process_case_jsonified_bulk(
             )
         except Exception as e:
             default_logger.error(f"Encountered error while processing case:{e}")
-            default_logger.error(traceback.format_exce())
+            default_logger.error(traceback.format_exc())
             seconds_time_wait = 10
             default_logger.error(
                 f"Continuing next task after waiting {seconds_time_wait} seconds."
