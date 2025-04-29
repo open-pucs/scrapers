@@ -2,7 +2,7 @@ from enum import Enum
 from hmac import new
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 from pydantic import BaseModel, HttpUrl
 
 from openpuc_scrapers.db.s3_utils import push_raw_attach_to_s3_and_db
@@ -36,14 +36,29 @@ async def process_generic_filing(filing: GenericFiling) -> GenericFiling:
     attachments = filing.attachments
     tasks = []
     for att in attachments:
-        tasks.append(process_and_shipout_initial_attachment(att))
+        tasks.append(process_and_shipout_attachment_errorfree(att))
     new_attachments = await asyncio.gather(*tasks)
+    errorfree_attachments = []
+    for att in new_attachments:
+        if isinstance(att, GenericAttachment):
+            errorfree_attachments.append(att)
     default_logger.info(f"Finished processing filing{filing.name}")
-    filing.attachments = new_attachments
+    filing.attachments = errorfree_attachments
     return filing
 
 
-async def process_and_shipout_initial_attachment(
+async def process_and_shipout_attachment_errorfree(
+    att: GenericAttachment,
+) -> Union[GenericAttachment, str]:
+    try:
+        return await process_and_shipout_attachment(att=att)
+    except Exception as e:
+        default_logger.error(f"Encountered exception while processing attachment: {e}")
+        error_str = str(e)
+        return error_str
+
+
+async def process_and_shipout_attachment(
     att: GenericAttachment,
 ) -> GenericAttachment:
     valid_extension = validate_document_extension(att.document_extension or "")
@@ -55,7 +70,7 @@ async def process_and_shipout_initial_attachment(
     hash = blake2b_hash_from_file(tmp_filepath)
     att.hash = hash
     raw_attach = RawAttachment(
-        hash=hash, name=att.name, extension=att.document_extension, text_objects=[]
+        hash=hash, name=att.name, extension=valid_extension, text_objects=[]
     )
 
     async def generate_initial_attachment_text(

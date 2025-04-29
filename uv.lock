@@ -522,6 +522,7 @@ dependencies = [
     { name = "pymupdf" },
     { name = "pymupdf4llm" },
     { name = "pytest" },
+    { name = "redis" },
     { name = "requests" },
     { name = "selenium" },
     { name = "sqlalchemy" },
@@ -548,6 +549,7 @@ requires-dist = [
     { name = "pymupdf", specifier = ">=1.25.5" },
     { name = "pymupdf4llm", specifier = ">=0.0.19" },
     { name = "pytest", specifier = ">=8.3.5" },
+    { name = "redis", specifier = ">=5.2.1" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "selenium", specifier = ">=4.29.0" },
     { name = "sqlalchemy", specifier = ">=2.0.40" },
@@ -800,6 +802,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/66/c0/0c8b6ad9f17a802ee498c46e004a0eb49bc148f2fd230864601a86dcf6db/python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3", size = 342432 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427", size = 229892 },
+]
+
+[[package]]
+name = "redis"
+version = "5.2.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/47/da/d283a37303a995cd36f8b92db85135153dc4f7a8e4441aa827721b442cfb/redis-5.2.1.tar.gz", hash = "sha256:16f2e22dff21d5125e8481515e386711a34cbec50f0e44413dd7d9c060a54e0f", size = 4608355 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3c/5f/fa26b9b2672cbe30e07d9a5bdf39cf16e3b80b42916757c5f92bca88e4ba/redis-5.2.1-py3-none-any.whl", hash = "sha256:ee7e1056b9aea0f04c6c2ed59452947f34c4940ee025f5dd83e6a6418b6989e4", size = 261502 },
 ]
 
 [[package]]

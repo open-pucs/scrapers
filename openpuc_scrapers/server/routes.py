@@ -8,7 +8,7 @@ from openpuc_scrapers.db.s3_utils import (
     fetch_attachment_file_from_s3,
     fetch_case_filing_from_s3,
 )
-from openpuc_scrapers.db.sql_utilities import Caseinfo, get_last_updated_cases
+from openpuc_scrapers.db.sql_utilities import CaseInfo, get_last_updated_cases
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.raw_attachments import RawAttachment
 from openpuc_scrapers.models.hashes import Blake2bHash
@@ -47,7 +47,7 @@ def register_routes(app: FastAPI):
     @app.get("/api/caselist/{jurisdiction_name}/all/indexed_after/{rfc339_date}")
     async def handle_caselist_jurisdiction_fetch(
         jurisdiction_name: str, rfc339_date: str, limit: int = 1000
-    ) -> List[Caseinfo]:
+    ) -> List[CaseInfo]:
         """
         Fetch case list for a specific jurisdiction after a given date.
 
@@ -57,7 +57,7 @@ def register_routes(app: FastAPI):
             limit (int, optional): Maximum number of cases to return. Defaults to 1000.
 
         Returns:
-            List[Caseinfo]: List of case information
+            List[CaseInfo]: List of case information
         """
         date = rfc_time_from_string(rfc339_date)
         return await get_last_updated_cases(
@@ -67,7 +67,7 @@ def register_routes(app: FastAPI):
     @app.get("/api/caselist/all/indexed_after/{rfc339_date}")
     async def handle_caselist_all_fetch(
         rfc339_date: str, limit: int = 1000
-    ) -> List[Caseinfo]:
+    ) -> List[CaseInfo]:
         """
         Fetch case list for all jurisdictions after a given date.
 
@@ -76,7 +76,7 @@ def register_routes(app: FastAPI):
             limit (int, optional): Maximum number of cases to return. Defaults to 1000.
 
         Returns:
-            List[Caseinfo]: List of case information
+            List[CaseInfo]: List of case information
         """
         date = rfc_time_from_string(rfc339_date)
         return await get_last_updated_cases(indexed_after=date, limit=limit)

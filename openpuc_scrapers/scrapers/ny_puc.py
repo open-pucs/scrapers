@@ -99,7 +99,7 @@ def process_docket(docket: NYPUCDocket) -> str:
 
         # Custom wait logic
         default_logger.debug("Waiting for page overlay to clear")
-        for attempt in range(10):
+        for attempt in range(20):
             overlay = driver.find_element(By.ID, "GridPlaceHolder_upUpdatePanelGrd")
             current_style = overlay.get_attribute("style")
             default_logger.debug(f"Overlay status attempt {attempt+1}: {current_style}")
@@ -333,7 +333,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
                 industry_affected = industry_elem.text.replace(
                     "Industry Affected:", ""
                 ).strip()
-                time.sleep(20)  # Reduced from 30 for demonstration
+                time.sleep(10)  # Reduced from 30 for demonstration
 
                 table_elem = wait.until(
                     EC.presence_of_element_located(

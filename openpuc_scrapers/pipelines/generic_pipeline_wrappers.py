@@ -1,4 +1,6 @@
 import logging
+import traceback
+import time
 import random
 from typing import Any, List, Optional
 from datetime import date, datetime, timezone
@@ -40,14 +42,33 @@ def generate_intermediate_object_save_path(
 
 
 def shuffle_split_string_list(biglist: List[str], split_number: int) -> List[List[str]]:
-    # Is this a clone or a move, it shouldnt matter, but python weird.
-    shuffled_big_list = biglist
-    random.shuffle(shuffled_big_list)
-    assert shuffled_big_list is not None, "Not at all sure how this could be Null"
-    list_list: List[List[str]] = []
-    chunk_size = (len(biglist) // split_number) + 1
-    for i in range(0, chunk_size, len(biglist)):
-        list_list.append(shuffled_big_list[i : i + chunk_size])
+    """Splits list into N chunks with shuffled order"""
+    assert isinstance(biglist, list), "Input must be a list"
+
+    # Create copy to avoid modifying original list
+    shuffled = biglist.copy()
+    random.shuffle(shuffled)
+
+    # Calculate dynamic chunk size based on desired split count
+    chunk_size = max(1, (len(shuffled) + split_number - 1) // split_number)
+
+    list_list = [
+        shuffled[i : i + chunk_size] for i in range(0, len(shuffled), chunk_size)
+    ]
+
+    # Validate output dimensions
+    actual_chunks = len(list_list)
+    if actual_chunks != split_number:
+        default_logger.warning(
+            f"Requested {split_number} chunks but created {actual_chunks} "
+            f"(original size: {len(shuffled)}, chunk size: {chunk_size})"
+        )
+
+    default_logger.debug(
+        f"Split {len(shuffled)} items into {actual_chunks} chunks "
+        f"(target: {split_number}), sizes: {[len(chunk) for chunk in list_list]}"
+    )
+
     return list_list
 
 
@@ -118,9 +139,20 @@ def process_case_jsonified_bulk(
 ) -> List[str]:
     return_strings = []
     for i in range(len(cases)):
-        return_strings.append(
-            process_case_jsonified(scraper=scraper, case=cases[i], base_path=base_path)
-        )
+        try:
+            return_strings.append(
+                process_case_jsonified(
+                    scraper=scraper, case=cases[i], base_path=base_path
+                )
+            )
+        except Exception as e:
+            default_logger.error(f"Encountered error while processing case:{e}")
+            default_logger.error(traceback.format_exc())
+            seconds_time_wait = 10
+            default_logger.error(
+                f"Continuing next task after waiting {seconds_time_wait} seconds."
+            )
+            time.sleep(seconds_time_wait)
     return return_strings
 
 

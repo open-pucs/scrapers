@@ -92,3 +92,11 @@ def rfc_time_from_mmddyyyy(date_str: str) -> RFC3339Time:
 
 def date_to_rfctime(date: date) -> RFC3339Time:
     return datetime.combine(date, datetime.min.time()).replace(tzinfo=timezone.utc)
+
+
+def rfc_time_to_timestamp(rfctime: RFC3339Time) -> float:
+    return datetime.timestamp(rfctime)
+
+
+def rfc_time_from_timestamp(timestamp: float) -> RFC3339Time:
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc)

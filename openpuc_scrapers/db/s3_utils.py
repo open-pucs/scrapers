@@ -1,6 +1,6 @@
 from pathlib import Path
 from openpuc_scrapers.db.s3_wrapper import S3FileManager
-from openpuc_scrapers.db.sql_utilities import set_case_as_updated
+from openpuc_scrapers.db.sql_utilities import CaseInfo, set_case_as_updated
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.constants import (
     OPENSCRAPERS_S3_OBJECT_BUCKET,
@@ -75,7 +75,8 @@ async def push_case_to_s3_and_db(
     case_jsonified = case.model_dump_json()
     # Maybe async this in its own thread?
     s3.save_string_to_remote_file(key=key, content=case_jsonified)
-    await set_case_as_updated(
-        case=case, jurisdiction=jurisdiction_name, state=state, country=country
+    case_info = CaseInfo(
+        case=case, jurisdiction_name=jurisdiction_name, state=state, country=country
     )
+    await set_case_as_updated(case_info=case_info)
     return case
