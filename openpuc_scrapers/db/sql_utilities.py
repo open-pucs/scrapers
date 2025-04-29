@@ -13,6 +13,7 @@
 from typing import Any, List, Optional
 
 from pydantic import BaseModel
+from openpuc_scrapers.models.constants import OPENSCRAPERS_REDIS_URL
 from redis import Redis, from_url
 
 from openpuc_scrapers.models.case import GenericCase
@@ -24,14 +25,13 @@ from openpuc_scrapers.models.timestamp import (
 
 # Redis connection URL (e.g. "redis://localhost:6379/0")
 # You can also use environment variables or config.
-REDIS_URL = "redis://localhost:6379/0"
 
 # Namespaces for our sorted sets
 GLOBAL_BY_TIME = "dockets:by_time"
 JURISDICTION_PREFIX = "dockets:by_jurisdiction:"
 
 # Setup Redis client
-redis: Redis = from_url(REDIS_URL, decode_responses=False)
+redis: Redis = from_url(OPENSCRAPERS_REDIS_URL, decode_responses=False)
 
 
 class CaseInfo(BaseModel):

@@ -46,10 +46,9 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             """Initialize Redis queue with all case IDs"""
             from redis import Redis
             from json import dumps
+            from openpuc_scrapers.models.constants import OPENSCRAPERS_REDIS_DOMAIN
 
-            redis_domain = os.getenv("OPENSCRAPERS_REDIS_DOMAIN")
-
-            r = Redis(host=redis_domain, port=6379, db=0)
+            r = Redis(host=OPENSCRAPERS_REDIS_DOMAIN, port=6379, db=0)
             queue_key = f"{scraper_info.id}_case_queue_{rand_string()}"
 
             # Clear previous queue contents
@@ -80,9 +79,9 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             from redis import Redis
             from json import loads
 
-            redis_domain = os.getenv("OPENSCRAPERS_REDIS_DOMAIN")
+            from openpuc_scrapers.models.constants import OPENSCRAPERS_REDIS_DOMAIN
 
-            r = Redis(host=redis_domain, port=6379, db=0)
+            r = Redis(host=OPENSCRAPERS_REDIS_DOMAIN, port=6379, db=0)
             scraper = (scraper_info.object_type)()
             max_iter_per_concurrent_node = 100_000
             completed_json = []
