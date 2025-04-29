@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
+import os
 from typing import Any, List
 from airflow.decorators import dag, task
+from openpuc_scrapers.db.s3_wrapper import rand_string
 from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
     generate_intermediate_object_save_path,
     get_all_caselist_raw_jsonified,
@@ -21,6 +23,100 @@ default_args = {
 
 
 def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
+    """Factory function to create DAG for a specific scraper with queue-based processing"""
+
+    @dag(
+        default_args=default_args,
+        schedule_interval=None,
+        dag_id=f"{scraper_info.id}_all_cases",
+        tags=["scrapers", "all_cases", scraper_info.id],
+        max_active_tasks=20,
+        concurrency=10,
+    )
+    def scraper_dag():
+        @task
+        def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[str]:
+            return get_all_caselist_raw_jsonified(scraper=scraper, base_path=base_path)
+
+        @task
+        def initialize_processing_queue(cases: List[str]) -> str:
+            """Initialize Redis queue with all case IDs"""
+            from redis import Redis
+            from json import dumps
+
+            redis_domain = os.getenv("OPENSCRAPERS_REDIS_DOMAIN")
+            redis_domain = "redis"
+
+            r = Redis(host="redis-service", port=6379, db=0)
+            queue_key = f"{scraper_info.id}_case_queue_{rand_string()}"
+
+            # Clear previous queue contents
+            r.delete(queue_key)
+
+            # Add all cases as JSON objects
+            pipeline = r.pipeline()
+            for case in cases:
+                pipeline.rpush(
+                    queue_key,
+                    dumps(
+                        {
+                            "scraper_id": scraper_info.id,
+                            "case_json": case,
+                            "base_path": base_path,
+                        }
+                    ),
+                )
+            pipeline.execute()
+
+            return queue_key
+
+        @task(
+            execution_timeout=timedelta(minutes=15),
+            pool="case_processing_pool",
+            retries=2,
+        )
+        def process_next_case_airflow(queue_key: str) -> dict:
+            """Process next case from queue with atomic pop operation"""
+            from redis import Redis
+            from json import loads
+
+            r = Redis(host="redis-service", port=6379, db=0)
+            case_data = r.lpop(queue_key)
+
+            if not case_data:
+                return {"status": "COMPLETED", "remaining": 0}
+
+            case_obj = loads(case_data)
+            result = process_case_jsonified(
+                scraper=(scraper_info.object_type)(),
+                case=case_obj["case_json"],
+                base_path=case_obj["base_path"],
+            )
+
+            return {
+                "status": "PROCESSED",
+                "case_id": case_obj["case_id"],
+                "result": result,
+                "remaining": r.llen(queue_key),
+            }
+
+        # DAG structure
+        scraper = (scraper_info.object_type)()
+        base_path = generate_intermediate_object_save_path(scraper)
+        cases = get_all_caselist_raw_airflow(scraper=scraper, base_path=base_path)
+        queue_key = initialize_processing_queue(scraper=scraper, cases=cases)
+
+        # Dynamic task generation with exponential backoff
+        max_batch_size = 100  # Adjust based on worker capacity
+        for _ in range(max_batch_size):
+            process_next_case_airflow(queue_key).set_downstream(
+                process_next_case_airflow(queue_key)
+            )
+
+    return scraper_dag()
+
+
+def create_scraper_allcases_dag_bulk(scraper_info: ScraperInfoObject) -> Any:
     """Factory function to create DAG for a specific scraper"""
 
     @dag(
@@ -52,6 +148,16 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
 
             return process_case_jsonified_bulk(
                 scraper=scraper, cases=cases, base_path=base_path
+            )
+
+        @task(
+            execution_timeout=timedelta(minutes=15),  # Add safety timeout
+        )
+        def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:
+            """Process individual case with concurrency limits and retries"""
+
+            return process_case_jsonified(
+                scraper=scraper, case=case, base_path=base_path
             )
 
         # DAG structure - now uses fixed scraper name

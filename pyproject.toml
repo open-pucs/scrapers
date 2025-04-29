@@ -21,6 +21,7 @@ dependencies = [
     "pymupdf>=1.25.5",
     "pymupdf4llm>=0.0.19",
     "pytest>=8.3.5",
+    "redis>=5.2.1",
     "requests>=2.32.3",
     "selenium>=4.29.0",
     "sqlalchemy>=2.0.40",
