@@ -3,6 +3,7 @@ import os
 from typing import Any, List, Tuple
 from airflow.decorators import dag, task
 from openpuc_scrapers.db.s3_wrapper import rand_string
+from openpuc_scrapers.models.timestamp import rfc_time_now, rfctime_serializer
 from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
     generate_intermediate_object_save_path,
     get_all_caselist_raw_jsonified,
@@ -80,7 +81,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         def process_concurrent_cases_airflow(queue_key: str) -> dict:
             """Process next case from queue with atomic pop operation"""
             from redis import Redis
-            from json import loads
+            from json import loads, dumps
 
             from openpuc_scrapers.models.constants import OPENSCRAPERS_REDIS_DOMAIN
             import logging
@@ -88,6 +89,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             default_logger = logging.getLogger(__name__)
 
             r = Redis(host=OPENSCRAPERS_REDIS_DOMAIN, port=6379, db=0)
+            errored_json_redis_key = f"{queue_key}-errored"
             scraper = (scraper_info.object_type)()
             max_iter_per_concurrent_node = 100_000
             completed_json = []
@@ -114,7 +116,16 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
                     default_logger.error(
                         f"Encountered exception while processing doc: {e}"
                     )
-                    errored_json.append(case_data)
+                    error_dict = {
+                        "case_json": case_data,
+                        "timestamp": rfctime_serializer(rfc_time_now()),
+                        "error": str(e),
+                    }
+                    default_logger.error(
+                        f"Pushing error data to redis queue: {errored_json_redis_key}"
+                    )
+                    r.rpush(errored_json_redis_key, dumps(error_dict))
+
                     default_logger.error(
                         f"So far {len(errored_json)} have failed, compared to {len(completed_json)} successes."
                     )
@@ -133,7 +144,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         queue_key = initialize_processing_queue(cases=cases)
 
         # Dynamic parallel processing with queue size awareness
-        concurrency_limit = 1
+        concurrency_limit = 2
 
         # Create independent parallel tasks that will each process until queue is empty
         for _ in range(concurrency_limit):
