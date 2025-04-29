@@ -1,154 +1,108 @@
+# Having a sqldb connection in this python project is adding a bunch of dependancies and complexity that in my opinion isnt needed.
+# What I would like to do is using only really simple data primatives that exist inside redis.
+# A docket consists of 4 values
+# - A unique name for that docket.
+# - A jurisdiction name for that docket.
+# - The unix time that docket was last updated.
+# - A bytestring that represents the data for that object.
+# We need to fufill a couple basic requirements.
+# 1. Every time a docket is indexed, if it doesnt exist in the datastructure, it should be added. If it already exists and matches on its id, it should update the data, juristiction_name, and most importantly unix-timestamp for that object. (It might do this just by deleting the old one and inserting the newest one.)
+# 2. The datastructure should support a fast query that gets all the dockets that have been ingested since a certain timestamp.
+# 3. Another query that just gets all the latest ingested dockets for a certain jurisdiction.
+#
 from typing import Any, List, Optional
 
 from pydantic import BaseModel
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from redis.asyncio import Redis, from_url
 
 from openpuc_scrapers.models.case import GenericCase
-from openpuc_scrapers.models.constants import OPENSCRAPERS_SQL_DB_CONNECTION
-from openpuc_scrapers.models.filing import GenericFiling
-from openpuc_scrapers.models.timestamp import RFC3339Time
+from openpuc_scrapers.models.timestamp import (
+    RFC3339Time,
+    rfc_time_from_timestamp,
+    rfc_time_now,
+    rfc_time_to_timestamp,
+)
 
-# from sqlalchemy.orm import sessionmaker
+# Redis connection URL (e.g. "redis://localhost:6379/0")
+# You can also use environment variables or config.
+REDIS_URL = "redis://localhost:6379/0"
 
-# Setup async engine and session
+# Namespaces for our sorted sets
+GLOBAL_BY_TIME = "dockets:by_time"
+JURISDICTION_PREFIX = "dockets:by_jurisdiction:"
 
-
-INITIALIZE_LAST_UPDATED = """
-CREATE TABLE IF NOT EXISTS public.object_last_updated (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    indexed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    country VARCHAR NOT NULL,
-    state VARCHAR NOT NULL,
-    juristiction_name VARCHAR NOT NULL,
-    object_type VARCHAR NOT NULL,
-    object_name VARCHAR NOT NULL
-);
-"""
-INITIALIZE_ATTACHMENT_TEXT = """
-CREATE TABLE IF NOT EXISTS public.attachment_text_reprocessed (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    indexed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    attachment_hash VARCHAR NOT NULL,
-    update_type VARCHAR NOT NULL,
-    object_type VARCHAR NOT NULL,
-    object_name VARCHAR NOT NULL
-);
-"""
+# Setup Redis client
+redis: Redis = from_url(REDIS_URL, decode_responses=False)
 
 
-# SQL Queries as constants with corrected juristiction spelling
-UPSERT_LAST_UPDATED = """
-INSERT INTO public.object_last_updated (
-    country,
-    state,
-    juristiction_name,
-    object_type,
-    object_name,
-    indexed_at
-) VALUES (
-    :country,
-    :state,
-    :juristiction_name,
-    :object_type,
-    :object_name,
-    NOW()
-);
-"""
-
-LIST_NEWEST_ALL = """
-SELECT *
-FROM public.object_last_updated
-WHERE indexed_at > :indexed_after
-ORDER BY updated_at ASC
-LIMIT :limit;
-"""
-
-LIST_NEWEST_JURISDICTION = """
-SELECT *
-FROM public.object_last_updated
-WHERE indexed_at > :indexed_after
-  AND juristiction_name = :juristiction_name
-ORDER BY updated_at ASC
-LIMIT :limit;
-"""
-
-
-Base = declarative_base()
-engine = create_async_engine(OPENSCRAPERS_SQL_DB_CONNECTION, echo=True)
-
-
-async def hackishly_initialize_db() -> None:
-    print("INITIALIZING DATABASE WITH NEW TABLES")
-    print(f"DATABASE CONNECTION STRING: {OPENSCRAPERS_SQL_DB_CONNECTION}")
-    async with engine.begin() as session:
-        await session.execute(text(INITIALIZE_LAST_UPDATED))
-        await session.execute(text(INITIALIZE_ATTACHMENT_TEXT))
-        await session.commit()
-
-
-async def set_case_as_updated(
-    case: GenericCase, jurisdiction: str, state: str, country: str = "usa"
-) -> None:
-    await hackishly_initialize_db()
-    async with engine.begin() as session:
-        await session.execute(
-            text(UPSERT_LAST_UPDATED),
-            {
-                "country": country,
-                "state": state,
-                "juristiction_name": jurisdiction,
-                "object_type": "case",
-                "object_name": getattr(case, "case_number"),
-            },
-        )
-        await session.commit()
-
-
-class Caseinfo(BaseModel):
+class CaseInfo(BaseModel):
     country: str
     state: str
     jurisdiction_name: str
-    indexed_at: RFC3339Time
+    indexed_at: Optional[RFC3339Time]
+    case: GenericCase
+
+
+def generate_case_uuid(case_info: CaseInfo) -> str:
+    return (
+        f"{case_info.state}-{case_info.jurisdiction_name}-{case_info.case.case_number}"
+    )
+
+
+async def set_case_as_updated(
+    case_info: CaseInfo,
+) -> None:
+    """
+    Upsert a docket into Redis. We index by case.case_number as the unique ID.
+    This will:
+      1. HSET the hash for the docket
+      2. ZADD the global by-time set
+      3. ZADD the jurisdiction-specific set
+    """
+    docket_uuid = generate_case_uuid(case_info=case_info)
+    updated_at = case_info.indexed_at
+    if updated_at is None:
+        updated_at = rfc_time_now()
+    updated_at_timestamp = int(rfc_time_to_timestamp(updated_at))
+
+    # 1. Store the fields in a hash
+    await redis.set(
+        f"docket:{docket_uuid}",
+        case_info.model_dump_json(),
+    )
+
+    # 2. Add/update in the global sorted set
+    await redis.zadd(GLOBAL_BY_TIME, {docket_uuid: updated_at})
+
+    # 3. Add/update in the jurisdiction-specific sorted set
+    await redis.zadd(
+        f"{JURISDICTION_PREFIX}{case_info.jurisdiction_name}", {docket_uuid: updated_at}
+    )
 
 
 async def get_last_updated_cases(
     indexed_after: RFC3339Time,
     limit: int = 10,
     match_jurisdiction: Optional[str] = None,
-) -> List[Caseinfo]:
-    def row_into_caseinfo(row: Any) -> Caseinfo:
-        return Caseinfo(
-            country=row.country,
-            state=row.state,
-            jurisdiction_name=row.juristiction_name,
-            indexed_at=row.indexed_at,
-        )
+) -> List[CaseInfo]:
+    """
+    Retrieve dockets updated after `indexed_after`. Optionally filter by jurisdiction.
+    """
+    # Convert to unix timestamp
+    ts = int(indexed_after.timestamp())
 
-    indexed_after_datetime = indexed_after.time
+    # Pick the appropriate sorted set
+    if match_jurisdiction:
+        key = f"{JURISDICTION_PREFIX}{match_jurisdiction}"
+        # ZRANGEBYSCORE returns in ascending score (older→newer)
+        ids = await redis.zrangebyscore(key, ts, "+inf", start=0, num=limit)
+    else:
+        ids = await redis.zrangebyscore(GLOBAL_BY_TIME, ts, "+inf", start=0, num=limit)
 
-    async with engine.begin() as session:
-        if match_jurisdiction:
-            result = await session.execute(
-                text(LIST_NEWEST_JURISDICTION),
-                {
-                    "indexed_after": indexed_after_datetime,
-                    "juristiction_name": match_jurisdiction,
-                    "limit": limit,
-                    "object_type": "case",
-                },
-            )
-        else:
-            result = await session.execute(
-                text(LIST_NEWEST_ALL),
-                {
-                    "indexed_after": indexed_after_datetime,
-                    "limit": limit,
-                    "object_type": "case",
-                },
-            )
+    results: List[CaseInfo] = []
+    for docket_id in ids:
+        h = await redis.get(f"docket:{docket_id}")
+        # h is a serialized str
+        results.append(CaseInfo.model_validate_json(h))
 
-        return [row_into_caseinfo(row) for row in result]
+    return results
