@@ -116,15 +116,19 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
                     default_logger.error(
                         f"Encountered exception while processing doc: {e}"
                     )
-                    error_dict = {
-                        "case_json": case_data,
-                        "timestamp": rfctime_serializer(rfc_time_now()),
-                        "error": str(e),
-                    }
                     default_logger.error(
                         f"Pushing error data to redis queue: {errored_json_redis_key}"
                     )
-                    r.rpush(errored_json_redis_key, dumps(error_dict))
+                    try:
+                        error_dict = {
+                            "case_json": str(case_data),
+                            "timestamp": str(rfctime_serializer(rfc_time_now())),
+                            "error": str(e),
+                        }
+                        dumps(error_dict)
+                        r.rpush(errored_json_redis_key)
+                    except Exception:
+                        default_logger.error("Error pushing error to redis queue.")
 
                     default_logger.error(
                         f"So far {len(errored_json)} have failed, compared to {len(completed_json)} successes."
