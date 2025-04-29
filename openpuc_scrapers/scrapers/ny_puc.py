@@ -99,7 +99,7 @@ def process_docket(docket: NYPUCDocket) -> str:
 
         # Custom wait logic
         default_logger.debug("Waiting for page overlay to clear")
-        for attempt in range(10):
+        for attempt in range(20):
             overlay = driver.find_element(By.ID, "GridPlaceHolder_upUpdatePanelGrd")
             current_style = overlay.get_attribute("style")
             default_logger.debug(f"Overlay status attempt {attempt+1}: {current_style}")

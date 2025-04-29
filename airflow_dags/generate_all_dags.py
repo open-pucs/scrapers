@@ -85,6 +85,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             scraper = (scraper_info.object_type)()
             max_iter_per_concurrent_node = 100_000
             completed_json = []
+            errored_json = []
             for _ in range(max_iter_per_concurrent_node):
                 case_data = r.lpop(queue_key)
 
@@ -92,20 +93,25 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
                     return {
                         "status": "COMPLETED",
                         "results": completed_json,
+                        "errored": errored_json,
                     }
 
                 case_obj = loads(case_data)
-                result = process_case_jsonified(
-                    scraper=scraper,
-                    case=case_obj["case_json"],
-                    base_path=case_obj["base_path"],
-                )
-                completed_json.append(result)
+                try:
+                    result = process_case_jsonified(
+                        scraper=scraper,
+                        case=case_obj["case_json"],
+                        base_path=case_obj["base_path"],
+                    )
+                    completed_json.append(result)
+                except Exception:
+                    errored_json.append(case_data)
 
             return {
                 "status": "ERROR",
                 "error": f"Individual node tried to do more then {max_iter_per_concurrent_node} tasks",
                 "results": completed_json,
+                "errored": errored_json,
             }
 
         # DAG structure
@@ -115,7 +121,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         queue_key = initialize_processing_queue(cases=cases)
 
         # Dynamic parallel processing with queue size awareness
-        concurrency_limit = 5
+        concurrency_limit = 1
 
         # Create independent parallel tasks that will each process until queue is empty
         for _ in range(concurrency_limit):
