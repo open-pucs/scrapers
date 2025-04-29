@@ -47,9 +47,12 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             from redis import Redis
             from json import dumps
             from openpuc_scrapers.models.constants import OPENSCRAPERS_REDIS_DOMAIN
+            import random
 
             r = Redis(host=OPENSCRAPERS_REDIS_DOMAIN, port=6379, db=0)
             queue_key = f"{scraper_info.id}_case_queue_{rand_string()}"
+
+            random.shuffle(cases)
 
             # Clear previous queue contents
             r.delete(queue_key)
