@@ -47,7 +47,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             redis_domain = os.getenv("OPENSCRAPERS_REDIS_DOMAIN")
             redis_domain = "redis"
 
-            r = Redis(host="redis-service", port=6379, db=0)
+            r = Redis(host=redis_domain, port=6379, db=0)
             queue_key = f"{scraper_info.id}_case_queue_{rand_string()}"
 
             # Clear previous queue contents
@@ -104,14 +104,17 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         scraper = (scraper_info.object_type)()
         base_path = generate_intermediate_object_save_path(scraper)
         cases = get_all_caselist_raw_airflow(scraper=scraper, base_path=base_path)
-        queue_key = initialize_processing_queue(scraper=scraper, cases=cases)
+        queue_key = initialize_processing_queue(cases=cases)
 
-        # Dynamic task generation with exponential backoff
-        max_batch_size = 100  # Adjust based on worker capacity
-        for _ in range(max_batch_size):
-            process_next_case_airflow(queue_key).set_downstream(
-                process_next_case_airflow(queue_key)
-            )
+        # Dynamic parallel processing with queue size awareness
+        initial_queue_size = len(cases)
+        concurrency_limit = min(
+            initial_queue_size, 10
+        )  # Use min of cases count and max workers
+
+        # Create independent parallel tasks that will each process until queue is empty
+        for _ in range(concurrency_limit):
+            process_next_case_airflow(queue_key)
 
     return scraper_dag()
 
