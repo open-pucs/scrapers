@@ -53,7 +53,7 @@ async def process_and_shipout_attachment_errorfree(
     try:
         return await process_and_shipout_attachment(att=att)
     except Exception as e:
-        default_logger.error("Encountered exception while processing attachment: {e}")
+        default_logger.error(f"Encountered exception while processing attachment: {e}")
         error_str = str(e)
         return error_str
 

@@ -76,7 +76,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             return queue_key
 
         @task(
-            execution_timeout=timedelta(minutes=15),
+            # execution_timeout=timedelta(minutes=15),
         )
         def process_concurrent_cases_airflow(queue_key: str) -> dict:
             """Process next case from queue with atomic pop operation"""
@@ -144,7 +144,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         queue_key = initialize_processing_queue(cases=cases)
 
         # Dynamic parallel processing with queue size awareness
-        concurrency_limit = 2
+        concurrency_limit = 1
 
         # Create independent parallel tasks that will each process until queue is empty
         for _ in range(concurrency_limit):
