@@ -18,7 +18,6 @@ from redis import Redis, from_url
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.timestamp import (
     RFC3339Time,
-    rfc_time_from_timestamp,
     rfc_time_now,
     rfc_time_to_timestamp,
 )
