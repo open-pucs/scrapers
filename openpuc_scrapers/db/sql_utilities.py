@@ -13,7 +13,7 @@
 from typing import Any, List, Optional
 
 from pydantic import BaseModel
-from redis.asyncio import Redis, from_url
+from redis import Redis, from_url
 
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.timestamp import (
@@ -39,7 +39,7 @@ class CaseInfo(BaseModel):
     country: str
     state: str
     jurisdiction_name: str
-    indexed_at: Optional[RFC3339Time]
+    indexed_at: Optional[RFC3339Time] = None
     case: GenericCase
 
 
@@ -66,17 +66,18 @@ async def set_case_as_updated(
     updated_at_timestamp = int(rfc_time_to_timestamp(updated_at))
 
     # 1. Store the fields in a hash
-    await redis.set(
+    redis.set(
         f"docket:{docket_uuid}",
         case_info.model_dump_json(),
     )
 
     # 2. Add/update in the global sorted set
-    await redis.zadd(GLOBAL_BY_TIME, {docket_uuid: updated_at})
+    redis.zadd(GLOBAL_BY_TIME, {docket_uuid: updated_at_timestamp})
 
     # 3. Add/update in the jurisdiction-specific sorted set
-    await redis.zadd(
-        f"{JURISDICTION_PREFIX}{case_info.jurisdiction_name}", {docket_uuid: updated_at}
+    redis.zadd(
+        f"{JURISDICTION_PREFIX}{case_info.jurisdiction_name}",
+        {docket_uuid: updated_at_timestamp},
     )
 
 
@@ -95,13 +96,13 @@ async def get_last_updated_cases(
     if match_jurisdiction:
         key = f"{JURISDICTION_PREFIX}{match_jurisdiction}"
         # ZRANGEBYSCORE returns in ascending score (older→newer)
-        ids = await redis.zrangebyscore(key, ts, "+inf", start=0, num=limit)
+        ids = redis.zrangebyscore(key, ts, "+inf", start=0, num=limit)
     else:
-        ids = await redis.zrangebyscore(GLOBAL_BY_TIME, ts, "+inf", start=0, num=limit)
+        ids = redis.zrangebyscore(GLOBAL_BY_TIME, ts, "+inf", start=0, num=limit)
 
     results: List[CaseInfo] = []
     for docket_id in ids:
-        h = await redis.get(f"docket:{docket_id}")
+        h = redis.get(f"docket:{docket_id}")
         # h is a serialized str
         results.append(CaseInfo.model_validate_json(h))
 
