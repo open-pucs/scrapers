@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 import os
-from typing import Any, List
+from typing import Any, List, Tuple
 from airflow.decorators import dag, task
 from openpuc_scrapers.db.s3_wrapper import rand_string
 from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
@@ -36,7 +36,10 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
     def scraper_dag():
         @task
         def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[str]:
-            return get_all_caselist_raw_jsonified(scraper=scraper, base_path=base_path)
+            json_list = get_all_caselist_raw_jsonified(
+                scraper=scraper, base_path=base_path
+            )
+            return json_list
 
         @task
         def initialize_processing_queue(cases: List[str]) -> str:
@@ -45,7 +48,6 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             from json import dumps
 
             redis_domain = os.getenv("OPENSCRAPERS_REDIS_DOMAIN")
-            redis_domain = "redis"
 
             r = Redis(host=redis_domain, port=6379, db=0)
             queue_key = f"{scraper_info.id}_case_queue_{rand_string()}"
@@ -72,32 +74,39 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
 
         @task(
             execution_timeout=timedelta(minutes=15),
-            pool="case_processing_pool",
-            retries=2,
         )
-        def process_next_case_airflow(queue_key: str) -> dict:
+        def process_concurrent_cases_airflow(queue_key: str) -> dict:
             """Process next case from queue with atomic pop operation"""
             from redis import Redis
             from json import loads
 
-            r = Redis(host="redis-service", port=6379, db=0)
-            case_data = r.lpop(queue_key)
+            redis_domain = os.getenv("OPENSCRAPERS_REDIS_DOMAIN")
 
-            if not case_data:
-                return {"status": "COMPLETED", "remaining": 0}
+            r = Redis(host=redis_domain, port=6379, db=0)
+            scraper = (scraper_info.object_type)()
+            max_iter_per_concurrent_node = 100_000
+            completed_json = []
+            for _ in range(max_iter_per_concurrent_node):
+                case_data = r.lpop(queue_key)
 
-            case_obj = loads(case_data)
-            result = process_case_jsonified(
-                scraper=(scraper_info.object_type)(),
-                case=case_obj["case_json"],
-                base_path=case_obj["base_path"],
-            )
+                if not case_data:
+                    return {
+                        "status": "COMPLETED",
+                        "results": completed_json,
+                    }
+
+                case_obj = loads(case_data)
+                result = process_case_jsonified(
+                    scraper=scraper,
+                    case=case_obj["case_json"],
+                    base_path=case_obj["base_path"],
+                )
+                completed_json.append(result)
 
             return {
-                "status": "PROCESSED",
-                "case_id": case_obj["case_id"],
-                "result": result,
-                "remaining": r.llen(queue_key),
+                "status": "ERROR",
+                "error": f"Individual node tried to do more then {max_iter_per_concurrent_node} tasks",
+                "results": completed_json,
             }
 
         # DAG structure
@@ -107,19 +116,16 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         queue_key = initialize_processing_queue(cases=cases)
 
         # Dynamic parallel processing with queue size awareness
-        initial_queue_size = len(cases)
-        concurrency_limit = min(
-            initial_queue_size, 10
-        )  # Use min of cases count and max workers
+        concurrency_limit = 5
 
         # Create independent parallel tasks that will each process until queue is empty
         for _ in range(concurrency_limit):
-            process_next_case_airflow(queue_key)
+            process_concurrent_cases_airflow(queue_key)
 
     return scraper_dag()
 
 
-def create_scraper_allcases_dag_bulk(scraper_info: ScraperInfoObject) -> Any:
+def create_scraper_allcases_dag_simple(scraper_info: ScraperInfoObject) -> Any:
     """Factory function to create DAG for a specific scraper"""
 
     @dag(
