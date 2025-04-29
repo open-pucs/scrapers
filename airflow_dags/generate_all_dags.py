@@ -80,6 +80,9 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             from json import loads
 
             from openpuc_scrapers.models.constants import OPENSCRAPERS_REDIS_DOMAIN
+            import logging
+
+            default_logger = logging.getLogger(__name__)
 
             r = Redis(host=OPENSCRAPERS_REDIS_DOMAIN, port=6379, db=0)
             scraper = (scraper_info.object_type)()
@@ -104,8 +107,14 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
                         base_path=case_obj["base_path"],
                     )
                     completed_json.append(result)
-                except Exception:
+                except Exception as e:
+                    default_logger.error(
+                        f"Encountered exception while processing doc: {e}"
+                    )
                     errored_json.append(case_data)
+                    default_logger.error(
+                        f"So far {len(errored_json)} have failed, compared to {len(completed_json)} successes."
+                    )
 
             return {
                 "status": "ERROR",
