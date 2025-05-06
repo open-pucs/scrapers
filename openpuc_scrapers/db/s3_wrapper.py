@@ -135,10 +135,29 @@ class S3FileManager:
         bucket: Optional[str] = None,
         immutable: bool = False,
     ) -> str:
-        if not immutable:
-            return await self.push_file_to_s3_async_non_immutable(
-                filepath=filepath, file_upload_key=file_upload_key, bucket=bucket
-            )
+        if immutable:
+            target_bucket = bucket or self.bucket
+            async with self._get_client() as s3:
+                try:
+                    # Check if object already exists
+                    await s3.head_object(Bucket=target_bucket, Key=file_upload_key)
+                    default_logger.debug(
+                        f"Skipping existing immutable object: {file_upload_key}"
+                    )
+                    return file_upload_key
+                except s3.exceptions.ClientError as e:
+                    if e.response["Error"]["Code"] == "404":
+                        # Object doesn't exist, proceed with upload
+                        return await self.push_file_to_s3_async_non_immutable(
+                            filepath=filepath,
+                            file_upload_key=file_upload_key,
+                            bucket=bucket,
+                        )
+                    raise  # Re-raise unexpected errors
+
+        return await self.push_file_to_s3_async_non_immutable(
+            filepath=filepath, file_upload_key=file_upload_key, bucket=bucket
+        )
 
     async def push_file_to_s3_async_non_immutable(
         self,
