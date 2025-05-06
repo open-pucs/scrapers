@@ -5,6 +5,7 @@ from openpuc_scrapers.db.s3_utils import (
     fetch_attachment_file_from_s3,
     fetch_case_filing_from_s3,
     push_case_to_s3_and_db,
+    push_raw_attach_to_s3_and_db,
 )
 from openpuc_scrapers.db.s3_wrapper import S3FileManager
 from openpuc_scrapers.models.case import GenericCase
@@ -99,5 +100,6 @@ async def fetch_and_rectify_raw_attachment_metadata(
     )
     if not did_rectify:
         return raw_attachment_metadata
-    await 
-    return output_case
+    # Attachment data is already in s3. So you can exclude the path here, and it will error if not present.
+    await push_raw_attach_to_s3_and_db(raw_att=raw_attachment_metadata, file_path=None)
+    return output_metadata

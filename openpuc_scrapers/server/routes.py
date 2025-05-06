@@ -19,6 +19,10 @@ from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.raw_attachments import RawAttachment
 from openpuc_scrapers.models.hashes import Blake2bHash
 from openpuc_scrapers.models.timestamp import rfc_time_from_string
+from openpuc_scrapers.server.validation.preserve_validation import (
+    fetch_and_rectify_case,
+    fetch_and_rectify_raw_attachment_metadata,
+)
 
 
 class HealthInfo(BaseModel):
@@ -52,10 +56,12 @@ def register_routes(app: FastAPI):
         Returns:
             GenericCase: The requested case filing
         """
-        return await fetch_case_filing_from_s3(
+        rectify = True
+        return await fetch_and_rectify_case(
             case_name=case_name,
             jurisdiction_name=jurisdiction_name,
             state=state,
+            rectify=rectify,
         )
 
     @app.get("/api/caselist/{state}/{jurisdiction_name}/all")
@@ -127,7 +133,10 @@ def register_routes(app: FastAPI):
         Returns:
             RawAttachment: The attachment data
         """
-        return await fetch_attachment_data_from_s3(hash=blake2b_hash)
+        rectify = True
+        return await fetch_and_rectify_raw_attachment_metadata(
+            hash=blake2b_hash, rectify=rectify
+        )
 
     @app.get("/api/raw_attachments/{blake2b_hash}/raw")
     async def handle_attachment_file_from_s3(blake2b_hash: Blake2bHash) -> FileResponse:
