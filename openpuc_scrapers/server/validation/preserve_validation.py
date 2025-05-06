@@ -27,17 +27,31 @@ async def rectify_filing_mutate(filing: GenericFiling) -> bool:
     if filing.name == "" and len(filing.attachments) > 0:
         if len(filing.attachments) == 1:
             filing.name = filing.attachments[0].name
-            did_rectify = True
-            return did_rectify
+            return True
+
+        # LLM prompt to select best attachment name
         llamaindex_llm = get_llm_from_model_name(LlmName.CheapReasoning)
-        # Write an llm prompt to go ahead and decide from amongst the names which one is best.
-        # if it fails fall back on
-        filing.name = filing.attachments[0].name
-        did_rectify = True
-        return did_rectify
-    else:
-        did_rectify = False
-        return did_rectify
+        attachment_names = [att.name for att in filing.attachments]
+
+        prompt = f"""Analyze these legal document attachment names and select the most appropriate 
+        primary filing name. Consider patterns suggesting main documents like complaints, petitions, 
+        or judgments. Return ONLY the index number (0-{len(attachment_names)-1}) of the best choice.
+        
+        Options:
+        {chr(10).join(f"{i}: {name}" for i, name in enumerate(attachment_names))}
+        
+        Best index:"""
+
+        try:
+            response = await llamaindex_llm.apredict(prompt)
+            chosen_index = int(response.strip())
+            filing.name = filing.attachments[chosen_index].name
+        except (ValueError, IndexError):
+            default_logger.warning("LLM name selection failed, using first attachment")
+            filing.name = filing.attachments[0].name
+
+        return True
+    return False
 
 
 async def rectify_case_raw(input: GenericCase) -> Tuple[bool, GenericCase]:
