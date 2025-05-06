@@ -21,7 +21,7 @@ from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.constants import OPENSCRAPERS_S3_OBJECT_BUCKET
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.hashes import Blake2bHash
-from openpuc_scrapers.models.raw_attachments import RawAttachment
+from openpuc_scrapers.models.raw_attachments import AttachmentTextQuality, RawAttachment
 from openpuc_scrapers.pipelines.raw_attachment_handling import (
     download_file_from_url_to_path,
     generate_initial_attachment_text,
@@ -113,13 +113,25 @@ async def fetch_and_rectify_case(
 async def rectify_raw_attachment_raw(
     attachment: RawAttachment,
 ) -> Tuple[bool, RawAttachment]:
+    did_rectify = False
     if len(attachment.text_objects) > 0:
-        did_rectify = False
-        return (did_rectify, attachment)
+        should_skip = (
+            len(attachment.text_objects) == 1
+            and attachment.text_objects[0].quality == AttachmentTextQuality.low
+            and len(attachment.text_objects[0].text) < 100
+        )
+        if not should_skip:
+            return (did_rectify, attachment)
+    stripped_extension = attachment.extension.removeprefix(
+        "ValidDocumentExtensions."
+    ).lower()
+    if stripped_extension != attachment.extension:
+        attachment.extension = stripped_extension
+        did_rectify = True
     if attachment.extension != "pdf":
         default_logger.info("Found non pdf data with no text data. Skipping.")
-        did_rectify = False
         return (did_rectify, attachment)
+    default_logger.error("Attempting to process pdf file.")
     filepath = await fetch_attachment_file_from_s3(attachment.hash)
     text_obj = await generate_initial_attachment_text(
         raw_attach=attachment, file_path=filepath

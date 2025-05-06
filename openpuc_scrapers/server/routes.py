@@ -17,7 +17,7 @@ from openpuc_scrapers.db.sql_utilities import (
 )
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.raw_attachments import RawAttachment
-from openpuc_scrapers.models.hashes import Blake2bHash
+from openpuc_scrapers.models.hashes import Blake2bHash, decode_blake2b
 from openpuc_scrapers.models.timestamp import rfc_time_from_string
 from openpuc_scrapers.server.validation.preserve_validation import (
     fetch_and_rectify_case,
@@ -122,7 +122,7 @@ def register_routes(app: FastAPI):
 
     @app.get("/api/raw_attachments/{blake2b_hash}/obj")
     async def handle_attachment_data_from_s3(
-        blake2b_hash: Blake2bHash,
+        blake2b_hash: str,
     ) -> RawAttachment:
         """
         Fetch attachment data from S3 by its Blake2b hash.
@@ -133,13 +133,14 @@ def register_routes(app: FastAPI):
         Returns:
             RawAttachment: The attachment data
         """
+        validated_hash = decode_blake2b(blake2b_hash)
         rectify = True
         return await fetch_and_rectify_raw_attachment_metadata(
-            hash=blake2b_hash, rectify=rectify
+            hash=validated_hash, rectify=rectify
         )
 
     @app.get("/api/raw_attachments/{blake2b_hash}/raw")
-    async def handle_attachment_file_from_s3(blake2b_hash: Blake2bHash) -> FileResponse:
+    async def handle_attachment_file_from_s3(blake2b_hash: str) -> FileResponse:
         """
         Fetch attachment file from S3 by its Blake2b hash.
 
@@ -149,5 +150,6 @@ def register_routes(app: FastAPI):
         Returns:
             FileResponse: The attachment file
         """
-        file_path = await fetch_attachment_file_from_s3(hash=blake2b_hash)
+        validated_hash = decode_blake2b(blake2b_hash)
+        file_path = await fetch_attachment_file_from_s3(hash=validated_hash)
         return FileResponse(file_path)

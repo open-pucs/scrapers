@@ -177,7 +177,7 @@ def validate_document_extension(string: str) -> Union[str, Exception]:
     striped_lowercase = string.strip().lower()
     try:
         enumed_extension = ValidDocumentExtensions(striped_lowercase)
-        return str(enumed_extension)
+        return enumed_extension.value
     except Exception as e:
         error_string = (
             f"Encountered invalid document extension, {striped_lowercase}: {e}"
