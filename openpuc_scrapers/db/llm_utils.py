@@ -42,9 +42,11 @@ def strip_thinking(content: str) -> str:
 
 def get_chat_llm_from_model_name(model_name: LlmName = LlmName.Regular):
     model_str = to_deepinfra_model_name(model_name)
+    assert DEEPINFRA_API_KEY is not None, "Deepinfra API key was none"
+    assert DEEPINFRA_API_KEY == "", "Deepinfra api key was the empty string."
     return DeepInfraLLM(
         model=model_str,
-        api_key=DEEPINFRA_API_KEY,  # Replace with your DeepInfra API key
+        api_key=DEEPINFRA_API_KEY,
         temperature=0.5,
         max_tokens=50,
         additional_kwargs={"top_p": 0.9},
