@@ -7,8 +7,6 @@ from typing import Optional
 from langchain_community.chat_models import ChatDeepInfra
 from langchain_core.messages import SystemMessage
 from langchain_core.output_parsers import StrOutputParser
-from llama_index.core.prompts import ChatMessage
-from llama_index.llms.deepinfra import DeepInfraLLM
 
 from openpuc_scrapers.models.constants import DEEPINFRA_API_KEY
 
@@ -44,7 +42,6 @@ def get_chat_llm_from_model_name(model_name: LlmName = LlmName.Regular):
     model_str = to_deepinfra_model_name(model_name)
     api_key = DEEPINFRA_API_KEY
     assert api_key, "Deepinfra API key must be configured"
-
     return ChatDeepInfra(
         model=model_str,
         deepinfra_api_key=api_key,
