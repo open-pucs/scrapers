@@ -1,5 +1,7 @@
 import logging
 from typing import Tuple
+
+from openpuc_scrapers.db.llm_utils import LlmName, get_llm_from_model_name
 from openpuc_scrapers.db.s3_utils import (
     fetch_attachment_data_from_s3,
     fetch_attachment_file_from_s3,
@@ -10,6 +12,7 @@ from openpuc_scrapers.db.s3_utils import (
 from openpuc_scrapers.db.s3_wrapper import S3FileManager
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.constants import OPENSCRAPERS_S3_OBJECT_BUCKET
+from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.hashes import Blake2bHash
 from openpuc_scrapers.models.raw_attachments import RawAttachment
 from openpuc_scrapers.pipelines.raw_attachment_handling import (
@@ -20,6 +23,24 @@ from openpuc_scrapers.pipelines.raw_attachment_handling import (
 default_logger = logging.getLogger(__name__)
 
 
+async def rectify_filing_mutate(filing : GenericFiling) -> bool:
+    if filing.name == "" and len(filing.attachments) > 0:
+        if len(filing.attachments) == 1:
+            filing.name = filing.attachments[0].name
+            did_rectify = True
+            return did_rectify
+        llamaindex_llm = get_llm_from_model_name(LlmName.CheapReasoning)
+        # Write an llm prompt to go ahead and decide from amongst the names which one is best.
+        # if it fails fall back on
+        filing.name = filing.attachments[0].name
+        did_rectify = True
+        return did_rectify
+    else:
+        did_rectify = False
+        return did_rectify
+
+
+
 async def rectify_case_raw(input: GenericCase) -> Tuple[bool, GenericCase]:
     did_rectify = False
     filings = input.filings
@@ -27,14 +48,6 @@ async def rectify_case_raw(input: GenericCase) -> Tuple[bool, GenericCase]:
         default_logger.warning(f"Encountered case {input.case_number} with no filings")
         return (False, input)
     for filing in filings:
-        if filing.name == "" and len(filing.attachments) > 0:
-            if len(filing.attachments) == 1:
-                filing.name = filing.attachments[0].name
-                did_rectify = True
-            # Write an llm prompt to go ahead and decide from amongst the names which one is best.
-            # if it fails fall back on
-            filing.name = filing.attachments[0].name
-            did_rectify = True
     return (did_rectify, input)
 
 
