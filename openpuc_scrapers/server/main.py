@@ -11,6 +11,7 @@ def create_app() -> FastAPI:
     This function allows for more flexible app creation and testing.
     """
     app = FastAPI()
+    register_routes(app)
 
     # Mount static files
     app.mount(
@@ -24,6 +25,3 @@ def create_app() -> FastAPI:
 
 # Create the FastAPI application
 app = create_app()
-
-# Register all routes
-register_routes(app)
