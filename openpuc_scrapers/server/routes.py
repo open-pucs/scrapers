@@ -2,6 +2,7 @@ from typing import List
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from openpuc_scrapers.db.s3_utils import (
     fetch_attachment_data_from_s3,
@@ -20,6 +21,10 @@ from openpuc_scrapers.models.hashes import Blake2bHash
 from openpuc_scrapers.models.timestamp import rfc_time_from_string
 
 
+class HealthInfo(BaseModel):
+    is_healthy: bool
+
+
 def register_routes(app: FastAPI):
     """
     Register all API routes for the OpenPUC Scrapers server.
@@ -27,6 +32,10 @@ def register_routes(app: FastAPI):
     Args:
         app (FastAPI): The FastAPI application instance to register routes on.
     """
+
+    @app.get("/api/health")
+    async def health() -> HealthInfo:
+        return HealthInfo(is_healthy=True)
 
     @app.get("/api/cases/{state}/{jurisdiction_name}/{case_name}")
     async def handle_case_filing_from_s3(
