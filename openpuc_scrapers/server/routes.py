@@ -8,7 +8,12 @@ from openpuc_scrapers.db.s3_utils import (
     fetch_attachment_file_from_s3,
     fetch_case_filing_from_s3,
 )
-from openpuc_scrapers.db.sql_utilities import CaseInfo, get_last_updated_cases
+from openpuc_scrapers.db.sql_utilities import (
+    CaseInfo,
+    CaseInfoMinimal,
+    get_all_cases_from_jurisdiction,
+    get_last_updated_cases,
+)
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.raw_attachments import RawAttachment
 from openpuc_scrapers.models.hashes import Blake2bHash
@@ -44,10 +49,10 @@ def register_routes(app: FastAPI):
             state=state,
         )
 
-    @app.get("/api/caselist/{jurisdiction_name}/all")
+    @app.get("/api/caselist/{state}/{jurisdiction_name}/all")
     async def handle_caselist_jurisdiction_fetch_all(
-        jurisdiction_name: str, limit: int = 1000
-    ) -> List[CaseInfo]:
+        jurisdiction_name: str, state: str, limit: int = 1000
+    ) -> List[CaseInfoMinimal]:
         """
         Fetch case list for a specific jurisdiction after a given date.
 
@@ -59,11 +64,11 @@ def register_routes(app: FastAPI):
         Returns:
             List[CaseInfo]: List of case information
         """
-        return await get_last_updated_cases(
-            indexed_after=date, match_jurisdiction=jurisdiction_name, limit=limit
+        return await get_all_cases_from_jurisdiction(
+            jurisdiction_name=jurisdiction_name, state=state
         )
 
-    @app.get("/api/caselist/{jurisdiction_name}/indexed_after/{rfc339_date}")
+    @app.get("/api/caselist/{state}/{jurisdiction_name}/indexed_after/{rfc339_date}")
     async def handle_caselist_jurisdiction_fetch_date(
         jurisdiction_name: str, rfc339_date: str, limit: int = 1000
     ) -> List[CaseInfo]:

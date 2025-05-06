@@ -13,7 +13,11 @@
 from typing import Any, List, Optional
 
 from pydantic import BaseModel
-from openpuc_scrapers.models.constants import OPENSCRAPERS_REDIS_URL
+from openpuc_scrapers.db.s3_wrapper import S3FileManager
+from openpuc_scrapers.models.constants import (
+    OPENSCRAPERS_REDIS_URL,
+    OPENSCRAPERS_S3_OBJECT_BUCKET,
+)
 from redis import Redis, from_url
 
 from openpuc_scrapers.models.case import GenericCase
@@ -40,6 +44,14 @@ class CaseInfo(BaseModel):
     jurisdiction_name: str
     indexed_at: Optional[RFC3339Time] = None
     case: GenericCase
+
+
+class CaseInfoMinimal(BaseModel):
+    country: str
+    state: str
+    jurisdiction_name: str
+    indexed_at: Optional[RFC3339Time] = None
+    case_id: str
 
 
 def generate_case_uuid(case_info: CaseInfo) -> str:
@@ -78,6 +90,28 @@ async def set_case_as_updated(
         f"{JURISDICTION_PREFIX}{case_info.jurisdiction_name}",
         {docket_uuid: updated_at_timestamp},
     )
+
+
+async def get_all_cases_from_jurisdiction(
+    jurisdiction_name: str, state: str, country: str = "usa"
+) -> List[CaseInfoMinimal]:
+    s3 = S3FileManager(OPENSCRAPERS_S3_OBJECT_BUCKET)
+    # example "objects/usa/ny/ny_puc/18-G-0736.json"
+    prefix = f"objects/{country}/{state}/{jurisdiction_name}/"
+    caseidlist = await s3.list_objects_with_prefix_async(prefix=prefix)
+
+    def gen_caseinfo(case_id: str) -> CaseInfoMinimal:
+        return CaseInfoMinimal(
+            case_id=case_id,
+            jurisdiction_name=jurisdiction_name,
+            state=state,
+            country=country,
+        )
+
+    case_info_list = []
+    for case_id in caseidlist:
+        case_info_list.append(gen_caseinfo(case_id))
+    return case_info_list
 
 
 async def get_last_updated_cases(
