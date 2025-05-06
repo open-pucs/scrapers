@@ -1,6 +1,5 @@
 import os
 from mimetypes import guess_type
-from anyio import Path
 import aioboto3
 from contextlib import asynccontextmanager
 
@@ -8,7 +7,7 @@ from typing import List, Optional, Any
 
 import logging
 import requests
-from pathlib import Path as SyncPath
+from pathlib import Path
 from tempfile import TemporaryFile
 
 from urllib.parse import urlparse
@@ -36,8 +35,8 @@ def rand_string() -> str:
     return base64.urlsafe_b64encode(secrets.token_bytes(8)).decode()
 
 
-def rand_filepath() -> SyncPath:
-    return SyncPath(rand_string())
+def rand_filepath() -> Path:
+    return Path(rand_string())
 
 
 class S3FileManager:
@@ -56,15 +55,12 @@ class S3FileManager:
             aws_secret_access_key=OPENSCRAPERS_S3_SECRET_KEY,
             region_name=OPENSCRAPERS_S3_CLOUD_REGION,
         )
-        if LOCAL_CACHE_DIR is not None:
-            self.s3_cache_directory = LOCAL_CACHE_DIR / SyncPath(self.bucket)
-        else:
-            self.s3_cache_directory = (
-                TMP_DIR / SyncPath("s3_cache") / SyncPath(self.bucket)
-            )
+        self.s3_cache_directory = (LOCAL_CACHE_DIR or TMP_DIR / "s3_cache") / Path(
+            self.bucket
+        )
 
-    def get_local_dir_from_key(self, key: str) -> SyncPath:
-        return self.s3_cache_directory / SyncPath(key)
+    def get_local_dir_from_key(self, key: str) -> Path:
+        return self.s3_cache_directory / Path(key)
 
     @asynccontextmanager
     async def _get_client(self):
@@ -77,16 +73,14 @@ class S3FileManager:
             return
 
         local_path = self.get_local_dir_from_key(key)
-        await local_path.parent.mkdir(parents=True, exist_ok=True)
-        await local_path.write_text(content, encoding="utf-8")
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        local_path.write_text(content, encoding="utf-8")
         await self.push_file_to_s3_async(local_path, key)
 
     async def download_s3_file_to_path_async(
         self, file_name: str, bucket: Optional[str] = None, serve_cache: bool = False
-    ) -> Optional[SyncPath]:
+    ) -> Optional[Path]:
         file_path = self.get_local_dir_from_key(file_name)
-        if bucket is None:
-            bucket = self.bucket
         if file_path.is_file():
             if serve_cache:
                 return file_path
@@ -106,7 +100,7 @@ class S3FileManager:
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
 
-    async def download_file_from_s3_url(self, s3_url: str) -> Optional[SyncPath]:
+    async def download_file_from_s3_url(self, s3_url: str) -> Optional[Path]:
         url_parsed = urlparse(s3_url)
         domain = url_parsed.hostname
         s3_key = url_parsed.path
@@ -141,55 +135,39 @@ class S3FileManager:
         bucket: Optional[str] = None,
         immutable: bool = False,
     ) -> str:
-        mutable = not immutable
-        if bucket is None:
-            bucket = self.bucket
-        local_cache_filepath = self.get_local_dir_from_key(file_upload_key)
-        if mutable or not local_cache_filepath.exists():
-            if filepath != local_cache_filepath:
-                try:
-                    if not await filepath.exists():
-                        raise FileNotFoundError(
-                            f"Source file {filepath} does not exist"
-                        )
-                    await local_cache_filepath.parent.mkdir(parents=True, exist_ok=True)
-                    default_logger.info(f"Copying {filepath} to {local_cache_filepath}")
-                except Exception as e:
-                    default_logger.warning(
-                        f"Encountered error copying file to cache: {e}"
-                    )
-                    raise e
-        try:
-
-            content_type = guess_type(file_upload_key)[0] or "application/octet-stream"
-            if file_upload_key.endswith(".json"):
-                content_type = "application/json"
-
-            default_logger.debug(
-                f"Uploading {filepath} (Size: {await filepath.stat().st_size} bytes) with Content-Type: {content_type}"
+        if not immutable:
+            return await self.push_file_to_s3_async_non_immutable(
+                filepath=filepath, file_upload_key=file_upload_key, bucket=bucket
             )
 
-            async with self._get_client() as s3:
-                await s3.upload_file(
-                    str(filepath),
-                    bucket or self.bucket,
-                    file_upload_key,
-                    ExtraArgs={
-                        "ContentType": content_type,
-                        "Metadata": {
-                            "source-file": str(filepath.name),
-                            "upload-system": "open-scrapers",
-                        },
+    async def push_file_to_s3_async_non_immutable(
+        self,
+        filepath: Path,
+        file_upload_key: str,
+        bucket: Optional[str] = None,
+    ) -> str:
+        content_type = guess_type(file_upload_key)[0] or "application/octet-stream"
+        if file_upload_key.endswith(".json"):
+            content_type = "application/json"
+
+        default_logger.debug(
+            f"Uploading {filepath} (Size: {filepath.stat().st_size} bytes)"
+        )
+
+        async with self._get_client() as s3:
+            await s3.upload_file(
+                str(filepath),
+                bucket or self.bucket,
+                file_upload_key,
+                ExtraArgs={
+                    "ContentType": content_type,
+                    "Metadata": {
+                        "source-file": filepath.name,
+                        "upload-system": "open-scrapers",
                     },
-                )
-            return file_upload_key
-        except Exception as e:
-            default_logger.error(f"Failed to upload {file_upload_key} from {filepath}")
-            default_logger.error(
-                f"File exists: {await filepath.exists()}, size: {await filepath.stat().st_size if await filepath.exists() else 0}"
+                },
             )
-            default_logger.error(f"Bucket: {bucket}, Key: {file_upload_key}")
-            return file_upload_key
+        return file_upload_key
 
     async def list_objects_with_prefix_async(self, prefix: str) -> List[str]:
         async with self._get_client() as s3:
