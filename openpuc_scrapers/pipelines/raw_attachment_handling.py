@@ -58,6 +58,24 @@ async def process_and_shipout_attachment_errorfree(
         return error_str
 
 
+async def generate_initial_attachment_text(
+    raw_attach: RawAttachment, file_path: Path
+) -> Optional[RawAttachmentText]:
+    match raw_attach.extension:
+        # TODO: Implement processing using pandoc for docx and doc text extraction.
+        case "pdf":
+            text = parse_raw_pdf_text(file_path)
+            text_obj = RawAttachmentText(
+                quality=AttachmentTextQuality.low,
+                text=text,
+                language="en",
+                timestamp=rfc_time_now(),
+            )
+            return text_obj
+
+    return None
+
+
 async def process_and_shipout_attachment(
     att: GenericAttachment,
 ) -> GenericAttachment:
@@ -72,23 +90,6 @@ async def process_and_shipout_attachment(
     raw_attach = RawAttachment(
         hash=hash, name=att.name, extension=valid_extension, text_objects=[]
     )
-
-    async def generate_initial_attachment_text(
-        raw_attach: RawAttachment, file_path: Path
-    ) -> Optional[RawAttachmentText]:
-        match raw_attach.extension:
-            # TODO: Implement processing using pandoc for docx and doc text extraction.
-            case "pdf":
-                text = parse_raw_pdf_text(file_path)
-                text_obj = RawAttachmentText(
-                    quality=AttachmentTextQuality.low,
-                    text=text,
-                    language="en",
-                    timestamp=rfc_time_now(),
-                )
-                return text_obj
-
-        return None
 
     result_text = await generate_initial_attachment_text(raw_attach, tmp_filepath)
     if result_text is not None:
