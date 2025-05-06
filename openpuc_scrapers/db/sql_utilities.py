@@ -101,9 +101,7 @@ async def get_all_cases_from_jurisdiction(
     caseidlist = await s3.list_objects_with_prefix_async(prefix=prefix)
 
     def gen_caseinfo(case_id: str) -> CaseInfoMinimal:
-        case_id_minified = case_id.split("/")[-1].split(".json")[
-            0
-        ]  # Extract filename without path or extension
+        case_id_minified = case_id.split("/")[-1].removesuffix(".json")
         return CaseInfoMinimal(
             case_id=case_id_minified,
             jurisdiction_name=jurisdiction_name,
