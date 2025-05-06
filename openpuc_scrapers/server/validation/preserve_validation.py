@@ -1,7 +1,7 @@
 import logging
 from typing import Tuple
-
 from openpuc_scrapers.db.llm_utils import LlmName, get_llm_from_model_name
+
 from openpuc_scrapers.db.s3_utils import (
     fetch_attachment_data_from_s3,
     fetch_attachment_file_from_s3,
@@ -23,7 +23,7 @@ from openpuc_scrapers.pipelines.raw_attachment_handling import (
 default_logger = logging.getLogger(__name__)
 
 
-async def rectify_filing_mutate(filing : GenericFiling) -> bool:
+async def rectify_filing_mutate(filing: GenericFiling) -> bool:
     if filing.name == "" and len(filing.attachments) > 0:
         if len(filing.attachments) == 1:
             filing.name = filing.attachments[0].name
@@ -40,7 +40,6 @@ async def rectify_filing_mutate(filing : GenericFiling) -> bool:
         return did_rectify
 
 
-
 async def rectify_case_raw(input: GenericCase) -> Tuple[bool, GenericCase]:
     did_rectify = False
     filings = input.filings
@@ -48,6 +47,8 @@ async def rectify_case_raw(input: GenericCase) -> Tuple[bool, GenericCase]:
         default_logger.warning(f"Encountered case {input.case_number} with no filings")
         return (False, input)
     for filing in filings:
+        rectified_filing = await rectify_filing_mutate(filing=filing)
+        did_rectify = did_rectify or rectified_filing
     return (did_rectify, input)
 
 
