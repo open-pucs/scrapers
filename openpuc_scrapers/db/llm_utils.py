@@ -5,6 +5,7 @@ import sys
 
 from typing import Optional
 
+from llama_index.core.prompts import ChatMessage
 from llama_index.llms.deepinfra import DeepInfraLLM
 import asyncio
 from enum import Enum
@@ -31,7 +32,15 @@ def to_deepinfra_model_name(name: LlmName) -> str:
 default_logger = logging.getLogger(__name__)
 
 
-def get_llm_from_model_name(model_name: LlmName = LlmName.Regular):
+def make_sysmsg(content: str) -> ChatMessage:
+    return ChatMessage(content=content, role="system")
+
+
+def strip_thinking(content: str) -> str:
+    return content.split("</think>")[-1].strip()
+
+
+def get_chat_llm_from_model_name(model_name: LlmName = LlmName.Regular):
     model_str = to_deepinfra_model_name(model_name)
     return DeepInfraLLM(
         model=model_str,

@@ -1,7 +1,14 @@
 import logging
 from typing import Tuple
-from openpuc_scrapers.db.llm_utils import LlmName, get_llm_from_model_name
 
+from llama_index.core.prompts import ChatMessage
+
+from openpuc_scrapers.db.llm_utils import (
+    LlmName,
+    get_chat_llm_from_model_name,
+    make_sysmsg,
+    strip_thinking,
+)
 from openpuc_scrapers.db.s3_utils import (
     fetch_attachment_data_from_s3,
     fetch_attachment_file_from_s3,
@@ -30,22 +37,26 @@ async def rectify_filing_mutate(filing: GenericFiling) -> bool:
             return True
 
         # LLM prompt to select best attachment name
-        llamaindex_llm = get_llm_from_model_name(LlmName.CheapReasoning)
+        llamaindex_llm = get_chat_llm_from_model_name(LlmName.CheapReasoning)
         attachment_names = [att.name for att in filing.attachments]
 
         prompt = f"""Analyze these legal document attachment names and select the most appropriate 
         primary filing name. Consider patterns suggesting main documents like complaints, petitions, 
-        or judgments. Return ONLY the index number (0-{len(attachment_names)-1}) of the best choice.
+        or judgments. If multiple file names exist like  <FILENAME> (Cover Letter), or 
+        <FILENAME> (Main Body) return the bare file name <FILENAME>. If that pattern doesnt exist return
+        the best match. AFTER YOU ARE DONE THINKING, RETURN THE NAME AND NOTHING ELSE.
         
         Options:
         {chr(10).join(f"{i}: {name}" for i, name in enumerate(attachment_names))}
         
-        Best index:"""
+        Best name:"""
 
         try:
-            response = await llamaindex_llm.apredict(prompt)
-            chosen_index = int(response.strip())
-            filing.name = filing.attachments[chosen_index].name
+            response = await llamaindex_llm.achat([make_sysmsg(content=prompt)])
+            response_content = response.message.content
+            assert response_content is not None, "Response content is none"
+            chosen_name = strip_thinking(response_content)
+            filing.name = chosen_name
         except (ValueError, IndexError):
             default_logger.warning("LLM name selection failed, using first attachment")
             filing.name = filing.attachments[0].name
