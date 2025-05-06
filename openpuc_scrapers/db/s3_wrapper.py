@@ -85,6 +85,7 @@ class S3FileManager:
         self, file_name: str, bucket: Optional[str] = None, serve_cache: bool = False
     ) -> Optional[Path]:
         file_path = self.get_local_dir_from_key(file_name)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
         if file_path.is_file():
             if serve_cache:
                 return file_path
