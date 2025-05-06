@@ -39,11 +39,12 @@ async def rectify_filing_mutate(filing: GenericFiling) -> bool:
         langchain_llm = get_chat_llm_from_model_name(LlmName.CheapReasoning)
         attachment_names = [att.name for att in filing.attachments]
 
-        prompt = f"""Analyze these legal document attachment names and select the most appropriate 
-        primary filing name. Consider patterns suggesting main documents like complaints, petitions, 
-        or judgments. If multiple file names exist like  <FILENAME> (Cover Letter), or 
-        <FILENAME> (Main Body) return the bare file name <FILENAME>. If that pattern doesnt exist return
-        the best match. AFTER YOU ARE DONE THINKING, RETURN THE NAME AND NOTHING ELSE.
+        prompt = f"""Analyze these legal document attachment names and synthesize the most appropriate
+        filing name.  If multiple file names exist like  <FILENAME> (Cover Letter), or <FILENAME> (Main Body)
+        return the bare file name <FILENAME>. If you tried to identify a pattern and couldnt find one return the 
+        name of the documentthat looks the most like it could be the main one main like complaints, 
+        petitions, or judgments.
+        AFTER YOU ARE DONE THINKING, RETURN YOUR BEST GUESS OF THE NAME AND NOTHING ELSE.
         
         Options:
         {chr(10).join(f"{i}: {name}" for i, name in enumerate(attachment_names))}
