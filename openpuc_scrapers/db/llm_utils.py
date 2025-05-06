@@ -44,7 +44,7 @@ def get_chat_llm_from_model_name(model_name: LlmName = LlmName.Regular):
     assert api_key, "Deepinfra API key must be configured"
     return ChatDeepInfra(
         model=model_str,
-        deepinfra_api_key=api_key,
+        deepinfra_api_token=api_key,
         temperature=0.5,
         max_tokens=50,
         top_p=0.9,
