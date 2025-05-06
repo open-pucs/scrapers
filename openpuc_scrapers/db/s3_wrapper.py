@@ -67,7 +67,9 @@ class S3FileManager:
         async with self._session.client("s3", endpoint_url=self.endpoint) as client:
             yield client
 
-    async def save_string_to_remote_file_async(self, key: str, content: str) -> None:
+    async def save_string_to_remote_file_async(
+        self, key: str, content: str, immutable: bool = False
+    ) -> None:
         if not content:
             default_logger.error(f"Tried to upload to {key} with empty content")
             return
@@ -75,7 +77,9 @@ class S3FileManager:
         local_path = self.get_local_dir_from_key(key)
         local_path.parent.mkdir(parents=True, exist_ok=True)
         local_path.write_text(content, encoding="utf-8")
-        await self.push_file_to_s3_async(local_path, key)
+        await self.push_file_to_s3_async(
+            filepath=local_path, file_upload_key=key, immutable=immutable
+        )
 
     async def download_s3_file_to_path_async(
         self, file_name: str, bucket: Optional[str] = None, serve_cache: bool = False

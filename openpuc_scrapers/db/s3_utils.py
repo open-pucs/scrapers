@@ -30,14 +30,14 @@ async def fetch_case_filing_from_s3(
 ) -> GenericCase:
     s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
     key = get_case_s3_key(case_name, jurisdiction_name, state)
-    raw_case = s3.download_s3_file_to_string(key)
+    raw_case = await s3.download_s3_file_to_string_async(file_name=key)
     return GenericCase.model_validate_json(raw_case)
 
 
 async def fetch_attachment_data_from_s3(hash: Blake2bHash) -> RawAttachment:
     obj_key = get_raw_attach_obj_key(hash)
     s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
-    result_str = s3.download_s3_file_to_string(obj_key)
+    result_str = await s3.download_s3_file_to_string_async(file_name=obj_key)
     raw_attach = RawAttachment.model_validate_json(result_str)
     return raw_attach
 
@@ -45,7 +45,9 @@ async def fetch_attachment_data_from_s3(hash: Blake2bHash) -> RawAttachment:
 async def fetch_attachment_file_from_s3(hash: Blake2bHash) -> Path:
     obj_key = get_raw_attach_file_key(hash)
     s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
-    result_path = s3.download_s3_file_to_path(obj_key, serve_cache=True)
+    result_path = await s3.download_s3_file_to_path_async(
+        file_name=obj_key, serve_cache=True
+    )
     if result_path is None:
         raise Exception("Failed to get file from s3")
     return result_path
@@ -56,9 +58,11 @@ async def push_raw_attach_to_s3_and_db(raw_att: RawAttachment, file_path: Path) 
     obj_key = get_raw_attach_obj_key(raw_att.hash)
     file_key = get_raw_attach_file_key(raw_att.hash)
     s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
-    s3.save_string_to_remote_file(key=obj_key, content=dumped_data)
+    await s3.save_string_to_remote_file_async(key=obj_key, content=dumped_data)
     # Immutable is true for this line since any file will always get saved with the same hash.
-    s3.push_file_to_s3(filepath=file_path, file_upload_key=file_key, immutable=True)
+    await s3.push_file_to_s3_async(
+        filepath=file_path, file_upload_key=file_key, immutable=True
+    )
     # TODO: Maybe update db that the file has been updated?
 
 
@@ -75,7 +79,7 @@ async def push_case_to_s3_and_db(
     s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
     case_jsonified = case.model_dump_json()
     # Maybe async this in its own thread?
-    s3.save_string_to_remote_file(key=key, content=case_jsonified)
+    await s3.save_string_to_remote_file_async(key=key, content=case_jsonified)
     case_info = CaseInfo(
         case=case, jurisdiction_name=jurisdiction_name, state=state, country=country
     )
@@ -83,7 +87,7 @@ async def push_case_to_s3_and_db(
     return case
 
 
-def list_cases_for_jurisdiction(
+async def list_cases_for_jurisdiction(
     jurisdiction_name: str, state: str, country: str = "usa"
 ) -> List[str]:
     """
@@ -101,7 +105,7 @@ def list_cases_for_jurisdiction(
     prefix = f"objects/{country}/{state}/{jurisdiction_name}/"
 
     # Get all keys matching the jurisdiction prefix
-    keys = s3.list_objects_with_prefix(prefix)
+    keys = await s3.list_objects_with_prefix_async(prefix)
 
     # Extract case names from S3 keys
     case_names = []
