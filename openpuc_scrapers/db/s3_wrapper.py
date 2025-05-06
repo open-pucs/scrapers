@@ -133,6 +133,25 @@ class S3FileManager:
         s3_uri = f"https://{bucket}.{base_endpoint}/{file_name}"
         return s3_uri
 
+    async def check_if_file_exists(
+        self, file_upload_key: str, bucket: Optional[str] = None
+    ) -> bool:
+        target_bucket = bucket or self.bucket
+        async with self._get_client() as s3:
+            try:
+                # Check if object already exists
+                await s3.head_object(Bucket=target_bucket, Key=file_upload_key)
+                # Found object and got non error response, ergo must exist
+                does_exist = True
+                return does_exist
+            except s3.exceptions.ClientError as e:
+                if e.response["Error"]["Code"] == "404":
+                    # Object doesn't exist, proceed with upload
+                    does_exist = False
+                    return does_exist
+
+                raise  # Re-raise unexpected errors
+
     async def push_file_to_s3_async(
         self,
         filepath: Path,
@@ -141,24 +160,20 @@ class S3FileManager:
         immutable: bool = False,
     ) -> str:
         if immutable:
-            target_bucket = bucket or self.bucket
-            async with self._get_client() as s3:
-                try:
-                    # Check if object already exists
-                    await s3.head_object(Bucket=target_bucket, Key=file_upload_key)
-                    default_logger.debug(
-                        f"Skipping existing immutable object: {file_upload_key}"
-                    )
-                    return file_upload_key
-                except s3.exceptions.ClientError as e:
-                    if e.response["Error"]["Code"] == "404":
-                        # Object doesn't exist, proceed with upload
-                        return await self.push_file_to_s3_async_non_immutable(
-                            filepath=filepath,
-                            file_upload_key=file_upload_key,
-                            bucket=bucket,
-                        )
-                    raise  # Re-raise unexpected errors
+            does_exist = await self.check_if_file_exists(
+                file_upload_key=file_upload_key
+            )
+            if does_exist:
+                default_logger.debug(
+                    f"Skipping existing immutable object: {file_upload_key}"
+                )
+                return file_upload_key
+            else:
+                return await self.push_file_to_s3_async_non_immutable(
+                    filepath=filepath,
+                    file_upload_key=file_upload_key,
+                    bucket=bucket,
+                )
 
         return await self.push_file_to_s3_async_non_immutable(
             filepath=filepath, file_upload_key=file_upload_key, bucket=bucket
