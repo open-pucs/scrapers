@@ -163,7 +163,7 @@ class GenericScraper(ABC, Generic[StateCaseData, StateFilingData]):
         pass
 
 
-class ValidDocumentExtensions(str, Enum):
+class ValidExtension(str, Enum):
     PDF = "pdf"
     DOCX = "docx"
     DOC = "doc"
@@ -176,7 +176,7 @@ class ValidDocumentExtensions(str, Enum):
 def validate_document_extension(string: str) -> Union[str, Exception]:
     striped_lowercase = string.strip().lower()
     try:
-        enumed_extension = ValidDocumentExtensions(striped_lowercase)
+        enumed_extension = ValidExtension(striped_lowercase)
         return enumed_extension.value
     except Exception as e:
         error_string = (
