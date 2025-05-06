@@ -9,6 +9,8 @@ from llama_index.llms.deepinfra import DeepInfraLLM
 import asyncio
 from enum import Enum
 
+from openpuc_scrapers.models.constants import DEEPINFRA_API_KEY
+
 
 class LlmName(str, Enum):
     Regular = "regular"
@@ -33,11 +35,8 @@ def get_llm_from_model_name(model_name: LlmName = LlmName.Regular):
     model_str = to_deepinfra_model_name(model_name)
     return DeepInfraLLM(
         model=model_str,
-        api_key="your-deepinfra-api-key",  # Replace with your DeepInfra API key
+        api_key=DEEPINFRA_API_KEY,  # Replace with your DeepInfra API key
         temperature=0.5,
         max_tokens=50,
         additional_kwargs={"top_p": 0.9},
     )
-
-
-llm = get_llm_from_model_str()
