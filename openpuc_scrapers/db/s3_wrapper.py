@@ -159,12 +159,6 @@ class S3FileManager:
                         f"Encountered error copying file to cache: {e}"
                     )
                     raise e
-        if mutable or not self.does_file_exist_s3(key=file_upload_key, bucket=bucket):
-            if not await filepath.exists():
-                raise FileNotFoundError(f"Source file {filepath} does not exist")
-            default_logger.info(
-                f"Uploading file {filepath}, to s3 key: {file_upload_key}"
-            )
         try:
 
             content_type = guess_type(file_upload_key)[0] or "application/octet-stream"
