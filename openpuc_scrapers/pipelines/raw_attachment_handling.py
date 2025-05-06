@@ -64,7 +64,8 @@ async def generate_initial_attachment_text(
     match raw_attach.extension:
         # TODO: Implement processing using pandoc for docx and doc text extraction.
         case "pdf":
-            text = parse_raw_pdf_text(file_path)
+
+            text = await asyncio.to_thread(lambda: parse_raw_pdf_text(file_path))
             text_obj = RawAttachmentText(
                 quality=AttachmentTextQuality.low,
                 text=text,
