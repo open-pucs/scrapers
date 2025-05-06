@@ -16,6 +16,7 @@ dependencies = [
     "beautifulsoup4>=4.13.3",
     "faker>=37.1.0",
     "jinja2>=3.1.6",
+    "llama-index-llms-deepinfra>=0.3.0",
     "psycopg2-binary>=2.9.10",
     "pydantic>=2.10.6",
     "pymupdf>=1.25.5",
