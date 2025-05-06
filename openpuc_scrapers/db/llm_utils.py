@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Optional
 
 from langchain_community.chat_models import ChatDeepInfra
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import StrOutputParser
 
 from openpuc_scrapers.models.constants import DEEPINFRA_API_KEY
@@ -34,8 +34,15 @@ def make_sysmsg(content: str) -> SystemMessage:
     return SystemMessage(content=content)
 
 
+def make_usermsg(content: str) -> HumanMessage:
+    return HumanMessage(content=content)
+
+
 def strip_thinking(content: str) -> str:
-    return content.split("</think>")[-1].strip()
+    # default_logger.debug(content)
+    stripped = content.split("</think>")[-1].strip()
+    # default_logger.debug(stripped)
+    return stripped
 
 
 def get_chat_llm_from_model_name(model_name: LlmName = LlmName.Regular):
@@ -46,7 +53,7 @@ def get_chat_llm_from_model_name(model_name: LlmName = LlmName.Regular):
         model=model_str,
         deepinfra_api_token=api_key,
         temperature=0.5,
-        max_tokens=50,
+        max_tokens=2000,
         top_p=0.9,
     ).bind(stop=["</think>"])
 

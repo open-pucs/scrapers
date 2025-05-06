@@ -6,6 +6,7 @@ from openpuc_scrapers.db.llm_utils import (
     LlmName,
     get_chat_llm_from_model_name,
     make_sysmsg,
+    make_usermsg,
     strip_thinking,
 )
 from openpuc_scrapers.db.s3_utils import (
@@ -30,13 +31,14 @@ default_logger = logging.getLogger(__name__)
 
 
 async def rectify_filing_mutate(filing: GenericFiling) -> bool:
-    if filing.name == "" and len(filing.attachments) > 0:
+    # if filing.name == "" and len(filing.attachments) > 0:
+    if len(filing.attachments) > 0:
         if len(filing.attachments) == 1:
             filing.name = filing.attachments[0].name
             return True
 
         # LLM prompt to select best attachment name
-        langchain_llm = get_chat_llm_from_model_name(LlmName.CheapReasoning)
+        langchain_llm = get_chat_llm_from_model_name(LlmName.Regular)
         attachment_names = [att.name for att in filing.attachments]
 
         prompt = f"""Analyze these legal document attachment names and synthesize the most appropriate
@@ -44,7 +46,7 @@ async def rectify_filing_mutate(filing: GenericFiling) -> bool:
         return the bare file name <FILENAME>. If you tried to identify a pattern and couldnt find one return the 
         name of the documentthat looks the most like it could be the main one main like complaints, 
         petitions, or judgments.
-        AFTER YOU ARE DONE THINKING, RETURN YOUR BEST GUESS OF THE NAME AND NOTHING ELSE.
+        RETURN YOUR BEST GUESS OF THE NAME AND NOTHING ELSE.
         
         Options:
         {chr(10).join(f"{i}: {name}" for i, name in enumerate(attachment_names))}
@@ -52,11 +54,14 @@ async def rectify_filing_mutate(filing: GenericFiling) -> bool:
         Best name:"""
 
         try:
-            response = await langchain_llm.ainvoke([make_sysmsg(content=prompt)])
+            response = await langchain_llm.ainvoke([make_usermsg(content=prompt)])
             response_content = response.content
             assert isinstance(response_content, str), "Did not respond with string."
             assert response_content is not None, "Response content is none"
             chosen_name = strip_thinking(response_content)
+            default_logger.info(
+                f"Recalculated and selected {chosen_name} for document."
+            )
             filing.name = chosen_name
         except (ValueError, IndexError):
             default_logger.warning("LLM name selection failed, using first attachment")
