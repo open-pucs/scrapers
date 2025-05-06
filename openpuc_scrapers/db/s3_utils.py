@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 from openpuc_scrapers.db.s3_wrapper import S3FileManager
 from openpuc_scrapers.db.sql_utilities import CaseInfo, set_case_as_updated
 from openpuc_scrapers.models.case import GenericCase
@@ -80,3 +81,35 @@ async def push_case_to_s3_and_db(
     )
     await set_case_as_updated(case_info=case_info)
     return case
+
+
+def list_cases_for_jurisdiction(
+    jurisdiction_name: str, state: str, country: str = "usa"
+) -> List[str]:
+    """
+    Returns all case names stored in S3 for a given jurisdiction.
+
+    Args:
+        jurisdiction_name: Name of the legal jurisdiction
+        state: State abbreviation
+        country: Country code (default: 'usa')
+
+    Returns:
+        List of case numbers/filenames found in the S3 bucket
+    """
+    s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
+    prefix = f"objects/{country}/{state}/{jurisdiction_name}/"
+
+    # Get all keys matching the jurisdiction prefix
+    keys = s3.list_objects_with_prefix(prefix)
+
+    # Extract case names from S3 keys
+    case_names = []
+    for key in keys:
+        if key.endswith(".json"):
+            # Split key path and remove .json extension
+            filename = key.split("/")[-1]
+            case_name = filename[:-5]
+            case_names.append(case_name)
+
+    return case_names

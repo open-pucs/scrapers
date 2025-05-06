@@ -2,7 +2,7 @@ import os
 import boto3
 
 
-from typing import Optional, Any
+from typing import List, Optional, Any
 
 import logging
 import requests
@@ -239,3 +239,15 @@ class S3FileManager:
 
             # raise e
             return file_upload_key
+
+    def list_objects_with_prefix(self, prefix: str) -> List[str]:
+        """List all S3 object keys matching the given prefix"""
+        paginator = self.s3.get_paginator("list_objects_v2")
+        pages = paginator.paginate(Bucket=self.bucket, Prefix=prefix)
+
+        keys = []
+        for page in pages:
+            if "Contents" in page:
+                for obj in page["Contents"]:
+                    keys.append(obj["Key"])
+        return keys

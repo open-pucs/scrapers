@@ -44,8 +44,27 @@ def register_routes(app: FastAPI):
             state=state,
         )
 
-    @app.get("/api/caselist/{jurisdiction_name}/all/indexed_after/{rfc339_date}")
-    async def handle_caselist_jurisdiction_fetch(
+    @app.get("/api/caselist/{jurisdiction_name}/all")
+    async def handle_caselist_jurisdiction_fetch_all(
+        jurisdiction_name: str, limit: int = 1000
+    ) -> List[CaseInfo]:
+        """
+        Fetch case list for a specific jurisdiction after a given date.
+
+        Args:
+            jurisdiction_name (str): Name of the jurisdiction
+            rfc339_date (str): RFC3339 formatted timestamp
+            limit (int, optional): Maximum number of cases to return. Defaults to 1000.
+
+        Returns:
+            List[CaseInfo]: List of case information
+        """
+        return await get_last_updated_cases(
+            indexed_after=date, match_jurisdiction=jurisdiction_name, limit=limit
+        )
+
+    @app.get("/api/caselist/{jurisdiction_name}/indexed_after/{rfc339_date}")
+    async def handle_caselist_jurisdiction_fetch_date(
         jurisdiction_name: str, rfc339_date: str, limit: int = 1000
     ) -> List[CaseInfo]:
         """
