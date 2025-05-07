@@ -9,6 +9,8 @@ def Maybe(f: Callable) -> Callable:
     return lambda x: f(x) if x is not None else None
 
 
+DEEPINFRA_API_KEY = os.environ["DEEPINFRA_API_KEY"]
+
 OPENSCRAPERS_S3_CLOUD_REGION = os.environ.get("OPENSCRAPERS_S3_CLOUD_REGION", "sfo3")
 OPENSCRAPERS_S3_ENDPOINT = os.environ.get(
     "OPENSCRAPERS_S3_ENDPOINT", "https://sfo3.digitaloceanspaces.com"

@@ -22,11 +22,10 @@ import aiohttp
 import aiofiles
 import asyncio
 
-
 import pymupdf4llm
 import pymupdf
 
-from openpuc_scrapers.scrapers.base import validate_document_extension
+from openpuc_scrapers.scrapers.base import ValidExtension, validate_document_extension
 
 default_logger = logging.getLogger(__name__)
 
@@ -58,6 +57,56 @@ async def process_and_shipout_attachment_errorfree(
         return error_str
 
 
+async def generate_initial_attachment_text(
+    raw_attach: RawAttachment, file_path: Path
+) -> Optional[RawAttachmentText]:
+    match raw_attach.extension:
+        # TODO: Implement processing using pandoc for docx and doc text extraction.
+        case "pdf":
+
+            text = await asyncio.to_thread(lambda: parse_raw_pdf_text(file_path))
+            text_obj = RawAttachmentText(
+                quality=AttachmentTextQuality.low,
+                text=text,
+                language="en",
+                timestamp=rfc_time_now(),
+            )
+            return text_obj
+
+    return None
+
+
+def validate_file_against_extension(
+    extension: ValidExtension, filepath: Path
+) -> Optional[Exception]:
+    if extension == ValidExtension.PDF:
+        # Basic file existence check
+        if not filepath.is_file():
+            return FileNotFoundError(f"File {filepath} does not exist or is not a file")
+
+        try:
+            # Check PDF magic bytes (first 5 characters should be "%PDF-")
+            with filepath.open("rb") as f:
+                header = f.read(5)
+                if not header.startswith(b"%PDF-"):
+                    return ValueError(
+                        f"Invalid PDF header: {header[:5].decode('ascii', errors='replace')}"
+                    )
+
+            # TODO: Magic was causing depenency issues, removing for now. Plus the previous check should remove all the intentional html pages.
+            # # Check MIME type using file signature
+            # mime = magic.Magic(mime=True)
+            # detected_mime = mime.from_file(str(filepath))
+            # if detected_mime != "application/pdf":
+            #     return ValueError(f"Incorrect MIME type detected: {detected_mime}")
+
+        except Exception as e:
+            return e
+
+        return None
+    return None
+
+
 async def process_and_shipout_attachment(
     att: GenericAttachment,
 ) -> GenericAttachment:
@@ -68,27 +117,16 @@ async def process_and_shipout_attachment(
     str_url = str(att.url)
     tmp_filepath = await download_file_from_url_to_path(str_url)
     hash = blake2b_hash_from_file(tmp_filepath)
+    does_match_type = validate_file_against_extension(
+        extension=ValidExtension(valid_extension), filepath=tmp_filepath
+    )
+    if isinstance(does_match_type, Exception):
+        raise does_match_type
+
     att.hash = hash
     raw_attach = RawAttachment(
         hash=hash, name=att.name, extension=valid_extension, text_objects=[]
     )
-
-    async def generate_initial_attachment_text(
-        raw_attach: RawAttachment, file_path: Path
-    ) -> Optional[RawAttachmentText]:
-        match raw_attach.extension:
-            # TODO: Implement processing using pandoc for docx and doc text extraction.
-            case "pdf":
-                text = parse_raw_pdf_text(file_path)
-                text_obj = RawAttachmentText(
-                    quality=AttachmentTextQuality.low,
-                    text=text,
-                    language="en",
-                    timestamp=rfc_time_now(),
-                )
-                return text_obj
-
-        return None
 
     result_text = await generate_initial_attachment_text(raw_attach, tmp_filepath)
     if result_text is not None:

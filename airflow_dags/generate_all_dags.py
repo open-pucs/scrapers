@@ -92,7 +92,8 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             errored_json_redis_key = f"{queue_key}-errored"
             scraper = (scraper_info.object_type)()
             max_iter_per_concurrent_node = 100_000
-            completed_json = []
+            # completed_json = []
+            successfully_completed_tasks = 0
             errored_json = []
             for _ in range(max_iter_per_concurrent_node):
                 case_data = r.lpop(queue_key)
@@ -100,7 +101,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
                 if not case_data:
                     return {
                         "status": "COMPLETED",
-                        "results": completed_json,
+                        "successfully_completed_tasks": successfully_completed_tasks,
                         "errored": errored_json,
                     }
 
@@ -111,7 +112,9 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
                         case=case_obj["case_json"],
                         base_path=case_obj["base_path"],
                     )
-                    completed_json.append(result)
+                    # completed_json.append(result)
+                    successfully_completed_tasks = successfully_completed_tasks + 1
+
                 except Exception as e:
                     default_logger.error(
                         f"Encountered exception while processing doc: {e}"
@@ -131,13 +134,13 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
                         default_logger.error("Error pushing error to redis queue.")
 
                     default_logger.error(
-                        f"So far {len(errored_json)} have failed, compared to {len(completed_json)} successes."
+                        f"So far {len(errored_json)} have failed, compared to {successfully_completed_tasks} successes."
                     )
 
             return {
                 "status": "ERROR",
                 "error": f"Individual node tried to do more then {max_iter_per_concurrent_node} tasks",
-                "results": completed_json,
+                # "results": completed_json,
                 "errored": errored_json,
             }
 
