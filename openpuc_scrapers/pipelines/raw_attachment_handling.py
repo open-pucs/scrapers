@@ -21,7 +21,6 @@ from openpuc_scrapers.models.timestamp import RFC3339Time, rfc_time_now
 import aiohttp
 import aiofiles
 import asyncio
-import magic
 
 import pymupdf4llm
 import pymupdf
