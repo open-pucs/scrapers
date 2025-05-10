@@ -132,9 +132,10 @@ async def process_and_shipout_attachment(
         hash=hash, name=att.name, extension=valid_extension, text_objects=[]
     )
 
-    result_text = await generate_initial_attachment_text(raw_attach, tmp_filepath)
-    if result_text is not None:
-        raw_attach.text_objects = [result_text]
+    # TODO: Write an algortithm for processing pdf texts on the backend and remove that from the initial scraping operations.
+    # result_text = await generate_initial_attachment_text(raw_attach, tmp_filepath)
+    # if result_text is not None:
+    #     raw_attach.text_objects = [result_text]
 
     await push_raw_attach_to_s3_and_db(raw_attach, tmp_filepath)
     return att
