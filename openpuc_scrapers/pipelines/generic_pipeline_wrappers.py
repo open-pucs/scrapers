@@ -214,7 +214,7 @@ def get_all_caselist_raw(
     """Get full caselist with 2020+ date filtering"""
     # Validate date input
     if cutoff_date is None:
-        cutoff_date = rfc_time_from_string("2020-01-01T00:00:00Z")
+        cutoff_date = rfc_time_from_string("2010-01-01T00:00:00Z")
 
     # Get and save case list
     caselist_intermediate = scraper.universal_caselist_intermediate()
