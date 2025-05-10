@@ -93,13 +93,6 @@ def validate_file_against_extension(
                         f"Invalid PDF header: {header[:5].decode('ascii', errors='replace')}"
                     )
 
-            # TODO: Magic was causing depenency issues, removing for now. Plus the previous check should remove all the intentional html pages.
-            # # Check MIME type using file signature
-            # mime = magic.Magic(mime=True)
-            # detected_mime = mime.from_file(str(filepath))
-            # if detected_mime != "application/pdf":
-            #     return ValueError(f"Incorrect MIME type detected: {detected_mime}")
-
         except Exception as e:
             return e
 
@@ -115,13 +108,24 @@ async def process_and_shipout_attachment(
         raise valid_extension
 
     str_url = str(att.url)
+    retries = 3
     tmp_filepath = await download_file_from_url_to_path(str_url)
+    for attempt in range(retries + 1):
+        match_type_err = validate_file_against_extension(
+            extension=ValidExtension(valid_extension), filepath=tmp_filepath
+        )
+        if match_type_err is None:
+            break
+        else:
+            if attempt < retries - 1:
+                default_logger.warning(
+                    f"Download attempt {attempt + 1} failed: {match_type_err}"
+                )
+                await asyncio.sleep(20)
+                tmp_filepath = await download_file_from_url_to_path(str_url)
+            else:
+                raise match_type_err
     hash = blake2b_hash_from_file(tmp_filepath)
-    does_match_type = validate_file_against_extension(
-        extension=ValidExtension(valid_extension), filepath=tmp_filepath
-    )
-    if isinstance(does_match_type, Exception):
-        raise does_match_type
 
     att.hash = hash
     raw_attach = RawAttachment(

@@ -1,7 +1,7 @@
+from hashlib import blake2b
 from typing import Annotated, Union
 import base64
 from pathlib import Path
-from hashlib import blake2b
 from pydantic import (
     BaseModel,
     BeforeValidator,
