@@ -25,7 +25,9 @@ from openpuc_scrapers.models.raw_attachments import AttachmentTextQuality, RawAt
 from openpuc_scrapers.pipelines.raw_attachment_handling import (
     download_file_from_url_to_path,
     generate_initial_attachment_text,
+    validate_file_against_extension,
 )
+from openpuc_scrapers.scrapers.base import ValidExtension, validate_document_extension
 
 default_logger = logging.getLogger(__name__)
 
@@ -114,6 +116,24 @@ async def rectify_raw_attachment_raw(
     attachment: RawAttachment,
 ) -> Tuple[bool, RawAttachment]:
     did_rectify = False
+    stripped_extension = attachment.extension.removeprefix(
+        "ValidDocumentExtensions."
+    ).lower()
+    if stripped_extension != attachment.extension:
+        attachment.extension = stripped_extension
+        did_rectify = True
+    if attachment.extension != "pdf":
+        default_logger.info("Found non pdf file. Skipping.")
+        return (did_rectify, attachment)
+    deep_rectify = True
+    filepath = await fetch_attachment_file_from_s3(attachment.hash)
+    if deep_rectify:
+        valid_extension = ValidExtension(stripped_extension)
+        is_valid_file = validate_file_against_extension(
+            extension=valid_extension, filepath=filepath
+        )
+        if is_valid_file is not None:
+            raise is_valid_file
     if len(attachment.text_objects) > 0:
         should_skip = (
             len(attachment.text_objects) == 1
@@ -122,17 +142,7 @@ async def rectify_raw_attachment_raw(
         )
         if not should_skip:
             return (did_rectify, attachment)
-    stripped_extension = attachment.extension.removeprefix(
-        "ValidDocumentExtensions."
-    ).lower()
-    if stripped_extension != attachment.extension:
-        attachment.extension = stripped_extension
-        did_rectify = True
-    if attachment.extension != "pdf":
-        default_logger.info("Found non pdf data with no text data. Skipping.")
-        return (did_rectify, attachment)
     default_logger.error("Attempting to process pdf file.")
-    filepath = await fetch_attachment_file_from_s3(attachment.hash)
     text_obj = await generate_initial_attachment_text(
         raw_attach=attachment, file_path=filepath
     )
