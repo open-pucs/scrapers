@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Any
 from pydantic import BaseModel
@@ -7,8 +8,8 @@ from openpuc_scrapers.db.s3_utils import S3FileManager
 
 
 # Helper functions
-def save_to_disk_and_s3(path: str, bucket: str, content: str) -> None:
-    S3FileManager(bucket).save_string_to_remote_file(path, content)
+async def save_to_disk_and_s3_async(path: str, bucket: str, content: str) -> None:
+    await S3FileManager(bucket).save_string_to_remote_file_async(path, content)
 
 
 # Takes in a dict, a pydantic BaseModel, or a List[BaseModel]
@@ -31,6 +32,6 @@ def create_json_string(data: Any) -> str:
     raise ValueError(f"Unsupported data type: {type(data)}")
 
 
-def save_json(path: str, bucket: str, data: Any) -> None:
+def save_json_sync(path: str, bucket: str, data: Any) -> None:
     json_str = create_json_string(data)
-    save_to_disk_and_s3(path, bucket, json_str)
+    asyncio.run(save_to_disk_and_s3_async(path, bucket, json_str))

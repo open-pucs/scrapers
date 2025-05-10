@@ -20,7 +20,7 @@ from openpuc_scrapers.models.timestamp import (
     rfc_time_now,
     rfctime_serializer,
 )
-from openpuc_scrapers.pipelines.helper_utils import save_json
+from openpuc_scrapers.pipelines.helper_utils import save_json_sync
 from openpuc_scrapers.pipelines.raw_attachment_handling import process_generic_filing
 from openpuc_scrapers.scrapers.base import (
     GenericScraper,
@@ -82,12 +82,12 @@ def process_case(
 
     # Save state-specific case data
     case_path = f"{base_path}/initial_cases/case_{case_num}.json"
-    save_json(path=case_path, bucket=OPENSCRAPERS_S3_OBJECT_BUCKET, data=case)
+    save_json_sync(path=case_path, bucket=OPENSCRAPERS_S3_OBJECT_BUCKET, data=case)
 
     # Process filings
     filings_intermediate = scraper.filing_data_intermediate(case)
     filings_path = f"{base_path}/intermediate_caseinfo/case_{case_num}.json"
-    save_json(
+    save_json_sync(
         path=filings_path,
         bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=filings_intermediate,
@@ -95,7 +95,7 @@ def process_case(
 
     filings = scraper.filing_data_from_intermediate(filings_intermediate)
     filings_json_path = f"{base_path}/filings/case_{case_num}.json"
-    save_json(
+    save_json_sync(
         path=filings_json_path,
         bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=filings,
@@ -219,7 +219,7 @@ def get_all_caselist_raw(
     # Get and save case list
     caselist_intermediate = scraper.universal_caselist_intermediate()
     caselist_path = f"{base_path}/caselist.json"
-    save_json(
+    save_json_sync(
         path=caselist_path,
         bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=caselist_intermediate,
@@ -254,7 +254,7 @@ def get_new_caselist_since_date(
     # Get and save updated cases
     updated_intermediate = scraper.updated_cases_since_date_intermediate(after_date)
     updated_path = f"{base_path}/updated_cases.json"
-    save_json(
+    save_json_sync(
         path=updated_path,
         bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=updated_intermediate,
