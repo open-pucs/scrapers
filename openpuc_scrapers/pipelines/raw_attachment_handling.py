@@ -93,13 +93,6 @@ def validate_file_against_extension(
                         f"Invalid PDF header: {header[:5].decode('ascii', errors='replace')}"
                     )
 
-            # TODO: Magic was causing depenency issues, removing for now. Plus the previous check should remove all the intentional html pages.
-            # # Check MIME type using file signature
-            # mime = magic.Magic(mime=True)
-            # detected_mime = mime.from_file(str(filepath))
-            # if detected_mime != "application/pdf":
-            #     return ValueError(f"Incorrect MIME type detected: {detected_mime}")
-
         except Exception as e:
             return e
 
