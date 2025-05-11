@@ -174,7 +174,9 @@ class ValidExtension(str, Enum):
 
 
 def validate_document_extension(string: str) -> Union[str, Exception]:
-    striped_lowercase = string.strip().lower()
+    # added the strip to deal with this annoyance
+    # [2025-05-11, 00:38:51 UTC] {base.py:185} ERROR - Encountered invalid document extension, pdf (66 kb): 'pdf (66 kb)' is not a valid ValidExtension
+    striped_lowercase = string.strip().split(" ")[0].strip().lower()
     try:
         enumed_extension = ValidExtension(striped_lowercase)
         return enumed_extension.value
