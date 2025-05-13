@@ -5,6 +5,7 @@ from openpuc_scrapers.db.s3_wrapper import S3FileManager
 from openpuc_scrapers.db.sql_utilities import CaseInfo, set_case_as_updated
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.constants import (
+    OPENSCRAPERS_S3_ENDPOINT,
     OPENSCRAPERS_S3_OBJECT_BUCKET,
 )
 from openpuc_scrapers.models.hashes import Blake2bHash, blake2b_to_str
@@ -27,6 +28,11 @@ def get_raw_attach_obj_key(hash: Blake2bHash) -> str:
 
 def get_raw_attach_file_key(hash: Blake2bHash) -> str:
     return f"raw/file/{blake2b_to_str(hash)}"
+
+
+def generate_s3_object_uri_from_key(key: str) -> str:
+    stripped_endpoint = OPENSCRAPERS_S3_ENDPOINT.removeprefix("https://")
+    return f"https://{OPENSCRAPERS_S3_OBJECT_BUCKET}.{stripped_endpoint}/{key}"
 
 
 async def fetch_case_filing_from_s3(
@@ -63,13 +69,14 @@ async def fetch_attachment_file_from_s3(hash: Blake2bHash) -> Path:
 
 
 async def push_raw_attach_to_s3_and_db(
-    raw_att: RawAttachment, file_path: Optional[Path]
+    raw_att: RawAttachment, file_path: Optional[Path], file_only: bool = False
 ) -> None:
     dumped_data = raw_att.model_dump_json()
     obj_key = get_raw_attach_obj_key(raw_att.hash)
     file_key = get_raw_attach_file_key(raw_att.hash)
     s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
-    await s3.save_string_to_remote_file_async(key=obj_key, content=dumped_data)
+    if not file_only:
+        await s3.save_string_to_remote_file_async(key=obj_key, content=dumped_data)
     # Immutable is true for this line since any file will always get saved with the same hash.
     if file_path is None:
         does_exist = await s3.check_if_file_exists(file_upload_key=file_key)
