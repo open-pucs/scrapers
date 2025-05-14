@@ -41,6 +41,8 @@ LOCAL_CACHE_DIR: Optional[Path] = (
     else Path(os.environ.get("LOCAL_CACHE_DIR"))
 )
 
+CRIMSON_URL = os.environ["CRIMSON_URL"]
+
 OPENSCRAPERS_S3_ACCESS_KEY = os.environ["OPENSCRAPERS_S3_ACCESS_KEY"]
 OPENSCRAPERS_S3_SECRET_KEY = os.environ["OPENSCRAPERS_S3_SECRET_KEY"]
 

@@ -5,10 +5,18 @@ from pathlib import Path
 from typing import List, Optional, Union
 from pydantic import BaseModel, HttpUrl
 
-from openpuc_scrapers.db.s3_utils import push_raw_attach_to_s3_and_db
+from openpuc_scrapers.db.s3_utils import (
+    generate_s3_object_uri_from_key,
+    get_raw_attach_file_key,
+    push_raw_attach_to_s3_and_db,
+)
 from openpuc_scrapers.db.s3_wrapper import S3FileManager, rand_filepath
 from openpuc_scrapers.models.attachment import GenericAttachment
-from openpuc_scrapers.models.constants import OPENSCRAPERS_S3_OBJECT_BUCKET, TMP_DIR
+from openpuc_scrapers.models.constants import (
+    CRIMSON_URL,
+    OPENSCRAPERS_S3_OBJECT_BUCKET,
+    TMP_DIR,
+)
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.hashes import Blake2bHash, blake2b_hash_from_file
 from openpuc_scrapers.models.raw_attachments import (
@@ -58,13 +66,13 @@ async def process_and_shipout_attachment_errorfree(
 
 
 async def generate_initial_attachment_text(
-    raw_attach: RawAttachment, file_path: Path
+    raw_attach: RawAttachment,
 ) -> Optional[RawAttachmentText]:
     match raw_attach.extension:
         # TODO: Implement processing using pandoc for docx and doc text extraction.
         case "pdf":
+            text = await process_pdf_text_using_crimson(raw_attach.hash)
 
-            text = await asyncio.to_thread(lambda: parse_raw_pdf_text(file_path))
             text_obj = RawAttachmentText(
                 quality=AttachmentTextQuality.low,
                 text=text,
@@ -133,11 +141,17 @@ async def process_and_shipout_attachment(
     )
 
     # TODO: Write an algortithm for processing pdf texts on the backend and remove that from the initial scraping operations.
-    # result_text = await generate_initial_attachment_text(raw_attach, tmp_filepath)
-    # if result_text is not None:
-    #     raw_attach.text_objects = [result_text]
 
-    await push_raw_attach_to_s3_and_db(raw_attach, tmp_filepath)
+    await push_raw_attach_to_s3_and_db(
+        raw_att=raw_attach, file_path=tmp_filepath, file_only=True
+    )
+    result_text = await generate_initial_attachment_text(raw_attach)
+    if result_text is not None:
+        raw_attach.text_objects = [result_text]
+    await push_raw_attach_to_s3_and_db(
+        raw_att=raw_attach, file_path=tmp_filepath, file_only=False
+    )
+
     return att
 
 
@@ -157,23 +171,67 @@ async def download_file_from_url_to_path(url: str) -> Path:
     return rand_path
 
 
-def parse_raw_pdf_text(pdf_file_path: Path) -> str:
-    full_text = []
+class CrimsonPDFIngestParamsS3(BaseModel):
+    s3_uri: str
+    langs: Optional[str] = None
+    force_ocr: Optional[bool] = None
+    paginate: Optional[bool] = None
+    disable_image_extraction: Optional[bool] = None
+    max_pages: Optional[int] = None
 
-    def combine_pdf_text_pages(page_texts: List[str]) -> str:
-        def page_seperator(page_num: int) -> str:
-            return f"<!-- Page {page_num} -->"
 
-        complete_text = ""
-        for index in range(len(page_texts)):
-            complete_text += page_texts[index] + page_seperator(index + 1)
-        return complete_text
+class DocStatusResponse(BaseModel):
+    request_id: str
+    request_check_url: str
+    markdown: Optional[str] = None
+    status: str
+    success: bool
+    completed: bool
+    images: Optional[dict[str, str]] = None
+    metadata: Optional[dict[str, str]] = None
+    error: Optional[str] = None
 
-    with pymupdf.open(pdf_file_path) as doc:
-        markdown_chunked_objects: List[dict] = pymupdf4llm.to_markdown(
-            doc, page_chunks=True
-        )  # This seems to run contrary to their own documentation
-        for chunked_page in markdown_chunked_objects:
-            full_text.append(chunked_page.get("text"))
 
-    return combine_pdf_text_pages(page_texts=full_text)
+async def process_pdf_text_using_crimson(attachment_hash_from_s3: Blake2bHash) -> str:
+    # build S3 URL from your attachment
+    hash_ = attachment_hash_from_s3
+    assert hash_ is not None, "Attachment hash cannot be None"
+    file_key = get_raw_attach_file_key(hash_)
+    s3_url = generate_s3_object_uri_from_key(file_key)
+
+    # create your params
+    crimson_params = CrimsonPDFIngestParamsS3(s3_uri=s3_url)
+    base_url = CRIMSON_URL.rstrip("/")
+
+    # 1) POST to /v1/ingest/s3
+    post_url = f"{base_url}/v1/ingest/s3"
+    async with aiohttp.ClientSession() as session:
+        async with session.post(post_url, json=crimson_params.dict()) as resp:
+            resp.raise_for_status()
+            init_data = await resp.json()
+
+        # extract the leaf and build full check URL
+        leaf = init_data["request_check_leaf"]
+        check_url = f"{base_url}/{leaf.lstrip('/')}"
+
+        # 2) poll every 3 seconds
+        while True:
+            await asyncio.sleep(3)
+            async with session.get(check_url) as status_resp:
+                status_resp.raise_for_status()
+                status_data = await status_resp.json()
+
+            if status_data.get("completed"):
+                if status_data.get("success"):
+                    # 3) return the markdown when done
+                    markdown = status_data.get("markdown", "")
+                    return markdown
+                else:
+                    error = status_data.get("error")
+                    raise Exception(f"Encountered error processing pdf: {error}")
+
+            # else loop again until success
+
+
+# Example usage:
+# result_md = await process_pdf_text_using_crimson(my_attachment, "some/s3/key.pdf")

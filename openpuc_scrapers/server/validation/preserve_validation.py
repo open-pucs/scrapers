@@ -143,9 +143,7 @@ async def rectify_raw_attachment_raw(
         if not should_skip:
             return (did_rectify, attachment)
     default_logger.error("Attempting to process pdf file.")
-    text_obj = await generate_initial_attachment_text(
-        raw_attach=attachment, file_path=filepath
-    )
+    text_obj = await generate_initial_attachment_text(raw_attach=attachment)
     if text_obj is None:
         raise Exception(
             f"Failed to process pdf text for raw attachment: {attachment.hash} dispite the document being a pdf."
