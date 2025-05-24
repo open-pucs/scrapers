@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, Union
+from typing import Annotated, List, Union
 from datetime import date, datetime, timezone
 
 from pydantic import BeforeValidator, PlainSerializer
@@ -61,6 +61,54 @@ def rfctime_serializer(input: datetime) -> str:
 RFC3339Time = Annotated[
     datetime, BeforeValidator(to_rfc339_time), PlainSerializer(rfctime_serializer)
 ]
+
+
+def is_before(rfctime: RFC3339Time, compare_to: RFC3339Time) -> bool:
+    return rfctime <= compare_to
+
+
+def is_after(rfctime: RFC3339Time, compare_to: RFC3339Time) -> bool:
+    return rfctime >= compare_to
+
+
+def is_between(rfctime: RFC3339Time, start: RFC3339Time, end: RFC3339Time) -> bool:
+    return start <= rfctime <= end
+
+
+def get_beginning_of_year_time(year: int) -> RFC3339Time:
+    return date_to_rfctime(date=date(year, 1, 1))
+
+
+def time_is_in_yearlist(years: List[int], rfctime: RFC3339Time) -> bool:
+    if not years:
+        return False
+
+    sorted_years = sorted(set(years))
+    intervals = []
+    current_start = sorted_years[0]
+    current_end = current_start + 1
+
+    for year in sorted_years[1:]:
+        if year == current_end:
+            current_end = year + 1
+        else:
+            intervals.append((current_start, current_end))
+            current_start = year
+            current_end = year + 1
+    intervals.append((current_start, current_end))
+
+    for start_year, end_year in intervals:
+        if is_between(
+            rfctime=rfctime,
+            start=get_beginning_of_year_time(start_year),
+            end=get_beginning_of_year_time(end_year),
+        ):
+            return True
+    return False
+
+
+def time_is_in_year(year: int, rfctime: RFC3339Time) -> bool:
+    return time_is_in_yearlist(years=[year], rfctime=rfctime)
 
 
 def rfc_time_from_string(input: str) -> RFC3339Time:
