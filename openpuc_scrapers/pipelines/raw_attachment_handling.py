@@ -172,13 +172,13 @@ async def push_raw_attach_and_process_text(
             raw_att.text_objects.extend(s3_metadata.text_objects)
     else:
         file_key = get_raw_attach_file_key(raw_att.hash)
+        await s3.push_file_to_s3_async(
+            filepath=file_path, file_upload_key=file_key, immutable=True
+        )
         if len(raw_att.text_objects) == 0:
             new_text = await generate_initial_attachment_text(raw_att)
             if new_text is not None:
                 raw_att.text_objects.append(new_text)
-        await s3.push_file_to_s3_async(
-            filepath=file_path, file_upload_key=file_key, immutable=True
-        )
     obj_key = get_raw_attach_obj_key(raw_att.hash)
     dumped_data = raw_att.model_dump_json()
     await s3.save_string_to_remote_file_async(key=obj_key, content=dumped_data)
