@@ -1,13 +1,13 @@
-from enum import Enum
-from hmac import new
 import logging
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 from pydantic import BaseModel, HttpUrl
 
 from openpuc_scrapers.db.s3_utils import (
+    does_openscrapers_attachment_exist,
     generate_s3_object_uri_from_key,
     get_raw_attach_file_key,
+    get_raw_attach_obj_key,
     push_raw_attach_to_s3_and_db,
 )
 from openpuc_scrapers.db.s3_wrapper import S3FileManager, rand_filepath
@@ -29,9 +29,6 @@ from openpuc_scrapers.models.timestamp import RFC3339Time, rfc_time_now
 import aiohttp
 import aiofiles
 import asyncio
-
-import pymupdf4llm
-import pymupdf
 
 from openpuc_scrapers.scrapers.base import ValidExtension, validate_document_extension
 
@@ -150,18 +147,47 @@ async def process_and_shipout_attachment(
     )
 
     # TODO: Write an algortithm for processing pdf texts on the backend and remove that from the initial scraping operations.
-
-    await push_raw_attach_to_s3_and_db(
-        raw_att=raw_attach, file_path=tmp_filepath, file_only=True
-    )
-    result_text = await generate_initial_attachment_text(raw_attach)
-    if result_text is not None:
-        raw_attach.text_objects = [result_text]
-    await push_raw_attach_to_s3_and_db(
-        raw_att=raw_attach, file_path=tmp_filepath, file_only=False
-    )
+    await push_raw_attach_and_process_text(raw_att=raw_attach, file_path=tmp_filepath)
 
     return att
+
+
+async def push_raw_attach_and_process_text(
+    raw_att: RawAttachment, file_path: Path
+) -> None:
+
+    s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
+    file_exists = await does_openscrapers_attachment_exist(raw_att.hash)
+
+    if file_exists:
+        s3_metadata_string = await s3.download_s3_file_to_string_async(
+            get_raw_attach_obj_key(raw_att.hash)
+        )
+        s3_metadata = RawAttachment.model_validate_json(s3_metadata_string)
+        if len(raw_att.text_objects) == 0:
+            if len(s3_metadata.text_objects) == 0:
+                new_text = await generate_initial_attachment_text(raw_att)
+                if new_text is not None:
+                    s3_metadata.text_objects.append(new_text)
+            raw_att.text_objects.extend(s3_metadata.text_objects)
+    else:
+        file_key = get_raw_attach_file_key(raw_att.hash)
+        if len(raw_att.text_objects) == 0:
+            new_text = await generate_initial_attachment_text(raw_att)
+            if new_text is not None:
+                raw_att.text_objects.append(new_text)
+        await s3.push_file_to_s3_async(
+            filepath=file_path, file_upload_key=file_key, immutable=True
+        )
+    obj_key = get_raw_attach_obj_key(raw_att.hash)
+    dumped_data = raw_att.model_dump_json()
+    await s3.save_string_to_remote_file_async(key=obj_key, content=dumped_data)
+    # Immutable is true for this line since any file will always get saved with the same hash.
+    file_exists = await does_openscrapers_attachment_exist(raw_att.hash)
+    if not file_exists:
+        raise Exception(
+            "File failed to upload to s3, and doesnt exist when s3 is polled"
+        )
 
 
 async def download_file_from_url_to_path(url: str) -> Path:

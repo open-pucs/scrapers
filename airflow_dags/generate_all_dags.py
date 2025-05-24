@@ -40,15 +40,16 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
     )
     def scraper_dag():
         @task
-        def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[str]:
+        def get_all_caselist_raw_airflow(
+            scraper: Any, base_path: str, params: dict
+        ) -> List[str]:
             import logging
 
             logger = logging.getLogger("initialize_caselist")
-            year_list = json.loads("{{ params.after_date }}")
+            year_list = json.loads(f"{params["year_list"]}")
             logger.info(
                 f"Successfully parsed year list, scraping from cases started in:{year_list}"
             )
-            year_list = [2024]
             json_list = get_all_caselist_raw_jsonified(
                 scraper=scraper, base_path=base_path, year_list=year_list
             )

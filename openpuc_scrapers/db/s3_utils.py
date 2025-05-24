@@ -12,9 +12,6 @@ from openpuc_scrapers.models.constants import (
 from openpuc_scrapers.models.hashes import Blake2bHash, blake2b_to_str
 from openpuc_scrapers.models.raw_attachments import RawAttachment
 from openpuc_scrapers.models.timestamp import rfc_time_now
-from openpuc_scrapers.pipelines.raw_attachment_handling import (
-    generate_initial_attachment_text,
-)
 
 
 default_logger = logging.getLogger(__name__)
@@ -97,44 +94,6 @@ async def push_raw_attach_to_s3_and_db(
     await s3.push_file_to_s3_async(
         filepath=file_path, file_upload_key=file_key, immutable=True
     )
-
-
-async def push_raw_attach_and_process_text(
-    raw_att: RawAttachment, file_path: Path
-) -> None:
-
-    s3 = S3FileManager(bucket=OPENSCRAPERS_S3_OBJECT_BUCKET)
-    file_exists = await does_openscrapers_attachment_exist(raw_att.hash)
-
-    if file_exists:
-        s3_metadata_string = await s3.download_s3_file_to_string_async(
-            get_raw_attach_obj_key(raw_att.hash)
-        )
-        s3_metadata = RawAttachment.model_validate_json(s3_metadata_string)
-        if len(raw_att.text_objects) == 0:
-            if len(s3_metadata.text_objects) == 0:
-                new_text = await generate_initial_attachment_text(raw_att)
-                if new_text is not None:
-                    s3_metadata.text_objects.append(new_text)
-            raw_att.text_objects.extend(s3_metadata.text_objects)
-    else:
-        file_key = get_raw_attach_file_key(raw_att.hash)
-        if len(raw_att.text_objects) == 0:
-            new_text = await generate_initial_attachment_text(raw_att)
-            if new_text is not None:
-                raw_att.text_objects.append(new_text)
-        await s3.push_file_to_s3_async(
-            filepath=file_path, file_upload_key=file_key, immutable=True
-        )
-    obj_key = get_raw_attach_obj_key(raw_att.hash)
-    dumped_data = raw_att.model_dump_json()
-    await s3.save_string_to_remote_file_async(key=obj_key, content=dumped_data)
-    # Immutable is true for this line since any file will always get saved with the same hash.
-    file_exists = await does_openscrapers_attachment_exist(raw_att.hash)
-    if not file_exists:
-        raise Exception(
-            "File failed to upload to s3, and doesnt exist when s3 is polled"
-        )
 
 
 async def does_openscrapers_attachment_exist(hash: Blake2bHash) -> bool:

@@ -223,8 +223,9 @@ def filter_off_filings_in_yearlist(
                 f"Case {generic_case.case_number} missing opened_date, excluding from results"
             )
             continue
-
-        if time_is_in_yearlist(rfctime=opened_date, years=yearlist):
+        if len(filtered_cases) == 0:
+            filtered_cases.append(case)
+        elif time_is_in_yearlist(rfctime=opened_date, years=yearlist):
             filtered_cases.append(case)
         else:
             pass
@@ -256,14 +257,10 @@ def get_all_caselist_raw(
 
     # Process cases and apply date filter
     state_cases = scraper.universal_caselist_from_intermediate(caselist_intermediate)
-    filtered_cases = filter_off_filings_after_date(
-        scraper=scraper, caselist=state_cases, after_date=cutoff_date
+    filtered_cases = filter_off_filings_in_yearlist(
+        scraper=scraper, caselist=state_cases, yearlist=year_list
     )
 
-    default_logger.info(
-        f"Initial caselist filtered from {len(state_cases)} to {len(filtered_cases)} "
-        f"cases after {cutoff_date}"
-    )
     return filtered_cases
 
 
