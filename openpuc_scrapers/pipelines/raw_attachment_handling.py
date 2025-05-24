@@ -2,7 +2,7 @@ from enum import Enum
 from hmac import new
 import logging
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 from pydantic import BaseModel, HttpUrl
 
 from openpuc_scrapers.db.s3_utils import (
@@ -38,20 +38,29 @@ from openpuc_scrapers.scrapers.base import ValidExtension, validate_document_ext
 default_logger = logging.getLogger(__name__)
 
 
-async def process_generic_filing(filing: GenericFiling) -> GenericFiling:
-    default_logger.info(f"Starting to process filing{filing.name}")
+async def process_generic_filing(
+    filing: GenericFiling,
+) -> Tuple[GenericFiling, int, int]:
+    """
+    Processes all attachments for a given filing, returning the updated filing
+    along with counts of successful and errored attachments.
+    """
     attachments = filing.attachments
-    tasks = []
-    for att in attachments:
-        tasks.append(process_and_shipout_attachment_errorfree(att))
+    tasks = [process_and_shipout_attachment_errorfree(att) for att in attachments]
     new_attachments = await asyncio.gather(*tasks)
+
     errorfree_attachments = []
+    success_count = 0
+    error_count = 0
     for att in new_attachments:
         if isinstance(att, GenericAttachment):
             errorfree_attachments.append(att)
-    default_logger.info(f"Finished processing filing{filing.name}")
+            success_count += 1
+        else:
+            error_count += 1
+
     filing.attachments = errorfree_attachments
-    return filing
+    return filing, success_count, error_count
 
 
 async def process_and_shipout_attachment_errorfree(

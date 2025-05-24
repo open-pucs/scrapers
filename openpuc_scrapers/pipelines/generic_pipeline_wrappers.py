@@ -2,7 +2,7 @@ import logging
 import traceback
 import time
 import random
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 from datetime import date, datetime, timezone
 from pydantic import BaseModel
 
@@ -109,26 +109,35 @@ def process_case(
         generic_filing = scraper.into_generic_filing_data(filing)
         case_specific_generic_cases.append(generic_filing)
 
-    default_logger.info("Starting Async Case Processing")
+    async def async_shit(case: GenericCase) -> Tuple[GenericCase, int, int]:
+        """
+        Processes all filings for a case, returning the updated case with
+        total counts of successful and errored attachments across all filings.
+        """
+        # Schedule processing for each generic filing
+        tasks = [process_generic_filing(f) for f in case_specific_generic_cases]
+        results = await asyncio.gather(*tasks)
 
-    async def async_shit(case: GenericCase) -> GenericCase:
-        tasks = []
-        for generic_filing in case_specific_generic_cases:
-            # FIXME : What do I do about async with flyte????
-            default_logger.info("Adding Generic Filing Task")
-            tasks.append(process_generic_filing(generic_filing))
-        default_logger.info("Begin Processing Filings")
-        result_generic_filings = await asyncio.gather(*tasks)
-        default_logger.info("Finish Processing Filings")
-        case.filings = result_generic_filings
+        # Aggregate success and error counts and update filings
+        total_success = sum(success for (_, success, _) in results)
+        total_error = sum(error for (_, _, error) in results)
+        case.filings = [f for (f, _, _) in results]
+
+        # Push updated case
         await push_case_to_s3_and_db(
             case=case,
             jurisdiction_name=scraper.jurisdiction_name,
             state=scraper.state,
         )
-        return case
 
-    return_generic_case = asyncio.run(async_shit(generic_case))
+        return case, total_success, total_error
+
+    return_generic_case, success_count, error_count = asyncio.run(
+        async_shit(generic_case)
+    )
+    default_logger.info(
+        f"Of all the attachments in this case, {success_count} were uploaded successfully, and {error_count} encountered an error."
+    )
     return return_generic_case
 
 
