@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pathlib import Path
 from typing import List, Optional
@@ -71,6 +72,7 @@ async def fetch_attachment_file_from_s3(hash: Blake2bHash) -> Path:
 async def push_raw_attach_to_s3_and_db(
     raw_att: RawAttachment, file_path: Optional[Path], file_only: bool = False
 ) -> None:
+
     dumped_data = raw_att.model_dump_json()
     obj_key = get_raw_attach_obj_key(raw_att.hash)
     file_key = get_raw_attach_file_key(raw_att.hash)
@@ -93,7 +95,20 @@ async def push_raw_attach_to_s3_and_db(
         filepath=file_path, file_upload_key=file_key, immutable=True
     )
 
-    # TODO: Maybe update db that the file has been updated?
+
+async def does_openscrapers_attachment_exist(hash: Blake2bHash) -> bool:
+    bucket = OPENSCRAPERS_S3_OBJECT_BUCKET
+    s3 = S3FileManager(bucket=bucket)
+    obj_key = get_raw_attach_obj_key(hash)
+    file_key = get_raw_attach_file_key(hash)
+    try:
+        do_files_exist_list = await asyncio.gather(
+            s3.check_if_file_exists(file_upload_key=obj_key, bucket=bucket),
+            s3.check_if_file_exists(file_upload_key=file_key, bucket=bucket),
+        )
+        return do_files_exist_list[0] and do_files_exist_list[1]
+    except Exception as e:
+        return False
 
 
 async def push_case_to_s3_and_db(

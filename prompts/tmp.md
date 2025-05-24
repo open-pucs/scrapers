@@ -1,40 +1,37 @@
+Here is this code snippet from some document processing code in
+/home/nicole/Documents/mycorrhizae/open-scrapers/openpuc_scrapers/pipelines/generic_pipeline_wrappers.py
 
-Here is the beginnings of the thing 
 ```py
-class CrimsonPDFIngestParamsS3(BaseModel):
-    s3_uri: str
-    langs: Optional[str] = None
-    force_ocr: Optional[bool] = None
-    paginate: Optional[bool] = None
-    disable_image_extraction: Optional[bool] = None
-    max_pages: Optional[int] = None
+    case_specific_generic_cases = []
+    for filing in filings:
+        generic_filing = scraper.into_generic_filing_data(filing)
+        case_specific_generic_cases.append(generic_filing)
 
 
-class DocStatusResponse(BaseModel):
-    request_id: str
-    request_check_url: str
-    request_check_leaf: str
-    markdown: Optional[str] = None
-    status: str
-    success: bool
-    images: Optional[dict[str, str]] = None
-    metadata: Optional[dict[str, str]] = None
-    error: Optional[str] = None
+    async def async_shit(case: GenericCase) -> Tuple[GenericCase, int, int]:
+        tasks = []
+        for generic_filing in case_specific_generic_cases:
+            tasks.append(process_generic_filing(generic_filing))
+        result_generic_filings = await asyncio.gather(*tasks)
+        case.filings = result_generic_filings
+        await push_case_to_s3_and_db(
+            case=case,
+            jurisdiction_name=scraper.jurisdiction_name,
+            state=scraper.state,
+        )
+        # TODO: Compute the success count for all attachments, and the error count for all attachments, and return them with the function:
+        return case
 
-
-async def process_pdf_text_using_crimson(att: GenericAttachment, s3_key: str) -> str:
-    hash = att.hash
-    assert hash is not None
-    file_key = get_raw_attach_file_key(hash)
-    s3_url = generate_s3_object_uri_from_key(file_key)
-    crimson_params = CrimsonPDFIngestParamsS3(s3_uri=s3_url)
-    base_url = CRIMSON_URL
-    
-
-    return "blaah"
+    return_generic_case, success_count, error_count = asyncio.run(
+        async_shit(generic_case)
+    )
+    default_logger.info(
+        f"Of all the attachments in this case, {success_count} were uploaded successfully, and {error_count} encountered an error."
+    )
+    return return_generic_case
 ```
 
-I want you to post the crimson params to 
-/v1/ingest/s3
+Could you descent into the process_generic_filing code to get it to return a success and errored count, tally tghem all together and return it out so it can be logged.
 
-and then take the request_check_leaf add the base_url too it and poll the resulting url with a get request once every 3 seconds until the success boolean is true, then return the markdown element. Use asyncio in python if possible.
+
+

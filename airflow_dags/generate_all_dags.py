@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import json
 import os
 from typing import Any, List, Tuple
 from airflow.decorators import dag, task
@@ -31,14 +32,26 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         schedule_interval=None,
         dag_id=f"{scraper_info.id}_all_cases",
         tags=["scrapers", "all_cases", scraper_info.id],
+        params={
+            "year_list": "[]",
+        },
         max_active_tasks=20,
         concurrency=10,
     )
     def scraper_dag():
         @task
-        def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[str]:
+        def get_all_caselist_raw_airflow(
+            scraper: Any, base_path: str, params: dict
+        ) -> List[str]:
+            import logging
+
+            logger = logging.getLogger("initialize_caselist")
+            year_list = json.loads(f"{params["year_list"]}")
+            logger.info(
+                f"Successfully parsed year list, scraping from cases started in:{year_list}"
+            )
             json_list = get_all_caselist_raw_jsonified(
-                scraper=scraper, base_path=base_path
+                scraper=scraper, base_path=base_path, year_list=year_list
             )
             return json_list
 
@@ -156,67 +169,6 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         # Create independent parallel tasks that will each process until queue is empty
         for _ in range(concurrency_limit):
             process_concurrent_cases_airflow(queue_key)
-
-    return scraper_dag()
-
-
-def create_scraper_allcases_dag_simple(scraper_info: ScraperInfoObject) -> Any:
-    """Factory function to create DAG for a specific scraper"""
-
-    @dag(
-        default_args=default_args,
-        schedule_interval=None,
-        dag_id=f"{scraper_info.id}_all_cases",
-        tags=["scrapers", "all_cases", scraper_info.id],
-        max_active_tasks=20,  # Overall DAG concurrency
-        concurrency=10,  # Match task concurrency
-    )
-    def scraper_dag():
-        @task
-        def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[str]:
-            return get_all_caselist_raw_jsonified(scraper=scraper, base_path=base_path)
-
-        @task
-        def shuffle_split_string_list_airflow(
-            biglist: List[str], split_number: int
-        ) -> List[List[str]]:
-            return shuffle_split_string_list(biglist=biglist, split_number=split_number)
-
-        @task(
-            execution_timeout=timedelta(minutes=15),  # Add safety timeout
-        )
-        def process_case_airflow_bulk(
-            scraper: Any, cases: List[str], base_path: str
-        ) -> List[str]:
-            """Process individual case with concurrency limits and retries"""
-
-            return process_case_jsonified_bulk(
-                scraper=scraper, cases=cases, base_path=base_path
-            )
-
-        @task(
-            execution_timeout=timedelta(minutes=15),  # Add safety timeout
-        )
-        def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:
-            """Process individual case with concurrency limits and retries"""
-
-            return process_case_jsonified(
-                scraper=scraper, case=case, base_path=base_path
-            )
-
-        # DAG structure - now uses fixed scraper name
-        scraper = (scraper_info.object_type)()
-        base_path = generate_intermediate_object_save_path(scraper)
-        cases = get_all_caselist_raw_airflow(scraper=scraper, base_path=base_path)
-        concurrency_num = 10
-        randomized_subcaselist = shuffle_split_string_list_airflow(
-            biglist=cases, split_number=concurrency_num
-        )
-        # break this into
-
-        return process_case_airflow_bulk.expand(
-            scraper=[scraper], cases=randomized_subcaselist, base_path=[base_path]
-        )
 
     return scraper_dag()
 
