@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import json
 import os
 from typing import Any, List, Tuple
 from airflow.decorators import dag, task
@@ -31,14 +32,25 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
         schedule_interval=None,
         dag_id=f"{scraper_info.id}_all_cases",
         tags=["scrapers", "all_cases", scraper_info.id],
+        params={
+            "year_list": "[]",
+        },
         max_active_tasks=20,
         concurrency=10,
     )
     def scraper_dag():
         @task
         def get_all_caselist_raw_airflow(scraper: Any, base_path: str) -> List[str]:
+            import logging
+
+            logger = logging.getLogger("initialize_caselist")
+            year_list = json.loads("{{ params.after_date }}")
+            logger.info(
+                f"Successfully parsed year list, scraping from cases started in:{year_list}"
+            )
+            year_list = [2024]
             json_list = get_all_caselist_raw_jsonified(
-                scraper=scraper, base_path=base_path
+                scraper=scraper, base_path=base_path, year_list=year_list
             )
             return json_list
 

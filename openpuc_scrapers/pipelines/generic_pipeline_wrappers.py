@@ -3,8 +3,6 @@ import traceback
 import time
 import random
 from typing import Any, List, Optional, Tuple
-from datetime import date, datetime, timezone
-from pydantic import BaseModel
 
 from openpuc_scrapers.db.s3_utils import push_case_to_s3_and_db
 from openpuc_scrapers.models.constants import (
@@ -16,9 +14,10 @@ from openpuc_scrapers.models.case import GenericCase
 
 from openpuc_scrapers.models.timestamp import (
     RFC3339Time,
-    rfc_time_from_string,
+    is_after,
     rfc_time_now,
     rfctime_serializer,
+    time_is_in_yearlist,
 )
 from openpuc_scrapers.pipelines.helper_utils import save_json_sync
 from openpuc_scrapers.pipelines.raw_attachment_handling import process_generic_filing
@@ -177,7 +176,7 @@ def process_case_jsonified(
     return processed_case.model_dump_json()
 
 
-def filter_off_filings_before_date(
+def filter_off_filings_after_date(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     caselist: List[StateCaseData],
     after_date: RFC3339Time,
@@ -195,17 +194,9 @@ def filter_off_filings_before_date(
             )
             continue
 
-        if opened_date > after_date:
+        if is_after(rfctime=opened_date, compare_to=after_date):
             filtered_cases.append(case)
-            # default_logger.debug(
-            #     f"Including case {generic_case.case_number} "
-            #     f"(opened: {opened_date}, cutoff: {after_date})"
-            # )
         else:
-            # default_logger.info(
-            #     f"Excluding case {generic_case.case_number} "
-            #     f"(opened: {opened_date} <= cutoff: {after_date})"
-            # )
             pass
 
     default_logger.info(
@@ -215,15 +206,44 @@ def filter_off_filings_before_date(
     return filtered_cases
 
 
+def filter_off_filings_in_yearlist(
+    scraper: GenericScraper[StateCaseData, StateFilingData],
+    caselist: List[StateCaseData],
+    yearlist: List[int],
+) -> List[StateCaseData]:
+    """Filter cases to only those opened after specified date with validation"""
+    filtered_cases = []
+
+    for case in caselist:
+        generic_case = scraper.into_generic_case_data(case)
+        opened_date = generic_case.opened_date
+
+        if not opened_date:
+            default_logger.warning(
+                f"Case {generic_case.case_number} missing opened_date, excluding from results"
+            )
+            continue
+
+        if time_is_in_yearlist(rfctime=opened_date, years=yearlist):
+            filtered_cases.append(case)
+        else:
+            pass
+
+    default_logger.info(
+        f"Date filtering complete - {len(filtered_cases)}/{len(caselist)} "
+        f"cases remain after including cases in {yearlist}"
+    )
+    random.shuffle(filtered_cases)
+    return filtered_cases
+
+
 def get_all_caselist_raw(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     base_path: str,
-    cutoff_date: Optional[RFC3339Time] = None,
+    year_list: List[int] = [],
 ) -> List[StateCaseData]:
     """Get full caselist with 2020+ date filtering"""
     # Validate date input
-    if cutoff_date is None:
-        cutoff_date = rfc_time_from_string("2010-01-01T00:00:00Z")
 
     # Get and save case list
     caselist_intermediate = scraper.universal_caselist_intermediate()
@@ -236,7 +256,7 @@ def get_all_caselist_raw(
 
     # Process cases and apply date filter
     state_cases = scraper.universal_caselist_from_intermediate(caselist_intermediate)
-    filtered_cases = filter_off_filings_before_date(
+    filtered_cases = filter_off_filings_after_date(
         scraper=scraper, caselist=state_cases, after_date=cutoff_date
     )
 
@@ -248,10 +268,12 @@ def get_all_caselist_raw(
 
 
 def get_all_caselist_raw_jsonified(
-    scraper: GenericScraper[StateCaseData, StateFilingData], base_path: str
+    scraper: GenericScraper[StateCaseData, StateFilingData],
+    base_path: str,
+    year_list: List[int] = [],
 ) -> List[str]:
     """JSON-serializable version for Airflow XComs"""
-    cases = get_all_caselist_raw(scraper, base_path)
+    cases = get_all_caselist_raw(scraper, base_path, year_list=year_list)
     return [case.model_dump_json() for case in cases]
 
 
@@ -259,6 +281,7 @@ def get_new_caselist_since_date(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     after_date: RFC3339Time,
     base_path: str,
+    year_list: List[int] = [],
 ) -> List[StateCaseData]:
     # Get and save updated cases
     updated_intermediate = scraper.updated_cases_since_date_intermediate(after_date)
