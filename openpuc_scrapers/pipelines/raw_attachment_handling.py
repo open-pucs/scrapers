@@ -176,9 +176,12 @@ async def push_raw_attach_and_process_text(
             filepath=file_path, file_upload_key=file_key, immutable=True
         )
         if len(raw_att.text_objects) == 0:
-            new_text = await generate_initial_attachment_text(raw_att)
-            if new_text is not None:
-                raw_att.text_objects.append(new_text)
+            try:
+                new_text = await generate_initial_attachment_text(raw_att)
+                if new_text is not None:
+                    raw_att.text_objects.append(new_text)
+            except Exception as e:
+                default_logger.error(e)
     obj_key = get_raw_attach_obj_key(raw_att.hash)
     dumped_data = raw_att.model_dump_json()
     await s3.save_string_to_remote_file_async(key=obj_key, content=dumped_data)
