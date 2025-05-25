@@ -1,0 +1,245 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Implementing new PUC scrapers &mdash; OpenPUC Scrapers 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=01f34227"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API Reference" href="modules.html" />
+    <link rel="prev" title="Data Models" href="datamodels.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            OpenPUC Scrapers
+              <img src="_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="datamodels.html">Data Models</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Implementing new PUC scrapers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#base-class-overview">Base Class Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#implementation-requirements">Implementation Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-implementation">Example Implementation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#testing-your-implementation">Testing Your Implementation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#common-challenges">Common Challenges</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="search.html">Search Page</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">OpenPUC Scrapers</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Implementing new PUC scrapers</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/scrapers.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="implementing-new-puc-scrapers">
+<h1>Implementing new PUC scrapers<a class="headerlink" href="#implementing-new-puc-scrapers" title="Link to this heading"></a></h1>
+<p>This guide explains how to implement a new scraper for collecting public utility commission case data using the <code class="docutils literal notranslate"><span class="pre">AbstractScraper</span></code> base class.</p>
+<section id="base-class-overview">
+<h2>Base Class Overview<a class="headerlink" href="#base-class-overview" title="Link to this heading"></a></h2>
+<p>All scrapers must inherit from <code class="docutils literal notranslate"><span class="pre">AbstractScraper</span></code> and implement two required methods:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">get_all_cases()</span></code> - Retrieves a list of all available cases</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_case_details(case)</span></code> - Retrieves detailed information for a specific case</p></li>
+</ol>
+<p>Scrapers should use the data models provided in the <code class="docutils literal notranslate"><span class="pre">openpuc_scrapers.models</span></code> module to represent cases, filings, and attachments. See the <a class="reference internal" href="datamodels.html"><span class="doc">Data Models</span></a> documentation for more details.</p>
+</section>
+<section id="implementation-requirements">
+<h2>Implementation Requirements<a class="headerlink" href="#implementation-requirements" title="Link to this heading"></a></h2>
+<p>To create a new scraper:</p>
+<ol class="arabic">
+<li><p>Create a new class inheriting from <code class="docutils literal notranslate"><span class="pre">AbstractScraper</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">AbstractScraper</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Case</span><span class="p">,</span> <span class="n">Filing</span><span class="p">,</span> <span class="n">Attachment</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">NewStatePUC</span><span class="p">(</span><span class="n">AbstractScraper</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Interface for interacting with and parsing {State} PUC data.&quot;&quot;&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p>Implement the required abstract methods:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">get_all_cases</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Case</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Retrieve a list of all available cases.&quot;&quot;&quot;</span>
+    <span class="c1"># Implementation here</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_case_details</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">case</span><span class="p">:</span> <span class="n">Case</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Case</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Retrieve details for a specific case.&quot;&quot;&quot;</span>
+    <span class="c1"># Implementation here</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="example-implementation">
+<h2>Example Implementation<a class="headerlink" href="#example-implementation" title="Link to this heading"></a></h2>
+<p>Here’s a simplified example showing the key components of a scraper implementation:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">NewStatePUC</span><span class="p">(</span><span class="n">AbstractScraper</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_all_cases</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Case</span><span class="p">]:</span>
+        <span class="c1"># Fetch list of cases from website</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_cases_url</span><span class="p">())</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+
+        <span class="n">soup</span> <span class="o">=</span> <span class="n">BeautifulSoup</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">text</span><span class="p">,</span> <span class="s2">&quot;html.parser&quot;</span><span class="p">)</span>
+        <span class="n">cases</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">case_element</span> <span class="ow">in</span> <span class="n">soup</span><span class="o">.</span><span class="n">find_all</span><span class="p">(</span><span class="s2">&quot;div&quot;</span><span class="p">,</span> <span class="n">class_</span><span class="o">=</span><span class="s2">&quot;case&quot;</span><span class="p">):</span>
+            <span class="n">case</span> <span class="o">=</span> <span class="n">Case</span><span class="p">(</span>
+                <span class="n">case_number</span><span class="o">=</span><span class="n">case_element</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;span&quot;</span><span class="p">,</span> <span class="n">class_</span><span class="o">=</span><span class="s2">&quot;number&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span><span class="p">,</span>
+                <span class="n">description</span><span class="o">=</span><span class="n">case_element</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;span&quot;</span><span class="p">,</span> <span class="n">class_</span><span class="o">=</span><span class="s2">&quot;description&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
+            <span class="p">)</span>
+            <span class="n">cases</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">case</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">cases</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_case_details</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">case</span><span class="p">:</span> <span class="n">Case</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Case</span><span class="p">:</span>
+        <span class="c1"># Fetch case details</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_case_url</span><span class="p">(</span><span class="n">case</span><span class="o">.</span><span class="n">case_number</span><span class="p">))</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+
+        <span class="n">soup</span> <span class="o">=</span> <span class="n">BeautifulSoup</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">text</span><span class="p">,</span> <span class="s2">&quot;html.parser&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Update case details</span>
+        <span class="n">case</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_case_details</span><span class="p">(</span><span class="n">soup</span><span class="p">,</span> <span class="n">case</span><span class="p">)</span>
+
+        <span class="c1"># Get filings</span>
+        <span class="k">case</span><span class="o">.</span><span class="n">filings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_filings</span><span class="p">(</span><span class="n">soup</span><span class="p">,</span> <span class="n">case</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">case</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_case_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">case_number</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;https://example.com/cases/</span><span class="si">{</span><span class="n">case_number</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_case_details</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">soup</span><span class="p">:</span> <span class="n">BeautifulSoup</span><span class="p">,</span> <span class="n">case</span><span class="p">:</span> <span class="n">Case</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Case</span><span class="p">:</span>
+        <span class="c1"># Extract and clean case details</span>
+        <span class="c1"># WARNING: you&#39;ll probably need to do some data santization first!</span>
+        <span class="k">case</span><span class="o">.</span><span class="n">case_type</span> <span class="o">=</span> <span class="n">soup</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;type&quot;</span><span class="p">)[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
+        <span class="k">case</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="n">soup</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;textarea&quot;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;description&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">case</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_filings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">soup</span><span class="p">:</span> <span class="n">BeautifulSoup</span><span class="p">,</span> <span class="n">case</span><span class="p">:</span> <span class="n">Case</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Filing</span><span class="p">]:</span>
+        <span class="n">filings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">filing_div</span> <span class="ow">in</span> <span class="n">soup</span><span class="o">.</span><span class="n">find_all</span><span class="p">(</span><span class="s2">&quot;div&quot;</span><span class="p">,</span> <span class="n">class_</span><span class="o">=</span><span class="s2">&quot;filing&quot;</span><span class="p">):</span>
+            <span class="c1"># WARNING: you&#39;ll probably need to do some data santization first!</span>
+            <span class="n">filing</span> <span class="o">=</span> <span class="n">Filing</span><span class="p">(</span>
+                <span class="n">filed_date</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span>
+                    <span class="n">filing_div</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;span&quot;</span><span class="p">,</span> <span class="n">class_</span><span class="o">=</span><span class="s2">&quot;date&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span><span class="p">,</span>
+                    <span class="s2">&quot;%m/</span><span class="si">%d</span><span class="s2">/%Y&quot;</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">date</span><span class="p">(),</span>
+                <span class="n">party_name</span><span class="o">=</span><span class="n">filing_div</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;span&quot;</span><span class="p">,</span> <span class="n">class_</span><span class="o">=</span><span class="s2">&quot;party&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span><span class="p">,</span>
+                <span class="n">filing_type</span><span class="o">=</span><span class="n">filing_div</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;span&quot;</span><span class="p">,</span> <span class="n">class_</span><span class="o">=</span><span class="s2">&quot;type&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span><span class="p">,</span>
+                <span class="n">description</span><span class="o">=</span><span class="n">filing_div</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;div&quot;</span><span class="p">,</span> <span class="n">class_</span><span class="o">=</span><span class="s2">&quot;description&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
+            <span class="p">)</span>
+            <span class="n">filings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">filing</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">filings</span>
+</pre></div>
+</div>
+</section>
+<section id="testing-your-implementation">
+<h2>Testing Your Implementation<a class="headerlink" href="#testing-your-implementation" title="Link to this heading"></a></h2>
+<p>When implementing a new scraper:</p>
+<ol class="arabic simple">
+<li><p>Test the <code class="docutils literal notranslate"><span class="pre">get_all_cases()</span></code> method to ensure it returns valid Case objects</p></li>
+<li><p>Test the <code class="docutils literal notranslate"><span class="pre">get_case_details()</span></code> method with various case numbers</p></li>
+<li><p>Verify all required fields are properly populated</p></li>
+<li><p>Check data sanitization and normalization</p></li>
+<li><p>Verify proper error handling for invalid cases or network issues</p></li>
+<li><p>Test handling of edge cases (empty fields, unusual characters, etc.)</p></li>
+</ol>
+</section>
+<section id="common-challenges">
+<h2>Common Challenges<a class="headerlink" href="#common-challenges" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Website Structure Changes</strong>: Design your parsing code to be resilient to minor HTML changes</p></li>
+<li><p><strong>Inconsistent Data</strong>: Handle variations in date formats, field names, and data quality</p></li>
+<li><p><strong>Error Handling</strong>: Implement robust error handling for network issues and invalid data</p></li>
+<li><p><strong>Data Sanitization</strong>: Clean and normalize data to ensure consistency and accuracy</p></li>
+<li><p><strong>Pagination</strong>: Implement pagination support if cases are spread across multiple pages</p></li>
+<li><p><strong>Rate Limiting</strong>: Respect website rate limits and implement appropriate delays</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="datamodels.html" class="btn btn-neutral float-left" title="Data Models" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modules.html" class="btn btn-neutral float-right" title="API Reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Charles Dawson.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
