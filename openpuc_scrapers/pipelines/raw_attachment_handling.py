@@ -117,28 +117,45 @@ def validate_file_against_extension(
 async def process_and_shipout_attachment(
     att: GenericAttachment,
 ) -> GenericAttachment:
-    valid_extension = validate_document_extension(att.document_extension or "")
-    if isinstance(valid_extension, Exception):
-        raise valid_extension
 
+    valid_extension = validate_document_extension(att.document_extension or "")
     str_url = str(att.url)
-    retries = 3
     tmp_filepath = await download_file_from_url_to_path(str_url)
-    for attempt in range(retries + 1):
+    if isinstance(valid_extension, Exception):
+        # raise valid_extension
+        # Assume extension is a pdf without any extra info.
+        valid_default_extension = ValidExtension.PDF
+        # TODO: Upgrade this function so that instead of assuming a pdf and validating against that
+        # it can infer the filetype from file metadata.
         match_type_err = validate_file_against_extension(
-            extension=ValidExtension(valid_extension), filepath=tmp_filepath
+            valid_default_extension, tmp_filepath
         )
-        if match_type_err is None:
-            break
+        if match_type_err is not None:
+            default_logger.error(
+                f"Encountered error processing extension, assumed it was a pdf and failed to validate:  {valid_extension}"
+            )
+            raise valid_extension
         else:
-            if attempt < retries - 1:
-                default_logger.warning(
-                    f"Download attempt {attempt + 1} failed: {match_type_err}"
-                )
-                await asyncio.sleep(20)
-                tmp_filepath = await download_file_from_url_to_path(str_url)
+            att.document_extension = valid_default_extension.value
+
+    else:
+        retries = 2
+        for attempt in range(retries + 1):
+            match_type_err = validate_file_against_extension(
+                extension=ValidExtension(valid_extension), filepath=tmp_filepath
+            )
+            if match_type_err is None:
+                att.document_extension = valid_extension
+                break
             else:
-                raise match_type_err
+                if attempt < retries - 1:
+                    default_logger.warning(
+                        f"Download attempt {attempt + 1} failed: {match_type_err}"
+                    )
+                    await asyncio.sleep(20)
+                    tmp_filepath = await download_file_from_url_to_path(str_url)
+                else:
+                    raise match_type_err
     hash = blake2b_hash_from_file(tmp_filepath)
 
     att.hash = hash
