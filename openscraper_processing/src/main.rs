@@ -11,6 +11,7 @@ use tracing::info;
 
 use crate::worker::start_workers;
 
+mod s3_stuff;
 mod types;
 mod worker;
 

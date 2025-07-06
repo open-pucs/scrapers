@@ -13,10 +13,6 @@ use thiserror::Error;
 pub struct Blake2bHash([u8; 32]);
 
 impl Blake2bHash {
-    pub fn is_zero(&self) -> bool {
-        self.0 == [0u8; 32]
-    }
-
     /// Creates hash from raw bytes
     pub fn from_bytes(data: &[u8]) -> Self {
         let mut hasher = Blake2b::<blake2::digest::consts::U32>::new();
@@ -39,6 +35,10 @@ impl Blake2bHash {
         }
 
         Ok(Blake2bHash(hasher.finalize().into()))
+    }
+
+    pub fn peek_bytes(&self) -> &[u8; 32] {
+        &self.0
     }
 }
 
@@ -126,6 +126,7 @@ mod tests {
         // Helper function for testing
         fn test_expected_hash(data: &[u8], expected_hex: &str) -> Result<(), String> {
             let computed_hash = Blake2bHash::from_bytes(data);
+            let computed_hash_bytes = *computed_hash.peek_bytes();
             let expected_bytes = hex::decode(expected_hex)
                 .map_err(|e| format!("Failed to decode hex string: {}", e))?;
 
@@ -133,18 +134,16 @@ mod tests {
                 return Err("Expected hash length must be 32 bytes".into());
             }
 
-            let expected_array: [u8; 32] = expected_bytes
+            let expected_hash_bytes: [u8; 32] = expected_bytes
                 .try_into()
                 .map_err(|_| "Conversion to array failed".to_string())?;
-            let expected_hash = Blake2bHash(expected_array);
 
-            if computed_hash == expected_hash {
+            if computed_hash_bytes == expected_hash_bytes {
                 Ok(())
             } else {
                 Err(format!(
-                    "Hash mismatch\nExpected: {}\nGot:      {}",
-                    expected_hash.to_string(),
-                    computed_hash.to_string()
+                    "Hash mismatch\nExpected:{:?}\nGot:{:?}",
+                    expected_hash_bytes, computed_hash_bytes
                 ))
             }
         }
