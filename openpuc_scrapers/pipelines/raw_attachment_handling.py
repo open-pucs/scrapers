@@ -8,7 +8,6 @@ from openpuc_scrapers.db.s3_utils import (
     generate_s3_object_uri_from_key,
     get_raw_attach_file_key,
     get_raw_attach_obj_key,
-    push_raw_attach_to_s3_and_db,
 )
 from openpuc_scrapers.db.s3_wrapper import S3FileManager, rand_filepath
 from openpuc_scrapers.models.attachment import GenericAttachment

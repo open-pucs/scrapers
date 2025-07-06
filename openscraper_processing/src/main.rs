@@ -1,0 +1,109 @@
+use aide::{
+    axum::{ApiRouter, IntoApiResponse, routing::get},
+    openapi::{Info, OpenApi},
+    swagger::Swagger,
+};
+use axum::{Extension, Json};
+use otel_bs::init_subscribers_and_loglevel;
+
+use std::net::{Ipv4Addr, SocketAddr};
+
+use tracing::{Subscriber, info};
+
+// use opentelemetry::global::{self, BoxedTracer, ObjectSafeTracerProvider, tracer};
+
+// Note that this clones the document on each request.
+// To be more efficient, we could wrap it into an Arc,
+// or even store it as a serialized string.
+async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
+    Json(api)
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    info!("Tracing Subscriber is up and running, trying to create app");
+    // initialise our subscriber
+    let app = ApiRouter::new()
+        .api_route("/v1/health", get(health))
+        .route("/api.json", get(serve_api))
+        .route("/swagger", Swagger::new("/api.json").axum_route())
+        .nest("/v1/", api::router())
+        .nest("/admin/", admin::router());
+
+    // Spawn background worker to process PDF tasks
+    // This worker runs indefinitely
+    info!("App Created, spawning background process:");
+    tokio::spawn(async move {
+        processing::worker::start_worker().await;
+    });
+
+    // bind and serve
+    let addr = SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 8080);
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    info!("Listening on http://{}", addr);
+    let mut api = OpenApi {
+        info: Info {
+            description: Some("A library for Cheaply Batch Processing PDF's".to_string()),
+            ..Info::default()
+        },
+        ..OpenApi::default()
+    };
+    info!("Initialized OpenAPI");
+    axum::serve(
+        listener,
+        app
+            // Generate the documentation.
+            .finish_api(&mut api)
+            // Expose the documentation to the handlers.
+            .layer(Extension(api))
+            .into_make_service(),
+    )
+    .await
+    .unwrap();
+    // });
+
+    Ok(())
+}
+
+/// Get health of the API.
+async fn health() -> &'static str {
+    "Service is Healthy"
+}
+
+mod admin {
+    use aide::axum::{ApiRouter, IntoApiResponse, routing::get};
+    use axum::Json;
+    use axum_tracing_opentelemetry::tracing_opentelemetry_instrumentation_sdk;
+    use schemars::JsonSchema;
+    use serde::{Deserialize, Serialize};
+    use tracing::{debug, error, info, warn};
+
+    #[derive(Serialize, Deserialize, JsonSchema)]
+    struct ServerInfo {
+        name: String,
+        version: String,
+    }
+
+    /// Expose admin routes
+    pub fn router() -> ApiRouter {
+        ApiRouter::new().api_route("/info", get(get_server_info))
+    }
+
+    /// Get static server info
+    async fn get_server_info() -> impl IntoApiResponse {
+        let trace_id_owned = tracing_opentelemetry_instrumentation_sdk::find_current_trace_id()
+            .unwrap_or_else(|| "unknown trace id".to_string());
+        let example = "test-value";
+        debug!(example, "Someone tried to get server info");
+        info!(example, "Someone tried to get server info");
+        warn!(example, "Someone tried to get server info");
+        error!(example, "Someone tried to get server info");
+        Json(ServerInfo {
+            name: "Crimson".into(),
+            version: "0.0".into(),
+        })
+    }
+}
+fn main() {
+    println!("Hello, world!");
+}
