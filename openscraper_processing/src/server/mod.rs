@@ -1,25 +1,24 @@
+use aide::axum::ApiRouter;
 use axum::{
     extract::{Path, Query, State},
     response::{IntoResponse, Json},
-    routing::get,
-    Router,
 };
 use serde::Deserialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tracing::info;
 
 use crate::types::{GenericCase, RawAttachment};
+use aide::{
+    axum::{IntoApiResponse, routing::get},
+    openapi::{Info, OpenApi},
+    swagger::Swagger,
+};
 
-struct AppState {
-    // We can add any shared state here, like a database connection pool
-}
-
-pub async fn start_server() {
-    let shared_state = Arc::new(Mutex::new(AppState {}));
-
-    let app = Router::new()
-        .route("/api/health", get(health))
+pub async fn define_routes() -> ApiRouter {
+    let app = ApiRouter::new()
+        .api_route("/api/health", get(health))
         .route(
             "/api/cases/:state/:jurisdiction_name/:case_name",
             get(handle_case_filing_from_s3),
@@ -43,24 +42,18 @@ pub async fn start_server() {
         .route(
             "/api/raw_attachments/:blake2b_hash/raw",
             get(handle_attachment_file_from_s3),
-        )
-        .with_state(shared_state);
-
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+        );
+    info!("Routes defined successfully");
+    app
 }
 
-async fn health() -> impl IntoResponse {
+async fn health() -> impl IntoApiResponse {
     Json("{\"is_healthy\": true}")
 }
 
 async fn handle_case_filing_from_s3(
     Path((state, jurisdiction_name, case_name)): Path<(String, String, String)>,
-    State(_state): State<Arc<Mutex<AppState>>>,
-) -> impl IntoResponse {
+) -> impl IntoApiResponse {
     // TODO: Implement this
     Json("Not implemented")
 }
@@ -72,43 +65,29 @@ struct CaseListParams {
 
 async fn handle_caselist_jurisdiction_fetch_all(
     Path((state, jurisdiction_name)): Path<(String, String)>,
-    Query(params): Query<CaseListParams>,
-    State(_state): State<Arc<Mutex<AppState>>>,
-) -> impl IntoResponse {
+) -> impl IntoApiResponse {
     // TODO: Implement this
     Json("Not implemented")
 }
 
 async fn handle_caselist_jurisdiction_fetch_date(
     Path((state, jurisdiction_name, rfc339_date)): Path<(String, String, String)>,
-    Query(params): Query<CaseListParams>,
-    State(_state): State<Arc<Mutex<AppState>>>,
-) -> impl IntoResponse {
+) -> impl IntoApiResponse {
     // TODO: Implement this
     Json("Not implemented")
 }
 
-async fn handle_caselist_all_fetch(
-    Path(rfc339_date): Path<String>,
-    Query(params): Query<CaseListParams>,
-    State(_state): State<Arc<Mutex<AppState>>>,
-) -> impl IntoResponse {
+async fn handle_caselist_all_fetch(Path(rfc339_date): Path<String>) -> impl IntoApiResponse {
     // TODO: Implement this
     Json("Not implemented")
 }
 
-async fn handle_attachment_data_from_s3(
-    Path(blake2b_hash): Path<String>,
-    State(_state): State<Arc<Mutex<AppState>>>,
-) -> impl IntoResponse {
+async fn handle_attachment_data_from_s3(Path(blake2b_hash): Path<String>) -> impl IntoApiResponse {
     // TODO: Implement this
     Json("Not implemented")
 }
 
-async fn handle_attachment_file_from_s3(
-    Path(blake2b_hash): Path<String>,
-    State(_state): State<Arc<Mutex<AppState>>>,
-) -> impl IntoResponse {
+async fn handle_attachment_file_from_s3(Path(blake2b_hash): Path<String>) -> impl IntoApiResponse {
     // TODO: Implement this
     Json("Not implemented")
 }
