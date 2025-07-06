@@ -11,6 +11,7 @@ use tracing::info;
 
 use crate::worker::start_workers;
 
+mod types;
 mod worker;
 
 // use opentelemetry::global::{self, BoxedTracer, ObjectSafeTracerProvider, tracer};
