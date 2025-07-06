@@ -1,12 +1,15 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE};
 use blake2::{Blake2b, Digest};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
+use std::borrow::Cow;
 use std::fmt;
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
 use std::str::FromStr;
 use thiserror::Error;
+
+use schemars::{JsonSchema, Schema, json_schema};
 
 /// Represents a base64 URL-encoded BLAKE2b-256 hash
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +94,20 @@ impl<'de> Deserialize<'de> for Blake2bHash {
     }
 }
 
+impl JsonSchema for Blake2bHash {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("Blake2bHash")
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
+        json_schema!({
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9_-]{43}$",
+        "title": "Base64 URL-encoded BLAKE2b-256 hash",
+        "description": "String representation of a BLAKE2b-256 hash using URL-safe base64 encoding without padding"
+        })
+    }
+}
 #[cfg(test)]
 mod tests {
 

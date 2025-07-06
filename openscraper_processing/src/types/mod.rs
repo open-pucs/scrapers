@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -7,7 +8,7 @@ use crate::types::hash::Blake2bHash;
 pub mod env_vars;
 pub mod hash;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct GenericAttachment {
     pub name: String,
     pub url: String,
@@ -16,7 +17,7 @@ pub struct GenericAttachment {
     pub hash: Option<Blake2bHash>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct GenericFiling {
     pub name: String,
     pub filed_date: DateTime<Utc>,
@@ -27,7 +28,7 @@ pub struct GenericFiling {
     pub extra_metadata: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct GenericCase {
     pub case_number: String,
     pub case_name: String,
