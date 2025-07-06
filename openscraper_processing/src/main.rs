@@ -45,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Listening on http://{}", addr);
     let mut api = OpenApi {
         info: Info {
-            description: Some("A library for Cheaply Batch Processing PDF's".to_string()),
+            description: Some("A component of the openscrapers library designed to efficently and cheaply process goverment docs at scale.".to_string()),
             ..Info::default()
         },
         ..OpenApi::default()
