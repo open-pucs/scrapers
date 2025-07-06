@@ -68,8 +68,10 @@ pub async fn start_workers() -> anyhow::Result<()> {
     let redis_client = redis::Client::open("redis://127.0.0.1/")?;
     let mut redis_con = redis_client.get_multiplexed_async_connection().await?;
 
+    tokio::spawn(crate::server::start_server());
+
     loop {
-        let result: Result<String, RedisError> = redis_con.brpop("case_queue", 0.0).await;
+        let result: Result<String, RedisError> = redis_con.brpop("generic_cases", 0.0).await;
         if let Ok(json_data) = result {
             let case: GenericCase = serde_json::from_str(&json_data)?;
             let s3_client_clone = s3_client.clone();
