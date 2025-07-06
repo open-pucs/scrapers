@@ -1,4 +1,7 @@
-use crate::s3_stuff::make_s3_client;
+use crate::s3_stuff::{
+    download_file, generate_s3_object_uri_from_key, get_raw_attach_file_key, make_s3_client,
+    push_raw_attach_to_s3,
+};
 use crate::types::env_vars::{CRIMSON_URL, OPENSCRAPERS_S3_OBJECT_BUCKET};
 use crate::types::hash::Blake2bHash;
 use crate::types::{AttachmentTextQuality, GenericCase, RawAttachment, RawAttachmentText};
@@ -34,20 +37,6 @@ struct CrimsonStatusResponse {
     error: Option<String>,
 }
 
-fn get_raw_attach_obj_key(hash: Blake2bHash) -> String {
-    format!("raw/metadata/{hash}.json")
-}
-
-fn get_raw_attach_file_key(hash: Blake2bHash) -> String {
-    format!("raw/file/{hash}")
-}
-
-fn generate_s3_object_uri_from_key(key: &str) -> String {
-    format!(
-        "https://{}.s3.amazonaws.com/{}",
-        &*OPENSCRAPERS_S3_OBJECT_BUCKET, key
-    )
-}
 // use futures::prelude::*;
 // use redis::AsyncCommands;
 //
@@ -67,8 +56,6 @@ pub async fn start_workers() -> anyhow::Result<()> {
     let s3_client = make_s3_client().await;
     let redis_client = redis::Client::open("redis://127.0.0.1/")?;
     let mut redis_con = redis_client.get_multiplexed_async_connection().await?;
-
-    tokio::spawn(crate::server::start_server());
 
     loop {
         let result: Result<String, RedisError> = redis_con.brpop("generic_cases", 0.0).await;
@@ -153,42 +140,4 @@ async fn process_pdf_text_using_crimson(
         }
     }
     bail!("Crimson processing failed after 1000 attempts.")
-}
-
-async fn push_raw_attach_to_s3(
-    s3_client: &S3Client,
-    raw_att: RawAttachment,
-    file_path: &str,
-) -> anyhow::Result<()> {
-    let dumped_data = serde_json::to_string(&raw_att)?;
-    let obj_key = get_raw_attach_obj_key(raw_att.hash);
-    let file_key = get_raw_attach_file_key(raw_att.hash);
-
-    s3_client
-        .put_object()
-        .bucket(&*OPENSCRAPERS_S3_OBJECT_BUCKET)
-        .key(obj_key)
-        .body(ByteStream::from(dumped_data.into_bytes()))
-        .send()
-        .await?;
-
-    let body = ByteStream::from_path(Path::new(file_path)).await?;
-    s3_client
-        .put_object()
-        .bucket(&*OPENSCRAPERS_S3_OBJECT_BUCKET)
-        .key(file_key)
-        .body(body)
-        .send()
-        .await?;
-
-    Ok(())
-}
-
-async fn download_file(url: &str) -> anyhow::Result<String> {
-    let response = reqwest::get(url).await?;
-    let temp_file_path = "temp_file";
-    let mut dest = File::create(temp_file_path).await?;
-    let content = response.bytes().await?;
-    tokio::io::copy(&mut content.as_ref(), &mut dest).await?;
-    Ok(temp_file_path.to_string())
 }
