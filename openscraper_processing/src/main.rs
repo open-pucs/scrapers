@@ -4,11 +4,14 @@ use aide::{
     swagger::Swagger,
 };
 use axum::{Extension, Json};
-use otel_bs::init_subscribers_and_loglevel;
 
 use std::net::{Ipv4Addr, SocketAddr};
 
-use tracing::{Subscriber, info};
+use tracing::info;
+
+use crate::worker::start_workers;
+
+mod worker;
 
 // use opentelemetry::global::{self, BoxedTracer, ObjectSafeTracerProvider, tracer};
 
@@ -20,21 +23,20 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> anyhow::Result<()> {
     info!("Tracing Subscriber is up and running, trying to create app");
     // initialise our subscriber
     let app = ApiRouter::new()
         .api_route("/v1/health", get(health))
         .route("/api.json", get(serve_api))
         .route("/swagger", Swagger::new("/api.json").axum_route())
-        .nest("/v1/", api::router())
         .nest("/admin/", admin::router());
 
     // Spawn background worker to process PDF tasks
     // This worker runs indefinitely
     info!("App Created, spawning background process:");
     tokio::spawn(async move {
-        processing::worker::start_worker().await;
+        start_workers().await;
     });
 
     // bind and serve
@@ -73,7 +75,6 @@ async fn health() -> &'static str {
 mod admin {
     use aide::axum::{ApiRouter, IntoApiResponse, routing::get};
     use axum::Json;
-    use axum_tracing_opentelemetry::tracing_opentelemetry_instrumentation_sdk;
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
     use tracing::{debug, error, info, warn};
@@ -91,8 +92,6 @@ mod admin {
 
     /// Get static server info
     async fn get_server_info() -> impl IntoApiResponse {
-        let trace_id_owned = tracing_opentelemetry_instrumentation_sdk::find_current_trace_id()
-            .unwrap_or_else(|| "unknown trace id".to_string());
         let example = "test-value";
         debug!(example, "Someone tried to get server info");
         info!(example, "Someone tried to get server info");
@@ -103,7 +102,4 @@ mod admin {
             version: "0.0".into(),
         })
     }
-}
-fn main() {
-    println!("Hello, world!");
 }
