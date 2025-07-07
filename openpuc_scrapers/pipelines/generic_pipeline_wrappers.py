@@ -3,6 +3,8 @@ import traceback
 import time
 import random
 from typing import Any, List, Optional, Tuple
+import redis
+import json
 
 from openpuc_scrapers.db.s3_utils import push_case_to_s3_and_db
 from openpuc_scrapers.models.constants import (
@@ -108,36 +110,21 @@ def process_case(
         generic_filing = scraper.into_generic_filing_data(filing)
         case_specific_generic_cases.append(generic_filing)
 
-    async def async_shit(case: GenericCase) -> Tuple[GenericCase, int, int]:
-        """
-        Processes all filings for a case, returning the updated case with
-        total counts of successful and errored attachments across all filings.
-        """
-        # Schedule processing for each generic filing
-        tasks = [process_generic_filing(f) for f in case_specific_generic_cases]
-        results = await asyncio.gather(*tasks)
+    # NOW THAT THE CASE IS FULLY GENERIC IT SHOULD PUSH ALL THIS STUFF OVER TO RUST
+    redis_client = redis.Redis(host="localhost", port=6379, db=0)
+    redis_client.lpush("generic_cases", generic_case.model_dump_json())
 
-        # Aggregate success and error counts and update filings
-        total_success = sum(success for (_, success, _) in results)
-        total_error = sum(error for (_, _, error) in results)
-        case.filings = [f for (f, _, _) in results]
-
-        # Push updated case
-        await push_case_to_s3_and_db(
-            case=case,
-            jurisdiction_name=scraper.jurisdiction_name,
-            state=scraper.state,
-        )
-
-        return case, total_success, total_error
-
-    return_generic_case, success_count, error_count = asyncio.run(
-        async_shit(generic_case)
+    # INSTEAD OF RETURNING THE CASE REFACTOR THE CODE TO RETURN A SUCCESSFUL SIGNAL
+    return GenericCase(
+        case_number="Success",
+        case_name="Success",
+        jurisdiction="Success",
+        state="Success",
+        filings=[],
+        opened_date=rfc_time_now(),
+        updated_date=rfc_time_now(),
+        source_url="Success",
     )
-    default_logger.info(
-        f"Of all the attachments in this case, {success_count} were uploaded successfully, and {error_count} encountered an error."
-    )
-    return return_generic_case
 
 
 def process_case_jsonified_bulk(
