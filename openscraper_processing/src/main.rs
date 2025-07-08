@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // bind and serve
-    let addr = SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 8080);
+    let addr = SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 8000);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     info!("Listening on http://{}", addr);
     let mut api = OpenApi {

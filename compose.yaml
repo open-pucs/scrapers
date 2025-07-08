@@ -67,8 +67,8 @@ services:
 
   openscrapers-api:
     build:
-      context: .
-      dockerfile: Dockerfile.server
+      context: ./openscraper_processing/
+      dockerfile: Dockerfile
     depends_on:
       - openscrapers-postgres
     labels:
