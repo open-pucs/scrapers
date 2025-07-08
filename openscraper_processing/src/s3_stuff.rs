@@ -8,6 +8,7 @@ use aws_sdk_s3::config::Credentials;
 use chrono::{DateTime, offset};
 use tokio::fs::File;
 
+use crate::types::s3_uri::S3Location;
 use crate::types::{
     GenericCase, RawAttachment,
     env_vars::{
@@ -27,16 +28,13 @@ pub fn get_raw_attach_file_key(hash: Blake2bHash) -> String {
 }
 
 pub fn generate_s3_object_uri_from_key(key: &str) -> String {
-    format!(
-        "https://{}.s3.amazonaws.com/{}",
-        &*OPENSCRAPERS_S3_OBJECT_BUCKET, key
-    )
+    S3Location::default_from_key(key).to_string()
 }
 pub async fn make_s3_client() -> S3Client {
-    let region = Region::new(&*OPENSCRAPERS_S3_CLOUD_REGION);
+    let region = Region::new(&**OPENSCRAPERS_S3_CLOUD_REGION);
     let creds = Credentials::new(
-        &*OPENSCRAPERS_S3_ACCESS_KEY,
-        &*OPENSCRAPERS_S3_SECRET_KEY,
+        &**OPENSCRAPERS_S3_ACCESS_KEY,
+        &**OPENSCRAPERS_S3_SECRET_KEY,
         None, // no session token
         None, // no expiration
         "manual",
@@ -46,7 +44,7 @@ pub async fn make_s3_client() -> S3Client {
     let cfg_loader = aws_config::defaults(BehaviorVersion::latest())
         .region(region)
         .credentials_provider(creds)
-        .endpoint_url(&*OPENSCRAPERS_S3_ENDPOINT);
+        .endpoint_url(&**OPENSCRAPERS_S3_ENDPOINT);
 
     let sdk_config = cfg_loader.load().await;
     S3Client::new(&sdk_config)
@@ -60,10 +58,11 @@ pub async fn push_raw_attach_to_s3(
     let dumped_data = serde_json::to_string(&raw_att)?;
     let obj_key = get_raw_attach_obj_key(raw_att.hash);
     let file_key = get_raw_attach_file_key(raw_att.hash);
+    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
 
     s3_client
         .put_object()
-        .bucket(&*OPENSCRAPERS_S3_OBJECT_BUCKET)
+        .bucket(bucket)
         .key(obj_key)
         .body(ByteStream::from(dumped_data.into_bytes()))
         .send()
@@ -72,7 +71,7 @@ pub async fn push_raw_attach_to_s3(
     let body = ByteStream::from_path(Path::new(file_path)).await?;
     s3_client
         .put_object()
-        .bucket(&*OPENSCRAPERS_S3_OBJECT_BUCKET)
+        .bucket(bucket)
         .key(file_key)
         .body(body)
         .send()
@@ -83,11 +82,12 @@ pub async fn push_raw_attach_to_s3(
 
 pub async fn download_file(url: &str) -> anyhow::Result<String> {
     let response = reqwest::get(url).await?;
-    let temp_file_path = "temp_file";
-    let mut dest = File::create(temp_file_path).await?;
+    let random_name = "blaahblah";
+    let temp_file_path = format!("tmp/downloads/{random_name}");
+    let mut dest = File::create(&temp_file_path).await?;
     let content = response.bytes().await?;
     tokio::io::copy(&mut content.as_ref(), &mut dest).await?;
-    Ok(temp_file_path.to_string())
+    Ok(temp_file_path)
 }
 
 pub fn get_case_s3_key(
@@ -109,7 +109,7 @@ pub async fn fetch_case_filing_from_s3(
     let key = get_case_s3_key(case_name, jurisdiction_name, state, country);
     let output = s3_client
         .get_object()
-        .bucket(&*OPENSCRAPERS_S3_OBJECT_BUCKET)
+        .bucket(&**OPENSCRAPERS_S3_OBJECT_BUCKET)
         .key(key)
         .send()
         .await?;
@@ -125,7 +125,7 @@ pub async fn fetch_attachment_data_from_s3(
     let obj_key = get_raw_attach_obj_key(hash);
     let result = s3_client
         .get_object()
-        .bucket(&*OPENSCRAPERS_S3_OBJECT_BUCKET)
+        .bucket(&**OPENSCRAPERS_S3_OBJECT_BUCKET)
         .key(obj_key)
         .send()
         .await?;
@@ -145,7 +145,7 @@ pub async fn fetch_attachment_file_from_s3(
     let mut file = File::create(&temp_path).await?;
     let mut stream = s3_client
         .get_object()
-        .bucket(&*OPENSCRAPERS_S3_OBJECT_BUCKET)
+        .bucket(&**OPENSCRAPERS_S3_OBJECT_BUCKET)
         .key(obj_key)
         .send()
         .await?
@@ -161,17 +161,18 @@ pub async fn fetch_attachment_file_from_s3(
 pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blake2bHash) -> bool {
     let obj_key = get_raw_attach_obj_key(hash);
     let file_key = get_raw_attach_file_key(hash);
+    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
 
     let obj_exists = s3_client
         .head_object()
-        .bucket(&*OPENSCRAPERS_S3_OBJECT_BUCKET)
+        .bucket(bucket)
         .key(obj_key)
         .send()
         .await;
 
     let file_exists = s3_client
         .head_object()
-        .bucket(&*OPENSCRAPERS_S3_OBJECT_BUCKET)
+        .bucket(bucket)
         .key(file_key)
         .send()
         .await;
@@ -191,7 +192,7 @@ pub async fn push_case_to_s3_and_db(
     let case_jsonified = serde_json::to_string(case)?;
     s3_client
         .put_object()
-        .bucket(&*OPENSCRAPERS_S3_OBJECT_BUCKET)
+        .bucket(&**OPENSCRAPERS_S3_OBJECT_BUCKET)
         .key(key)
         .body(ByteStream::from(case_jsonified.into_bytes()))
         .send()
@@ -211,7 +212,7 @@ pub async fn list_cases_for_jurisdiction(
 
     let mut stream = s3_client
         .list_objects_v2()
-        .bucket(&*OPENSCRAPERS_S3_OBJECT_BUCKET)
+        .bucket(&**OPENSCRAPERS_S3_OBJECT_BUCKET)
         .prefix(prefix)
         .into_paginator()
         .send();

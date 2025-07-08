@@ -7,6 +7,7 @@ use crate::types::hash::Blake2bHash;
 
 pub mod env_vars;
 pub mod hash;
+pub mod s3_uri;
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct GenericAttachment {

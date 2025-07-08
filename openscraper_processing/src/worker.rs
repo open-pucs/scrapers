@@ -2,7 +2,9 @@ use crate::s3_stuff::{
     download_file, generate_s3_object_uri_from_key, get_raw_attach_file_key, make_s3_client,
     push_raw_attach_to_s3,
 };
-use crate::types::env_vars::{CRIMSON_URL, OPENSCRAPERS_S3_OBJECT_BUCKET};
+use crate::types::env_vars::{
+    CRIMSON_URL, OPENSCRAPERS_REDIS_DOMAIN, OPENSCRAPERS_S3_OBJECT_BUCKET,
+};
 use crate::types::hash::Blake2bHash;
 use crate::types::{AttachmentTextQuality, GenericCase, RawAttachment, RawAttachmentText};
 use anyhow::{anyhow, bail};
@@ -54,7 +56,7 @@ struct CrimsonStatusResponse {
 // assert_eq!(result, Ok(("foo".to_string(), b"bar".to_vec())));
 pub async fn start_workers() -> anyhow::Result<()> {
     let s3_client = make_s3_client().await;
-    let redis_client = redis::Client::open("redis://127.0.0.1/")?;
+    let redis_client = redis::Client::open(&**OPENSCRAPERS_REDIS_DOMAIN)?;
     let mut redis_con = redis_client.get_multiplexed_async_connection().await?;
 
     loop {
@@ -113,14 +115,15 @@ async fn process_pdf_text_using_crimson(
 
     let crimson_params = CrimsonPDFIngestParamsS3 { s3_uri: s3_url };
     let client = reqwest::Client::new();
-    let post_url = format!("{}/v1/ingest/s3", &*CRIMSON_URL);
+    let crimson_url = &**CRIMSON_URL;
+    let post_url = format!("{crimson_url}/v1/ingest/s3");
 
     let initial_response = client.post(&post_url).json(&crimson_params).send().await?;
     let initial_data: CrimsonInitialResponse = initial_response.json().await?;
 
     let check_url = format!(
         "{}/v1/ingest/status/{}",
-        &*CRIMSON_URL, initial_data.request_check_leaf
+        crimson_url, initial_data.request_check_leaf
     );
 
     for _ in 1..1000 {
