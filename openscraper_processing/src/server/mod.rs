@@ -1,9 +1,14 @@
-use aide::axum::ApiRouter;
+use aide::{
+    self,
+    axum::{ApiRouter, IntoApiResponse, routing::get_with},
+    transform::TransformOperation,
+};
 use axum::{
     extract::{Path, Query, State},
     response::{IntoResponse, Json, Response},
 };
 use hyper::body::Bytes;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use std::sync::Arc;
 use std::{net::SocketAddr, str::FromStr};
@@ -11,30 +16,39 @@ use tokio::sync::Mutex;
 use tracing::info;
 
 use crate::types::{GenericCase, RawAttachment, hash::Blake2bHash};
-use aide::{
-    axum::{IntoApiResponse, routing::get},
-    openapi::{Info, OpenApi},
-    swagger::Swagger,
-};
+// use aide::{
+//     axum::{IntoApiResponse, routing::get},
+//     openapi::{Info, OpenApi},
+//     swagger::Swagger,
+// };
 
 pub async fn define_routes() -> ApiRouter {
     let app = ApiRouter::new()
-        .api_route("/api/health", get(health))
+        .api_route("/api/health", get_with(health, health_docs))
         .api_route(
             "/api/cases/{state}/{jurisdiction_name}/{case_name}",
-            get(handle_case_filing_from_s3),
+            get_with(handle_case_filing_from_s3, handle_case_filing_from_s3_docs),
         )
         .api_route(
             "/api/caselist/{state}/{jurisdiction_name}/all",
-            get(handle_caselist_jurisdiction_fetch_all),
+            get_with(
+                handle_caselist_jurisdiction_fetch_all,
+                handle_caselist_jurisdiction_fetch_all_docs,
+            ),
         )
         .api_route(
             "/api/raw_attachments/{blake2b_hash}/obj",
-            get(handle_attachment_data_from_s3),
+            get_with(
+                handle_attachment_data_from_s3,
+                handle_attachment_data_from_s3_docs,
+            ),
         )
         .api_route(
             "/api/raw_attachments/{blake2b_hash}/raw",
-            get(handle_attachment_file_from_s3),
+            get_with(
+                handle_attachment_file_from_s3,
+                handle_attachment_file_from_s3_docs,
+            ),
         );
 
     // .api_route(
@@ -53,8 +67,27 @@ async fn health() -> impl IntoApiResponse {
     Json("{\"is_healthy\": true}")
 }
 
+fn health_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Check the health of the server.")
+        .response::<200, Json<String>>()
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct CasePath {
+    /// The state of the jurisdiction.
+    state: String,
+    /// The name of the jurisdiction.
+    jurisdiction_name: String,
+    /// The name of the case.
+    case_name: String,
+}
+
 async fn handle_case_filing_from_s3(
-    Path((state, jurisdiction_name, case_name)): Path<(String, String, String)>,
+    Path(CasePath {
+        state,
+        jurisdiction_name,
+        case_name,
+    }): Path<CasePath>,
 ) -> impl IntoApiResponse {
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let country = "usa"; // Or get from somewhere else
@@ -72,13 +105,30 @@ async fn handle_case_filing_from_s3(
     }
 }
 
+fn handle_case_filing_from_s3_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Fetch a case filing from S3.")
+        .response::<200, Json<GenericCase>>()
+        .response_with::<500, String, _>(|res| res.description("Error fetching case filing."))
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct JurisdictionPath {
+    /// The state of the jurisdiction.
+    state: String,
+    /// The name of the jurisdiction.
+    jurisdiction_name: String,
+}
+
 #[derive(Deserialize)]
 struct CaseListParams {
     limit: Option<i32>,
 }
 
 async fn handle_caselist_jurisdiction_fetch_all(
-    Path((state, jurisdiction_name)): Path<(String, String)>,
+    Path(JurisdictionPath {
+        state,
+        jurisdiction_name,
+    }): Path<JurisdictionPath>,
 ) -> impl IntoApiResponse {
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let country = "usa"; // Or get from somewhere else
@@ -95,7 +145,21 @@ async fn handle_caselist_jurisdiction_fetch_all(
     }
 }
 
-async fn handle_attachment_data_from_s3(Path(blake2b_hash): Path<String>) -> impl IntoApiResponse {
+fn handle_caselist_jurisdiction_fetch_all_docs(op: TransformOperation) -> TransformOperation {
+    op.description("List all cases for a jurisdiction.")
+        .response::<200, Json<Vec<String>>>()
+        .response_with::<500, String, _>(|res| res.description("Error listing cases."))
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct AttachmentPath {
+    /// The blake2b hash of the attachment.
+    blake2b_hash: String,
+}
+
+async fn handle_attachment_data_from_s3(
+    Path(AttachmentPath { blake2b_hash }): Path<AttachmentPath>,
+) -> impl IntoApiResponse {
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let hash = match Blake2bHash::from_str(&blake2b_hash) {
         Ok(hash) => hash,
@@ -110,7 +174,16 @@ async fn handle_attachment_data_from_s3(Path(blake2b_hash): Path<String>) -> imp
     }
 }
 
-async fn handle_attachment_file_from_s3(Path(blake2b_hash): Path<String>) -> impl IntoApiResponse {
+fn handle_attachment_data_from_s3_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Fetch attachment data from S3.")
+        .response::<200, Json<RawAttachment>>()
+        .response_with::<400, String, _>(|res| res.description("Invalid hash format."))
+        .response_with::<500, String, _>(|res| res.description("Error fetching attachment data."))
+}
+
+async fn handle_attachment_file_from_s3(
+    Path(AttachmentPath { blake2b_hash }): Path<AttachmentPath>,
+) -> impl IntoApiResponse {
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let hash = match Blake2bHash::from_str(&blake2b_hash) {
         Ok(hash) => hash,
@@ -134,6 +207,13 @@ async fn handle_attachment_file_from_s3(Path(blake2b_hash): Path<String>) -> imp
     }
 }
 
+fn handle_attachment_file_from_s3_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Fetch an attachment file from S3.")
+        .response::<200, Bytes>()
+        .response_with::<400, String, _>(|res| res.description("Invalid hash format."))
+        .response_with::<500, String, _>(|res| res.description("Error fetching attachment file."))
+}
+
 // async fn handle_caselist_jurisdiction_fetch_date(
 //     Path((state, jurisdiction_name, rfc339_date)): Path<(String, String, String)>,
 // ) -> impl IntoApiResponse {
@@ -145,3 +225,4 @@ async fn handle_attachment_file_from_s3(Path(blake2b_hash): Path<String>) -> imp
 //     // TODO: Implement this
 //     Json("Not implemented")
 // }
+

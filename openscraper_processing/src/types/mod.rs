@@ -46,7 +46,7 @@ pub struct GenericCase {
     pub indexed_at: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, JsonSchema)]
 pub enum AttachmentTextQuality {
     #[serde(rename = "low")]
     Low,
@@ -54,7 +54,7 @@ pub enum AttachmentTextQuality {
     High,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
 pub struct RawAttachmentText {
     pub quality: AttachmentTextQuality,
     pub language: String,
@@ -62,7 +62,7 @@ pub struct RawAttachmentText {
     pub timestamp: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct RawAttachment {
     pub hash: Blake2bHash,
     pub name: String,
