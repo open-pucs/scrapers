@@ -13,8 +13,7 @@ chrono = { version = "0.4.39", features = ["serde"] }
 axum = "0.8.4"
 serde = { version = "1.0.219", features = ["derive"] }
 tokio = { version = "1.44.2", features = ["full"] }
-aide = { version = "0.15", features = ["axum", "axum-json", 
-  "axum-matched-path", "axum-multipart", "axum-query", "swagger"] }
+aide = { version = "0.15", features = ["axum", "axum-extra", "axum-extra-query", "axum-json", "axum-matched-path", "axum-multipart", "axum-query", "macros", "swagger"] }
 aws-sdk-s3 = "1.85.0"
 aws-config = "1.6.2"
 tracing = "0.1.41"
@@ -25,3 +24,4 @@ hex = "0.4.3"
 rand_core = "0.9.3"
 rand = "0.9.1"
 thiserror = "2.0.12"
+hyper = "1.6.0"
