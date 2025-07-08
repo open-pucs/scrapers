@@ -9,7 +9,7 @@ use axum::{
 };
 use hyper::body::Bytes;
 use schemars::JsonSchema;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::{net::SocketAddr, str::FromStr};
 use tokio::sync::Mutex;
@@ -22,7 +22,21 @@ use crate::types::{GenericCase, RawAttachment, hash::Blake2bHash};
 //     swagger::Swagger,
 // };
 
-pub async fn define_routes() -> ApiRouter {
+#[derive(Deserialize, Serialize, JsonSchema, Default, Clone, Copy)]
+struct PaginationData {
+    limit: Option<u32>,
+    offset: Option<u32>,
+}
+fn make_paginated_subslice<T>(pagination: PaginationData, slice: &[T]) -> &[T] {
+    if pagination.limit.is_none() {
+        return slice;
+    }
+    let begin_index = (pagination.offset.unwrap_or(0) as usize).max(slice.len());
+    let end_index = (begin_index + (pagination.limit.unwrap_or(20) as usize)).max(slice.len());
+    &slice[begin_index..end_index]
+}
+
+pub fn define_routes() -> ApiRouter {
     let app = ApiRouter::new()
         .api_route("/api/health", get_with(health, health_docs))
         .api_route(
@@ -129,6 +143,7 @@ async fn handle_caselist_jurisdiction_fetch_all(
         state,
         jurisdiction_name,
     }): Path<JurisdictionPath>,
+    Query(PaginationData { limit, offset }): Query<PaginationData>,
 ) -> impl IntoApiResponse {
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let country = "usa"; // Or get from somewhere else
@@ -139,8 +154,9 @@ async fn handle_caselist_jurisdiction_fetch_all(
         country,
     )
     .await;
+    let pagination = PaginationData { limit, offset };
     match result {
-        Ok(cases) => Json(cases).into_response(),
+        Ok(cases) => Json(make_paginated_subslice(pagination, &cases)).into_response(),
         Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }

@@ -28,7 +28,7 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
 async fn main() -> anyhow::Result<()> {
     info!("Tracing Subscriber is up and running, trying to create app");
     // initialise our subscriber
-    let routes = define_routes().await;
+    let routes = define_routes();
     let app = routes
         .api_route("/health", get(health))
         .route("/api.json", get(serve_api))
