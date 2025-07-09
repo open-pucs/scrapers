@@ -5,7 +5,10 @@ use std::time::{Instant, SystemTime};
 use anyhow::bail;
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::config::Credentials;
+use base64::Engine;
+use base64::prelude::BASE64_URL_SAFE;
 use chrono::{DateTime, offset};
+use rand::Rng;
 use tokio::fs::File;
 
 use crate::types::s3_uri::S3Location;
@@ -82,14 +85,16 @@ pub async fn push_raw_attach_to_s3(
 
 pub async fn download_file(url: &str) -> anyhow::Result<String> {
     let response = reqwest::get(url).await?;
-    let random_name = "blaahblah";
-    let temp_file_path = format!("tmp/downloads/{random_name}");
+    let mut rng = rand::rng();
+    let random_bytes: [u8; 6] = rng.random(); // Generate 6 random bytes
+    let random_name = BASE64_URL_SAFE.encode(&random_bytes);
+    let random_name = &random_name[..8]; // Take the first 8 characters
+    let temp_file_path = format!("tmp/downloads/{}", random_name);
     let mut dest = File::create(&temp_file_path).await?;
     let content = response.bytes().await?;
     tokio::io::copy(&mut content.as_ref(), &mut dest).await?;
     Ok(temp_file_path)
 }
-
 pub fn get_case_s3_key(
     case_name: &str,
     jurisdiction_name: &str,
