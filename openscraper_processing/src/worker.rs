@@ -6,7 +6,9 @@ use crate::types::env_vars::{
     CRIMSON_URL, OPENSCRAPERS_REDIS_DOMAIN, OPENSCRAPERS_S3_OBJECT_BUCKET,
 };
 use crate::types::hash::Blake2bHash;
-use crate::types::{AttachmentTextQuality, GenericCase, RawAttachment, RawAttachmentText};
+use crate::types::{
+    AttachmentTextQuality, GenericAttachment, GenericCase, RawAttachment, RawAttachmentText,
+};
 use anyhow::{anyhow, bail};
 use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
 use blake2::{Blake2b, Digest};
@@ -65,7 +67,7 @@ pub async fn start_workers() -> anyhow::Result<()> {
             let case: GenericCase = serde_json::from_str(&json_data)?;
             let s3_client_clone = s3_client.clone();
             tokio::spawn(async move {
-                if let Err(e) = process_case(case, s3_client_clone).await {
+                if let Err(e) = process_case(&case, s3_client_clone).await {
                     warn!(error = e.to_string(), "Error processing case");
                 }
             });
@@ -74,36 +76,77 @@ pub async fn start_workers() -> anyhow::Result<()> {
         }
     }
 }
+struct AttachResult {
+    attach: anyhow::Result<RawAttachment>,
+    attach_index: usize,
+    filling_index: usize,
+}
+async fn process_attachment(
+    s3_client: &S3Client,
+    attachment: &GenericAttachment,
+    attach_index: usize,
+    filling_index: usize,
+) -> AttachResult {
+    async fn process_attachment_raw(
+        s3_client: &S3Client,
+        attachment: &GenericAttachment,
+    ) -> anyhow::Result<RawAttachment> {
+        let file_path = download_file(&attachment.url).await?;
+        let hash = Blake2bHash::from_file(&file_path)?;
 
-async fn process_case(case: GenericCase, s3_client: S3Client) -> anyhow::Result<()> {
-    let mut return_case = case.clone();
-    for (filling_index, filing) in case.filings.iter().enumerate() {
-        for (attachment_index, attachment) in filing.attachments.iter().enumerate() {
-            let file_path = download_file(&attachment.url).await?;
-            let hash = Blake2bHash::from_file(&file_path)?;
-            return_case.filings[filling_index].attachments[attachment_index].hash = Some(hash);
+        let mut raw_attachment = RawAttachment {
+            hash,
+            name: attachment.name.clone(),
+            extension: attachment.document_extension.clone().unwrap_or_default(),
+            text_objects: vec![],
+        };
 
-            let mut raw_attachment = RawAttachment {
-                hash,
-                name: attachment.name.clone(),
-                extension: attachment.document_extension.clone().unwrap_or_default(),
-                text_objects: vec![],
+        if raw_attachment.extension == "pdf" {
+            let text = process_pdf_text_using_crimson(raw_attachment.hash).await?;
+            let text_obj = RawAttachmentText {
+                quality: AttachmentTextQuality::Low,
+                language: "en".to_string(),
+                text,
+                timestamp: Utc::now(),
             };
+            raw_attachment.text_objects.push(text_obj);
+        }
+        push_raw_attach_to_s3(&s3_client, &raw_attachment, &file_path).await?;
+        Ok(raw_attachment)
+    }
+    AttachResult {
+        attach: process_attachment_raw(s3_client, attachment).await,
+        filling_index,
+        attach_index,
+    }
+}
 
-            if raw_attachment.extension == "pdf" {
-                let text = process_pdf_text_using_crimson(raw_attachment.hash).await?;
-                let text_obj = RawAttachmentText {
-                    quality: AttachmentTextQuality::Low,
-                    language: "en".to_string(),
-                    text,
-                    timestamp: Utc::now(),
-                };
-                raw_attachment.text_objects.push(text_obj);
-            }
-
-            push_raw_attach_to_s3(&s3_client, raw_attachment, &file_path).await?;
+async fn process_case(case: &GenericCase, s3_client: S3Client) -> anyhow::Result<()> {
+    let mut return_case = case.to_owned();
+    let mut attachment_futures = vec![];
+    for (filling_index, filing) in case.filings.iter().enumerate() {
+        for (attach_index, attachment) in filing.attachments.iter().enumerate() {
+            attachment_futures.push(process_attachment(
+                &s3_client,
+                attachment,
+                attach_index,
+                filling_index,
+            ));
         }
     }
+    let attachment_results: Vec<AttachResult> = vec![]; // use a semaphor to process the results 10 at
+    // a time.
+    for AttachResult {
+        attach,
+        filling_index,
+        attach_index,
+    } in attachment_results
+    {
+        let attach = attach?;
+
+        return_case.filings[filling_index].attachments[attach_index].hash = Some(attach.hash);
+    }
+
     let default_jurisdiction = "ny_puc";
     let default_state = "ny";
     let default_country = "usa";

@@ -63,7 +63,7 @@ pub async fn make_s3_client() -> S3Client {
 
 pub async fn push_raw_attach_to_s3(
     s3_client: &S3Client,
-    raw_att: RawAttachment,
+    raw_att: &RawAttachment,
     file_path: &str,
 ) -> anyhow::Result<()> {
     info!(hash = %raw_att.hash, "Pushing raw attachment to S3");
