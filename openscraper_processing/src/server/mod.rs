@@ -159,6 +159,8 @@ async fn handle_caselist_jurisdiction_fetch_all(
 ) -> impl IntoApiResponse {
     info!(state = %state, jurisdiction = %jurisdiction_name, "Request received for case list");
     let s3_client = crate::s3_stuff::make_s3_client().await;
+
+    info!("Sucessfully created s3 client.");
     let country = "usa"; // Or get from somewhere else
     let result = crate::s3_stuff::list_cases_for_jurisdiction(
         &s3_client,
@@ -167,6 +169,7 @@ async fn handle_caselist_jurisdiction_fetch_all(
         country,
     )
     .await;
+    info!("Completed call to s3 to get jurisdiction list.");
     let pagination = PaginationData { limit, offset };
     match result {
         Ok(cases) => {
@@ -275,4 +278,3 @@ fn handle_attachment_file_from_s3_docs(op: TransformOperation) -> TransformOpera
 //     // TODO: Implement this
 //     Json("Not implemented")
 // }
-

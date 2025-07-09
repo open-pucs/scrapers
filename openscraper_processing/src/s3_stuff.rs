@@ -288,8 +288,8 @@ pub async fn list_cases_for_jurisdiction(
         state, country, "Listing cases for jurisdiction"
     );
     let prefix = format!("objects/{country}/{state}/{jurisdiction_name}/");
-    debug!("Listing cases with prefix: {}", prefix);
     let mut case_names = Vec::new();
+    info!("Listing cases with prefix: {}", prefix);
 
     let mut stream = s3_client
         .list_objects_v2()
@@ -301,6 +301,7 @@ pub async fn list_cases_for_jurisdiction(
     while let Some(result) = stream.next().await {
         for object in result?.contents() {
             if let Some(key) = object.key() {
+                info!(%key, "Found list attachment object");
                 if key.ends_with(".json") {
                     if let Some(filename) = Path::new(key).file_name() {
                         if let Some(filestem) = filename.to_str().unwrap().strip_suffix(".json") {

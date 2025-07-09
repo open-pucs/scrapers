@@ -103,7 +103,7 @@ async fn process_attachment(
         };
         raw_attachment.text_objects.push(text_obj);
     }
-    push_raw_attach_to_s3(&s3_client, &raw_attachment, &file_path).await?;
+    push_raw_attach_to_s3(s3_client, &raw_attachment, &file_path).await?;
     Ok(raw_attachment)
 }
 
@@ -123,12 +123,12 @@ async fn process_case(case: &GenericCase, s3_client: S3Client) -> anyhow::Result
                 filling_index,
                 attach_index,
             });
-            let tmp_closure = async |attach| {
+            let tmp_closure = async |attach| -> anyhow::Result<RawAttachment> {
                 // Acquire permit from semaphore (waits if none available)
                 let permit = sem.acquire().await.map_err(anyhow::Error::from)?;
                 let result = process_attachment(&s3_client, &attach).await?;
                 drop(permit); // Explicit drop allows Rust compiler to optimize
-                Ok(result) as anyhow::Result<RawAttachment>
+                Ok(result)
             };
             attachment_tasks.push(tmp_closure(attachment.clone()));
         }
