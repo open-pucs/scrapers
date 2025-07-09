@@ -37,6 +37,8 @@ fn make_paginated_subslice<T>(pagination: PaginationData, slice: &[T]) -> &[T] {
 }
 
 pub fn define_routes() -> ApiRouter {
+    println!("Defining API Routes but without tracing.");
+    info!("Defining API Routes");
     let app = ApiRouter::new()
         .api_route("/api/health", get_with(health, health_docs))
         .api_route(
@@ -241,4 +243,3 @@ fn handle_attachment_file_from_s3_docs(op: TransformOperation) -> TransformOpera
 //     // TODO: Implement this
 //     Json("Not implemented")
 // }
-

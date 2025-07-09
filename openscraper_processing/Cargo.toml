@@ -17,6 +17,7 @@ aide = { version = "0.15", features = ["axum", "axum-extra", "axum-extra-query",
 aws-sdk-s3 = "1.85.0"
 aws-config = "1.6.2"
 tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
 schemars = { version = "0.9", features = ["chrono04", "uuid1"] }
 redis = { version = "0.32.3", features = ["tokio-comp", "uuid"] }
 anyhow = "1.0.98"

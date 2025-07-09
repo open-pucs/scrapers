@@ -26,6 +26,7 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::init();
     info!("Tracing Subscriber is up and running, trying to create app");
     // initialise our subscriber
     let routes = define_routes();
