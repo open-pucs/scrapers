@@ -1,6 +1,6 @@
 use crate::s3_stuff::{
     download_file, generate_s3_object_uri_from_key, get_raw_attach_file_key, make_s3_client,
-    push_raw_attach_to_s3,
+    push_case_to_s3_and_db, push_raw_attach_to_s3,
 };
 use crate::types::env_vars::{
     CRIMSON_URL, OPENSCRAPERS_REDIS_DOMAIN, OPENSCRAPERS_S3_OBJECT_BUCKET,
@@ -76,12 +76,12 @@ pub async fn start_workers() -> anyhow::Result<()> {
 }
 
 async fn process_case(case: GenericCase, s3_client: S3Client) -> anyhow::Result<()> {
-    let filings = case.filings;
-    for filing in filings {
-        for mut attachment in filing.attachments {
+    let mut return_case = case.clone();
+    for (filling_index, filing) in case.filings.iter().enumerate() {
+        for (attachment_index, attachment) in filing.attachments.iter().enumerate() {
             let file_path = download_file(&attachment.url).await?;
             let hash = Blake2bHash::from_file(&file_path)?;
-            attachment.hash = Some(hash);
+            return_case.filings[filling_index].attachments[attachment_index].hash = Some(hash);
 
             let mut raw_attachment = RawAttachment {
                 hash,
@@ -104,6 +104,17 @@ async fn process_case(case: GenericCase, s3_client: S3Client) -> anyhow::Result<
             push_raw_attach_to_s3(&s3_client, raw_attachment, &file_path).await?;
         }
     }
+    let default_jurisdiction = "ny_puc";
+    let default_state = "ny";
+    let default_country = "usa";
+    push_case_to_s3_and_db(
+        &s3_client,
+        &mut return_case,
+        default_jurisdiction,
+        default_state,
+        default_country,
+    )
+    .await?;
     Ok(())
 }
 

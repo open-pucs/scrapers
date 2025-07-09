@@ -9,7 +9,7 @@ pub mod env_vars;
 pub mod hash;
 pub mod s3_uri;
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct GenericAttachment {
     pub name: String,
     pub url: String,
@@ -18,7 +18,7 @@ pub struct GenericAttachment {
     pub hash: Option<Blake2bHash>,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct GenericFiling {
     pub name: String,
     pub filed_date: DateTime<Utc>,
@@ -29,7 +29,7 @@ pub struct GenericFiling {
     pub extra_metadata: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct GenericCase {
     pub case_number: String,
     pub case_name: String,
