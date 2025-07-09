@@ -109,11 +109,13 @@ pub async fn push_raw_attach_to_s3(
 pub async fn download_file(url: &str) -> anyhow::Result<String> {
     info!(url, "Downloading file");
     let response = reqwest::get(url).await?;
-    let mut rng = rand::thread_rng();
-    let random_bytes: [u8; 6] = rng.gen(); // Generate 6 random bytes
-    let random_name = BASE64_URL_SAFE.encode(&random_bytes);
-    let random_name = &random_name[..8]; // Take the first 8 characters
-    let temp_file_path = format!("tmp/downloads/{}", random_name);
+    let temp_file_path = {
+        let mut rng = rand::rng();
+        let random_bytes: [u8; 6] = rng.random(); // Generate 6 random bytes
+        let random_name = BASE64_URL_SAFE.encode(random_bytes);
+        let random_name = &random_name[..8]; // Take the first 8 characters
+        format!("tmp/downloads/{random_name}")
+    };
     debug!("Downloading to temporary file: {}", temp_file_path);
     let mut dest = File::create(&temp_file_path).await?;
     let content = response.bytes().await?;
@@ -130,11 +132,7 @@ pub fn get_case_s3_key(
     let key = format!("objects/{country}/{state}/{jurisdiction_name}/{case_name}.json");
     debug!(
         case_name,
-        jurisdiction_name,
-        state,
-        country,
-        "Generated case S3 key: {}",
-        key
+        jurisdiction_name, state, country, "Generated case S3 key: {}", key
     );
     key
 }
@@ -285,7 +283,10 @@ pub async fn list_cases_for_jurisdiction(
     state: &str,
     country: &str,
 ) -> anyhow::Result<Vec<String>> {
-    info!(jurisdiction_name, state, country, "Listing cases for jurisdiction");
+    info!(
+        jurisdiction_name,
+        state, country, "Listing cases for jurisdiction"
+    );
     let prefix = format!("objects/{country}/{state}/{jurisdiction_name}/");
     debug!("Listing cases with prefix: {}", prefix);
     let mut case_names = Vec::new();
