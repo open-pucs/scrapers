@@ -13,13 +13,16 @@ use anyhow::{anyhow, bail};
 use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
 use blake2::{Blake2b, Digest};
 use chrono::Utc;
+use futures_util::future::join_all;
 use redis::{AsyncCommands, RedisError};
 use reqwest;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
+use tokio::sync::Semaphore;
 use tokio::time::sleep;
 use tracing::warn;
 
@@ -76,75 +79,73 @@ pub async fn start_workers() -> anyhow::Result<()> {
         }
     }
 }
-struct AttachResult {
-    attach: anyhow::Result<RawAttachment>,
-    attach_index: usize,
-    filling_index: usize,
-}
 async fn process_attachment(
     s3_client: &S3Client,
     attachment: &GenericAttachment,
+) -> anyhow::Result<RawAttachment> {
+    let file_path = download_file(&attachment.url).await?;
+    let hash = Blake2bHash::from_file(&file_path)?;
+
+    let mut raw_attachment = RawAttachment {
+        hash,
+        name: attachment.name.clone(),
+        extension: attachment.document_extension.clone().unwrap_or_default(),
+        text_objects: vec![],
+    };
+
+    if raw_attachment.extension == "pdf" {
+        let text = process_pdf_text_using_crimson(raw_attachment.hash).await?;
+        let text_obj = RawAttachmentText {
+            quality: AttachmentTextQuality::Low,
+            language: "en".to_string(),
+            text,
+            timestamp: Utc::now(),
+        };
+        raw_attachment.text_objects.push(text_obj);
+    }
+    push_raw_attach_to_s3(&s3_client, &raw_attachment, &file_path).await?;
+    Ok(raw_attachment)
+}
+
+struct AttachIndex {
     attach_index: usize,
     filling_index: usize,
-) -> AttachResult {
-    async fn process_attachment_raw(
-        s3_client: &S3Client,
-        attachment: &GenericAttachment,
-    ) -> anyhow::Result<RawAttachment> {
-        let file_path = download_file(&attachment.url).await?;
-        let hash = Blake2bHash::from_file(&file_path)?;
-
-        let mut raw_attachment = RawAttachment {
-            hash,
-            name: attachment.name.clone(),
-            extension: attachment.document_extension.clone().unwrap_or_default(),
-            text_objects: vec![],
-        };
-
-        if raw_attachment.extension == "pdf" {
-            let text = process_pdf_text_using_crimson(raw_attachment.hash).await?;
-            let text_obj = RawAttachmentText {
-                quality: AttachmentTextQuality::Low,
-                language: "en".to_string(),
-                text,
-                timestamp: Utc::now(),
-            };
-            raw_attachment.text_objects.push(text_obj);
-        }
-        push_raw_attach_to_s3(&s3_client, &raw_attachment, &file_path).await?;
-        Ok(raw_attachment)
-    }
-    AttachResult {
-        attach: process_attachment_raw(s3_client, attachment).await,
-        filling_index,
-        attach_index,
-    }
 }
 
 async fn process_case(case: &GenericCase, s3_client: S3Client) -> anyhow::Result<()> {
+    let sem = Semaphore::new(10); // Allow up to 10 concurrent tasks
     let mut return_case = case.to_owned();
-    let mut attachment_futures = vec![];
+    let mut attachment_tasks = Vec::with_capacity(case.filings.len());
+    let mut attachment_indecies = Vec::with_capacity(case.filings.len());
     for (filling_index, filing) in case.filings.iter().enumerate() {
         for (attach_index, attachment) in filing.attachments.iter().enumerate() {
-            attachment_futures.push(process_attachment(
-                &s3_client,
-                attachment,
-                attach_index,
+            attachment_indecies.push(AttachIndex {
                 filling_index,
-            ));
+                attach_index,
+            });
+            let tmp_closure = async |attach| {
+                // Acquire permit from semaphore (waits if none available)
+                let permit = sem.acquire().await.map_err(anyhow::Error::from)?;
+                let result = process_attachment(&s3_client, &attach).await?;
+                drop(permit); // Explicit drop allows Rust compiler to optimize
+                Ok(result) as anyhow::Result<RawAttachment>
+            };
+            attachment_tasks.push(tmp_closure(attachment.clone()));
         }
     }
-    let attachment_results: Vec<AttachResult> = vec![]; // use a semaphor to process the results 10 at
-    // a time.
-    for AttachResult {
-        attach,
-        filling_index,
-        attach_index,
-    } in attachment_results
-    {
-        let attach = attach?;
-
-        return_case.filings[filling_index].attachments[attach_index].hash = Some(attach.hash);
+    for (raw_index, raw_attach) in join_all(attachment_tasks).await.into_iter().enumerate() {
+        let AttachIndex {
+            filling_index,
+            attach_index,
+        } = attachment_indecies[raw_index];
+        let hash_opt = if let Ok(attach) = raw_attach {
+            Some(attach.hash)
+        } else {
+            let err = raw_attach.unwrap_err();
+            tracing::error!(%err,%attach_index,%filling_index,"Encountered error processing attachment");
+            None
+        };
+        return_case.filings[filling_index].attachments[attach_index].hash = hash_opt;
     }
 
     let default_jurisdiction = "ny_puc";
