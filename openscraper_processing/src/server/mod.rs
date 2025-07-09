@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::{net::SocketAddr, str::FromStr};
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{error, info};
 
 use crate::types::{GenericCase, RawAttachment, hash::Blake2bHash};
 // use aide::{
@@ -80,7 +80,10 @@ pub fn define_routes() -> ApiRouter {
 }
 
 async fn health() -> impl IntoApiResponse {
-    Json("{\"is_healthy\": true}")
+    info!("Health check requested");
+    let response = Json("{\"is_healthy\": true}");
+    info!("Health check successful");
+    response
 }
 
 fn health_docs(op: TransformOperation) -> TransformOperation {
@@ -105,6 +108,7 @@ async fn handle_case_filing_from_s3(
         case_name,
     }): Path<CasePath>,
 ) -> impl IntoApiResponse {
+    info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Request received for case filing");
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let country = "usa"; // Or get from somewhere else
     let result = crate::s3_stuff::fetch_case_filing_from_s3(
@@ -116,8 +120,14 @@ async fn handle_case_filing_from_s3(
     )
     .await;
     match result {
-        Ok(case) => Json(case).into_response(),
-        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(case) => {
+            info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Successfully fetched case filing");
+            Json(case).into_response()
+        }
+        Err(e) => {
+            error!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, error = %e, "Error fetching case filing");
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
     }
 }
 
@@ -147,6 +157,7 @@ async fn handle_caselist_jurisdiction_fetch_all(
     }): Path<JurisdictionPath>,
     Query(PaginationData { limit, offset }): Query<PaginationData>,
 ) -> impl IntoApiResponse {
+    info!(state = %state, jurisdiction = %jurisdiction_name, "Request received for case list");
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let country = "usa"; // Or get from somewhere else
     let result = crate::s3_stuff::list_cases_for_jurisdiction(
@@ -158,8 +169,14 @@ async fn handle_caselist_jurisdiction_fetch_all(
     .await;
     let pagination = PaginationData { limit, offset };
     match result {
-        Ok(cases) => Json(make_paginated_subslice(pagination, &cases)).into_response(),
-        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(cases) => {
+            info!(state = %state, jurisdiction = %jurisdiction_name, "Successfully fetched case list");
+            Json(make_paginated_subslice(pagination, &cases)).into_response()
+        }
+        Err(e) => {
+            error!(state = %state, jurisdiction = %jurisdiction_name, error = %e, "Error fetching case list");
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
     }
 }
 
@@ -178,17 +195,25 @@ struct AttachmentPath {
 async fn handle_attachment_data_from_s3(
     Path(AttachmentPath { blake2b_hash }): Path<AttachmentPath>,
 ) -> impl IntoApiResponse {
+    info!(hash = %blake2b_hash, "Request received for attachment data");
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let hash = match Blake2bHash::from_str(&blake2b_hash) {
         Ok(hash) => hash,
         Err(e) => {
+            error!(hash = %blake2b_hash, error = %e, "Invalid hash format for attachment data request");
             return (axum::http::StatusCode::BAD_REQUEST, e.to_string()).into_response();
         }
     };
     let result = crate::s3_stuff::fetch_attachment_data_from_s3(&s3_client, hash).await;
     match result {
-        Ok(attachment) => Json(attachment).into_response(),
-        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(attachment) => {
+            info!(hash = %blake2b_hash, "Successfully fetched attachment data");
+            Json(attachment).into_response()
+        }
+        Err(e) => {
+            error!(hash = %blake2b_hash, error = %e, "Error fetching attachment data");
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
     }
 }
 
@@ -202,26 +227,33 @@ fn handle_attachment_data_from_s3_docs(op: TransformOperation) -> TransformOpera
 async fn handle_attachment_file_from_s3(
     Path(AttachmentPath { blake2b_hash }): Path<AttachmentPath>,
 ) -> impl IntoApiResponse {
+    info!(hash = %blake2b_hash, "Request received for attachment file");
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let hash = match Blake2bHash::from_str(&blake2b_hash) {
         Ok(hash) => hash,
         Err(e) => {
+            error!(hash = %blake2b_hash, error = %e, "Invalid hash format for attachment file request");
             return (axum::http::StatusCode::BAD_REQUEST, e.to_string()).into_response();
         }
     };
     let result = crate::s3_stuff::fetch_attachment_file_from_s3(&s3_client, hash).await;
     match result {
         Ok(path) => {
-            let file_contents = match tokio::fs::read(path).await {
+            let file_contents = match tokio::fs::read(&path).await {
                 Ok(contents) => contents,
                 Err(e) => {
+                    error!(hash = %blake2b_hash, path = ?path, error = %e, "Error reading attachment file from disk");
                     return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
                         .into_response();
                 }
             };
+            info!(hash = %blake2b_hash, "Successfully fetched attachment file");
             (axum::http::StatusCode::OK, Bytes::from(file_contents)).into_response()
         }
-        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => {
+            error!(hash = %blake2b_hash, error = %e, "Error fetching attachment file");
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
     }
 }
 
@@ -243,3 +275,4 @@ fn handle_attachment_file_from_s3_docs(op: TransformOperation) -> TransformOpera
 //     // TODO: Implement this
 //     Json("Not implemented")
 // }
+
