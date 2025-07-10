@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::{net::SocketAddr, str::FromStr};
 use tokio::sync::Mutex;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::types::{GenericCase, RawAttachment, hash::Blake2bHash};
 // use aide::{
@@ -158,6 +158,7 @@ async fn handle_caselist_jurisdiction_fetch_all(
     Query(PaginationData { limit, offset }): Query<PaginationData>,
 ) -> impl IntoApiResponse {
     info!(state = %state, jurisdiction = %jurisdiction_name, "Request received for case list");
+    warn!("I dont know what the fuck is going wrong with this stuff");
     let s3_client = crate::s3_stuff::make_s3_client().await;
 
     info!("Sucessfully created s3 client.");
