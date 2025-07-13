@@ -101,11 +101,11 @@ async fn process_attachment(
     let mut raw_attachment = RawAttachment {
         hash,
         name: attachment.name.clone(),
-        extension: attachment.document_extension.clone().unwrap_or_default(),
+        extension: extension.clone(),
         text_objects: vec![],
     };
 
-    if raw_attachment.extension == "pdf" {
+    if raw_attachment.extension == FileExtension::Pdf {
         let text = process_pdf_text_using_crimson(raw_attachment.hash).await?;
         let text_obj = RawAttachmentText {
             quality: AttachmentTextQuality::Low,
@@ -177,14 +177,16 @@ async fn process_case(case: &GenericCase, s3_client: S3Client) -> anyhow::Result
             filling_index,
             attach_index,
         } = attachment_indecies[raw_index];
-        let hash_opt = if let Ok(attach) = raw_attach {
-            Some(attach.hash)
+        if let Ok(attach) = raw_attach {
+            let hash_opt = Some(attach.hash);
+            let valid_extension = attach.extension.to_string();
+            return_case.filings[filling_index].attachments[attach_index].hash = hash_opt;
+            return_case.filings[filling_index].attachments[attach_index].document_extension =
+                Some(valid_extension);
         } else {
             let err = raw_attach.unwrap_err();
             tracing::error!(%err,%attach_index,%filling_index,"Encountered error processing attachment");
-            None
         };
-        return_case.filings[filling_index].attachments[attach_index].hash = hash_opt;
     }
 
     let default_jurisdiction = "ny_puc";

@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use file_extension::FileExtension;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -67,6 +68,6 @@ pub struct RawAttachmentText {
 pub struct RawAttachment {
     pub hash: Blake2bHash,
     pub name: String,
-    pub extension: String,
+    pub extension: FileExtension,
     pub text_objects: Vec<RawAttachmentText>,
 }

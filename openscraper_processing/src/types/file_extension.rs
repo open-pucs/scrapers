@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 use std::{fs, path::Path, str};
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FileExtension {
     Pdf,
     Xlsx,
@@ -75,6 +75,38 @@ impl fmt::Display for FileExtension {
             FileExtension::Unknown(ext) => ext.to_owned(),
         };
         write!(f, "{displayed}")
+    }
+}
+use schemars::JsonSchema;
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
+impl Serialize for FileExtension {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Use the existing Display implementation to convert to string
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for FileExtension {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize as string then parse using FromStr
+        let s = String::deserialize(deserializer)?;
+        s.parse::<FileExtension>().map_err(de::Error::custom)
+    }
+}
+
+impl JsonSchema for FileExtension {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "FileExtension".into()
+    }
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        let schema = generator.subschema_for::<String>();
+        schema
     }
 }
 
