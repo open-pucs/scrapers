@@ -10,9 +10,7 @@ use axum::{
 use hyper::body::Bytes;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::{net::SocketAddr, str::FromStr};
-use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
 use crate::types::{GenericCase, RawAttachment, hash::Blake2bHash};

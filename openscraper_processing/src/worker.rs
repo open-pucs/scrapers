@@ -5,6 +5,7 @@ use crate::s3_stuff::{
 use crate::types::env_vars::{
     CRIMSON_URL, OPENSCRAPERS_REDIS_DOMAIN, OPENSCRAPERS_S3_OBJECT_BUCKET,
 };
+use crate::types::file_extension::FileExtension;
 use crate::types::hash::Blake2bHash;
 use crate::types::{
     AttachmentTextQuality, GenericAttachment, GenericCase, RawAttachment, RawAttachmentText,
@@ -18,6 +19,7 @@ use redis::{AsyncCommands, RedisError};
 use reqwest;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::File;
@@ -79,11 +81,21 @@ pub async fn start_workers() -> anyhow::Result<()> {
         }
     }
 }
+
 async fn process_attachment(
     s3_client: &S3Client,
     attachment: &GenericAttachment,
 ) -> anyhow::Result<RawAttachment> {
-    let file_path = download_file(&attachment.url).await?;
+    if attachment.document_extension.is_none() {
+        bail!("Extension does not exist!")
+    };
+    let invalid_ext = attachment.document_extension.as_ref().unwrap();
+    let extension = match FileExtension::from_str(invalid_ext) {
+        Ok(val) => val,
+        Err(err) => bail!(err),
+    };
+
+    let file_path = download_file_validated_with_retries(&attachment.url, &extension).await?;
     let hash = Blake2bHash::from_file(&file_path)?;
 
     let mut raw_attachment = RawAttachment {
@@ -105,6 +117,33 @@ async fn process_attachment(
     }
     push_raw_attach_to_s3(s3_client, &raw_attachment, &file_path).await?;
     Ok(raw_attachment)
+}
+
+const ATTACHMENT_DOWNLOAD_TRIES: usize = 2;
+const DOWNLOAD_RETRY_DELAY_SECONDS: u64 = 2;
+async fn download_file_validated_with_retries(
+    url: &str,
+    extension: &FileExtension,
+) -> anyhow::Result<String> {
+    let mut last_error: Option<anyhow::Error> = None;
+    for _ in 0..ATTACHMENT_DOWNLOAD_TRIES {
+        match download_file(url).await {
+            Ok(file_path) => {
+                if let Err(err) = extension.is_valid_file(&file_path) {
+                    last_error = Some(anyhow::Error::from(err))
+                } else {
+                    return Ok(file_path);
+                }
+            }
+            Err(err) => {
+                last_error = Some(err);
+            }
+        };
+        sleep(Duration::from_secs(DOWNLOAD_RETRY_DELAY_SECONDS)).await;
+    }
+    Err(last_error.unwrap_or(anyhow!(
+        "UNREACHABLE CODE: Should have not gotten to last step without error being set"
+    )))
 }
 
 struct AttachIndex {
