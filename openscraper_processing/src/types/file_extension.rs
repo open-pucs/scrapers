@@ -77,7 +77,7 @@ impl fmt::Display for FileExtension {
         write!(f, "{displayed}")
     }
 }
-use schemars::JsonSchema;
+use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 impl Serialize for FileExtension {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -105,7 +105,11 @@ impl JsonSchema for FileExtension {
         "FileExtension".into()
     }
     fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        let schema = generator.subschema_for::<String>();
-        schema
+        json_schema!({
+        "type": "string",
+        "title": "File Extension",
+        "description": "File extension. Should be lowercase with no whitespace, but can parse other values."
+        })
     }
 }
+
