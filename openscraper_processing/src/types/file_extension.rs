@@ -36,7 +36,7 @@ pub enum FileValidationError {
     #[error("Invalid PDF header (expected '%PDF-' at start)")]
     InvalidHeader,
     #[error("File is entirely UTF-8 encoded (expected binary PDF)")]
-    Utf8Encoded,
+    UnexpectedUtf8Encoding,
 }
 
 impl FileExtension {
@@ -53,7 +53,7 @@ impl FileExtension {
             }
 
             if str::from_utf8(&contents).is_ok() {
-                return Err(FileValidationError::Utf8Encoded);
+                return Err(FileValidationError::UnexpectedUtf8Encoding);
             }
 
             Ok(())
@@ -109,4 +109,3 @@ impl JsonSchema for FileExtension {
         schema
     }
 }
-
