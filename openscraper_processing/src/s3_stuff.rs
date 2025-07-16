@@ -129,8 +129,8 @@ pub async fn fetch_attachment_data_from_s3(
             Ok(attachment)
         }
         Err(err) => {
-            let display_bytes = String::from_utf8_lossy(&bytes[0..400]);
-            info!(%err, json_snippet = %display_bytes, "Couldnt deserialze attachment from s3.");
+            let display_bytes = String::from_utf8_lossy(&bytes[0..100]);
+            info!(%err,%key, json_snippet = %display_bytes, "Couldnt deserialze attachment from s3.");
             Err(anyhow::Error::from(err))
         }
     }
