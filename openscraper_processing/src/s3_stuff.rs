@@ -251,3 +251,47 @@ pub async fn list_cases_for_jurisdiction(
     info!("Found {} cases for jurisdiction", case_names.len());
     Ok(case_names)
 }
+
+pub async fn push_raw_attach_to_s3(
+    s3_client: &S3Client,
+    raw_att: &RawAttachment,
+    file_contents: Vec<u8>,
+) -> anyhow::Result<()> {
+    info!(hash = %raw_att.hash, "Pushing raw attachment to S3");
+    let dumped_data = serde_json::to_string(&raw_att)?;
+    let obj_key = get_raw_attach_obj_key(raw_att.hash);
+    let file_key = get_raw_attach_file_key(raw_att.hash);
+    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
+    debug!(
+        bucket,
+        "Pushing raw attachment with object key: {} and file key: {}", obj_key, file_key
+    );
+
+    if let Err(e) = s3_client
+        .put_object()
+        .bucket(bucket)
+        .key(&obj_key)
+        .body(ByteStream::from(dumped_data.into_bytes()))
+        .send()
+        .await
+    {
+        error!(error = %e, "Failed to push metadata object to S3");
+        bail!(e)
+    }
+    info!("Successfully pushed metadata object to S3");
+
+    if let Err(e) = s3_client
+        .put_object()
+        .bucket(bucket)
+        .key(&file_key)
+        .body(ByteStream::from(file_contents))
+        .send()
+        .await
+    {
+        error!(error = %e, "Failed to push file to S3");
+        bail!(e)
+    }
+    info!("Successfully pushed file to S3");
+
+    Ok(())
+}

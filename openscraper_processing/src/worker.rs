@@ -116,7 +116,7 @@ async fn process_attachment(
         };
         raw_attachment.text_objects.push(text_obj);
     }
-    push_raw_attach_to_s3(s3_client, &raw_attachment, &file_contents).await?;
+    push_raw_attach_to_s3(s3_client, &raw_attachment, file_contents).await?;
     Ok(raw_attachment)
 }
 
