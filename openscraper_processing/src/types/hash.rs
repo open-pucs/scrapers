@@ -40,7 +40,7 @@ impl Blake2bHash {
         Ok(Blake2bHash(hasher.finalize().into()))
     }
 
-    pub fn peek_bytes(&self) -> &[u8; 32] {
+    pub const fn peek_bytes(&self) -> &[u8; 32] {
         &self.0
     }
 }
@@ -99,7 +99,7 @@ impl JsonSchema for Blake2bHash {
         Cow::Borrowed("Blake2bHash")
     }
 
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> Schema {
         json_schema!({
         "type": "string",
         "pattern": "^[a-zA-Z0-9_-]{43}$",
@@ -130,7 +130,7 @@ mod tests {
             // Convert back from string
             let decoded = match s.parse::<Blake2bHash>() {
                 Ok(h) => h,
-                Err(e) => panic!("Error decoding string: {}", e),
+                Err(e) => panic!("Error decoding string: {e}"),
             };
 
             // Verify match

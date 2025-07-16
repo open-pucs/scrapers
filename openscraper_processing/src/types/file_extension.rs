@@ -1,28 +1,74 @@
 use std::fmt;
 use std::str::FromStr;
 use std::{fs, path::Path, str};
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum FileExtension {
-    Pdf,
-    Xlsx,
-    Unknown(String),
+use tracing::warn;
+
+macro_rules! define_file_extensions {
+    ($($variant:ident => ($ext_str:expr, $is_binary:expr)),* $(,)?) => {
+        #[derive(Clone, Debug, PartialEq, Eq)]
+        pub enum FileExtension {
+            $($variant),*,
+            Unknown(String),
+        }
+
+        impl FromStr for FileExtension {
+            type Err = &'static str;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                let ext = s.split_whitespace().next()
+                    .map(|s| s.to_lowercase())
+                    .ok_or("Extension was empty")?;
+
+                match ext.as_str() {
+                    $(
+                        $ext_str => Ok(FileExtension::$variant),
+                    )*
+                    _ => {
+                        warn!(extension=%ext,"Encountered unknown file extension, if not invalid, consider adding it.");
+                        Ok(FileExtension::Unknown(ext))},
+                }
+            }
+        }
+
+        impl fmt::Display for FileExtension {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self {
+                    $(
+                        FileExtension::$variant => write!(f, $ext_str),
+                    )*
+                    FileExtension::Unknown(ext) => write!(f, "{}", ext),
+                }
+            }
+        }
+
+        impl FileExtension {
+            pub fn get_encoding(&self) -> FileEncoding {
+                match self {
+                    $(
+                        FileExtension::$variant => $is_binary,
+                    )*
+                    FileExtension::Unknown(_) => FileEncoding::Unknown,
+                }
+            }
+        }
+    };
 }
 
-impl FromStr for FileExtension {
-    type Err = &'static str;
+pub enum FileEncoding {
+    Binary,
+    Utf8,
+    Unknown,
+}
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let first_element_extension = s.split_whitespace().next();
-        let lowercase_validated_extension = match first_element_extension {
-            Some(val) => val.to_lowercase(),
-            None => return Err("Extension was empty"),
-        };
-        match &*lowercase_validated_extension {
-            "pdf" => Ok(FileExtension::Pdf),
-            "xlsx" => Ok(FileExtension::Xlsx),
-            _ => Ok(FileExtension::Unknown(lowercase_validated_extension)),
-        }
-    }
+// Define all supported file extensions. Second variable should be true if file is binary, and
+// false if it is utf8 encoded.
+define_file_extensions! {
+    Pdf => ("pdf", FileEncoding::Binary),
+    Xlsx => ("xlsx", FileEncoding::Unknown),
+    Md => ("md", FileEncoding::Utf8),
+    Html => ("html", FileEncoding::Utf8),
+    Docx => ("docx", FileEncoding::Unknown),
+    Png => ("png", FileEncoding::Binary),
 }
 
 use thiserror::Error;
@@ -35,48 +81,60 @@ pub enum FileValidationError {
     TooShort,
     #[error("Invalid PDF header (expected '%PDF-' at start)")]
     InvalidHeader,
-    #[error("File is entirely UTF-8 encoded (expected binary PDF)")]
-    UnexpectedUtf8Encoding,
+    #[error("File is entirely UTF-8 encoded (expected a binary file)")]
+    BinaryWanted,
+    #[error("File is not utf8 encoded")]
+    Utf8Wanted,
 }
 
 impl FileExtension {
-    pub fn is_valid_file<P: AsRef<Path>>(&self, path: P) -> Result<(), FileValidationError> {
-        fn is_valid_pdf(path: &Path) -> Result<(), FileValidationError> {
-            let contents = fs::read(path)?; // This returns ReadError on failure
-
+    pub fn is_valid_file_contents(&self, contents: &[u8]) -> Result<(), FileValidationError> {
+        self.get_encoding().is_valid_file_contents(contents)?;
+        fn is_valid_pdf_contents(contents: &[u8]) -> Result<(), FileValidationError> {
             if contents.len() < 5 {
                 return Err(FileValidationError::TooShort);
             }
-
             if &contents[0..5] != b"%PDF-" {
                 return Err(FileValidationError::InvalidHeader);
             }
-
-            if str::from_utf8(&contents).is_ok() {
-                return Err(FileValidationError::UnexpectedUtf8Encoding);
-            }
-
             Ok(())
         }
 
         match self {
-            FileExtension::Pdf => is_valid_pdf(path.as_ref()),
-            FileExtension::Xlsx => Ok(()),
-            FileExtension::Unknown(_val) => Ok(()),
+            FileExtension::Pdf => is_valid_pdf_contents(contents),
+            _ => Ok(()),
+        }
+    }
+    pub fn is_valid_file<P: AsRef<Path>>(&self, path: P) -> Result<(), FileValidationError> {
+        let contents = fs::read(path)?; // This returns ReadError on failure
+        self.is_valid_file_contents(&contents)
+    }
+}
+impl FileEncoding {
+    pub fn is_valid_file_contents(&self, contents: &[u8]) -> Result<(), FileValidationError> {
+        match self {
+            Self::Unknown => Ok(()),
+            Self::Binary => {
+                let is_not_utf8 = str::from_utf8(contents).is_err();
+                if is_not_utf8 {
+                    Ok(())
+                } else {
+                    Err(FileValidationError::BinaryWanted)
+                }
+            }
+
+            Self::Utf8 => {
+                let is_utf8 = str::from_utf8(contents).is_ok();
+                if is_utf8 {
+                    Ok(())
+                } else {
+                    Err(FileValidationError::Utf8Wanted)
+                }
+            }
         }
     }
 }
 
-impl fmt::Display for FileExtension {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let displayed = match self {
-            FileExtension::Pdf => "pdf".to_string(),
-            FileExtension::Xlsx => "xlsx".to_string(),
-            FileExtension::Unknown(ext) => ext.to_owned(),
-        };
-        write!(f, "{displayed}")
-    }
-}
 use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 impl Serialize for FileExtension {
@@ -112,4 +170,3 @@ impl JsonSchema for FileExtension {
         })
     }
 }
-
