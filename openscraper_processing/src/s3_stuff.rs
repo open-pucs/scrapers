@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::config::Credentials;
 use chrono::offset;
@@ -122,9 +122,18 @@ pub async fn fetch_attachment_data_from_s3(
     info!(%hash, "Fetching attachment data from S3");
     let key = get_raw_attach_obj_key(hash);
     let bytes = download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await?;
-    let attachment = serde_json::from_slice(&bytes)?;
-    info!("Successfully deserialized attachment data");
-    Ok(attachment)
+    info!(%key, "Successfully got file from s3.");
+    match serde_json::from_slice(&bytes) {
+        Ok(attachment) => {
+            info!("Successfully deserialized attachment data");
+            Ok(attachment)
+        }
+        Err(err) => {
+            let display_bytes = String::from_utf8_lossy(&bytes[0..400]);
+            info!(%err, json_snippet = %display_bytes, "Couldnt deserialze attachment from s3.");
+            Err(anyhow::Error::from(err))
+        }
+    }
 }
 
 pub async fn fetch_attachment_file_from_s3(
