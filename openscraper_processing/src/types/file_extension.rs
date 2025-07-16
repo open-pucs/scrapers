@@ -4,7 +4,7 @@ use std::{fs, path::Path, str};
 use tracing::warn;
 
 macro_rules! define_file_extensions {
-    ($($variant:ident => ($ext_str:expr, $is_binary:expr)),* $(,)?) => {
+    ($($variant:ident => ($ext_str:expr, $encoding:expr)),* $(,)?) => {
         #[derive(Clone, Debug, PartialEq, Eq)]
         pub enum FileExtension {
             $($variant),*,
@@ -45,7 +45,7 @@ macro_rules! define_file_extensions {
             pub fn get_encoding(&self) -> FileEncoding {
                 match self {
                     $(
-                        FileExtension::$variant => $is_binary,
+                        FileExtension::$variant => $encoding,
                     )*
                     FileExtension::Unknown(_) => FileEncoding::Unknown,
                 }
@@ -54,6 +54,7 @@ macro_rules! define_file_extensions {
     };
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum FileEncoding {
     Binary,
     Utf8,

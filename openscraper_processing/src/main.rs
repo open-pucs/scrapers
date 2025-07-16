@@ -1,3 +1,5 @@
+use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
+use misc::otel_setup::init_subscribers_and_loglevel;
 use tracing::info;
 
 use crate::{server::define_routes, worker::start_workers};
@@ -11,6 +13,7 @@ use axum::{Extension, Json};
 
 use std::net::{Ipv4Addr, SocketAddr};
 
+mod misc;
 mod s3_stuff;
 mod server;
 mod types;
@@ -26,11 +29,14 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
-    info!("Tracing Subscriber is up and running, trying to create app");
+    let _ =
+        init_subscribers_and_loglevel().expect("Failed to initialize opentelemetry tracing stuff");
     // initialise our subscriber
     let routes = define_routes();
     let app = routes
+        .layer(OtelInResponseLayer)
+        //start OpenTelemetry trace on incoming request
+        .layer(OtelAxumLayer::default())
         .api_route("/health", get(health))
         .route("/api.json", get(serve_api))
         .route("/swagger", Swagger::new("/api.json").axum_route());
