@@ -61,67 +61,85 @@ pub async fn make_s3_client() -> S3Client {
     S3Client::new(&sdk_config)
 }
 
-pub async fn push_raw_attach_to_s3(
+// Core function to download bytes from S3
+async fn download_s3_bytes(
     s3_client: &S3Client,
-    raw_att: &RawAttachment,
-    file_path: &str,
-) -> anyhow::Result<()> {
-    info!(hash = %raw_att.hash, "Pushing raw attachment to S3");
-    let dumped_data = serde_json::to_string(&raw_att)?;
-    let obj_key = get_raw_attach_obj_key(raw_att.hash);
-    let file_key = get_raw_attach_file_key(raw_att.hash);
-    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
+    bucket: &str,
+    key: &str,
+) -> anyhow::Result<Vec<u8>> {
+    debug!("Downloading S3 object: {}/{}", bucket, key);
+    let output = s3_client
+        .get_object()
+        .bucket(bucket)
+        .key(key)
+        .send()
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to download S3 object: {}/{}", bucket, key);
+            e
+        })?;
+
+    let bytes = output
+        .body
+        .collect()
+        .await
+        .map(|data| data.into_bytes().to_vec())
+        .map_err(|e| {
+            error!(error = %e, "Failed to read response body: {}/{}", bucket, key);
+            e
+        })?;
+
     debug!(
+        "Successfully downloaded {} bytes from {}/{}",
+        bytes.len(),
         bucket,
-        "Pushing raw attachment with object key: {} and file key: {}", obj_key, file_key
+        key
     );
-
-    if let Err(e) = s3_client
-        .put_object()
-        .bucket(bucket)
-        .key(&obj_key)
-        .body(ByteStream::from(dumped_data.into_bytes()))
-        .send()
-        .await
-    {
-        error!(error = %e, "Failed to push metadata object to S3");
-        bail!(e)
-    }
-    info!("Successfully pushed metadata object to S3");
-
-    let body = ByteStream::from_path(Path::new(file_path)).await?;
-    if let Err(e) = s3_client
-        .put_object()
-        .bucket(bucket)
-        .key(&file_key)
-        .body(body)
-        .send()
-        .await
-    {
-        error!(error = %e, "Failed to push file to S3");
-        bail!(e)
-    }
-    info!("Successfully pushed file to S3");
-
-    Ok(())
+    Ok(bytes)
 }
 
-pub async fn download_file(url: &str) -> anyhow::Result<String> {
+pub async fn download_file(url: &str) -> anyhow::Result<Vec<u8>> {
     info!(url, "Downloading file");
     let response = reqwest::get(url).await?;
-    let temp_file_path = {
-        let mut rng = rand::rng();
-        let random_bytes: [u8; 6] = rng.random(); // Generate 6 random bytes
-        let random_name = BASE64_URL_SAFE.encode(random_bytes);
-        let random_name = &random_name[..8]; // Take the first 8 characters
-        format!("tmp/downloads/{random_name}")
-    };
-    debug!("Downloading to temporary file: {}", temp_file_path);
-    let mut dest = File::create(&temp_file_path).await?;
-    let content = response.bytes().await?;
-    tokio::io::copy(&mut content.as_ref(), &mut dest).await?;
-    info!("Successfully downloaded file to {}", temp_file_path);
-    Ok(temp_file_path)
+    let bytes = response.bytes().await?.to_vec();
+    info!("Successfully downloaded {} bytes", bytes.len());
+    Ok(bytes)
+}
+
+pub async fn fetch_case_filing_from_s3(
+    s3_client: &S3Client,
+    case_name: &str,
+    jurisdiction_name: &str,
+    state: &str,
+    country: &str,
+) -> anyhow::Result<GenericCase> {
+    info!(case_name, jurisdiction_name, "Fetching case filing from S3");
+    let key = get_case_s3_key(case_name, jurisdiction_name, state, country);
+    let bytes = download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await?;
+    let case = serde_json::from_slice(&bytes)?;
+    info!("Successfully deserialized case filing");
+    Ok(case)
+}
+
+pub async fn fetch_attachment_data_from_s3(
+    s3_client: &S3Client,
+    hash: Blake2bHash,
+) -> anyhow::Result<RawAttachment> {
+    info!(%hash, "Fetching attachment data from S3");
+    let key = get_raw_attach_obj_key(hash);
+    let bytes = download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await?;
+    let attachment = serde_json::from_slice(&bytes)?;
+    info!("Successfully deserialized attachment data");
+    Ok(attachment)
+}
+
+pub async fn fetch_attachment_file_from_s3(
+    s3_client: &S3Client,
+    hash: Blake2bHash,
+) -> anyhow::Result<Vec<u8>> {
+    info!(%hash, "Fetching attachment file from S3");
+    let key = get_raw_attach_file_key(hash);
+    download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await
 }
 pub fn get_case_s3_key(
     case_name: &str,
@@ -135,89 +153,6 @@ pub fn get_case_s3_key(
         jurisdiction_name, state, country, "Generated case S3 key: {}", key
     );
     key
-}
-
-pub async fn fetch_case_filing_from_s3(
-    s3_client: &S3Client,
-    case_name: &str,
-    jurisdiction_name: &str,
-    state: &str,
-    country: &str,
-) -> anyhow::Result<GenericCase> {
-    info!(case_name, jurisdiction_name, "Fetching case filing from S3");
-    let key = get_case_s3_key(case_name, jurisdiction_name, state, country);
-    debug!("Fetching case filing with key: {}", key);
-    let output = s3_client
-        .get_object()
-        .bucket(&**OPENSCRAPERS_S3_OBJECT_BUCKET)
-        .key(&key)
-        .send()
-        .await
-        .map_err(|e| {
-            error!(error = %e, "Failed to fetch case filing from S3");
-            e
-        })?;
-    let bytes = output.body.collect().await?.into_bytes();
-    let case: GenericCase = serde_json::from_slice(&bytes)?;
-    info!("Successfully fetched case filing from S3");
-    Ok(case)
-}
-
-pub async fn fetch_attachment_data_from_s3(
-    s3_client: &S3Client,
-    hash: Blake2bHash,
-) -> anyhow::Result<RawAttachment> {
-    info!(%hash, "Fetching attachment data from S3");
-    let obj_key = get_raw_attach_obj_key(hash);
-    debug!("Fetching attachment data with key: {}", obj_key);
-    let result = s3_client
-        .get_object()
-        .bucket(&**OPENSCRAPERS_S3_OBJECT_BUCKET)
-        .key(obj_key)
-        .send()
-        .await
-        .map_err(|e| {
-            error!(error = %e, "Failed to fetch attachment data from S3");
-            e
-        })?;
-    let bytes = result.body.collect().await?.into_bytes();
-    let raw_attach: RawAttachment = serde_json::from_slice(&bytes)?;
-    info!("Successfully fetched attachment data from S3");
-    Ok(raw_attach)
-}
-
-pub async fn fetch_attachment_file_from_s3(
-    s3_client: &S3Client,
-    hash: Blake2bHash,
-) -> anyhow::Result<PathBuf> {
-    info!(%hash, "Fetching attachment file from S3");
-    let obj_key = get_raw_attach_file_key(hash);
-    let mut temp_path = env::temp_dir();
-    temp_path.push(hash.to_string());
-    debug!(
-        "Fetching attachment file with key: {} to temporary path: {:?}",
-        obj_key, temp_path
-    );
-
-    let mut file = File::create(&temp_path).await?;
-    let mut stream = s3_client
-        .get_object()
-        .bucket(&**OPENSCRAPERS_S3_OBJECT_BUCKET)
-        .key(obj_key)
-        .send()
-        .await
-        .map_err(|e| {
-            error!(error = %e, "Failed to fetch attachment file from S3");
-            e
-        })?
-        .body;
-
-    while let Some(chunk) = stream.try_next().await? {
-        tokio::io::copy(&mut chunk.as_ref(), &mut file).await?;
-    }
-
-    info!("Successfully fetched attachment file from S3");
-    Ok(temp_path)
 }
 
 pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blake2bHash) -> bool {

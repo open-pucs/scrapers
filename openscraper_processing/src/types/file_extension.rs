@@ -60,8 +60,7 @@ pub enum FileEncoding {
     Unknown,
 }
 
-// Define all supported file extensions. Second variable should be true if file is binary, and
-// false if it is utf8 encoded.
+// Define all supported file extensions. Second variable should be the encoding of the file.
 define_file_extensions! {
     Pdf => ("pdf", FileEncoding::Binary),
     Xlsx => ("xlsx", FileEncoding::Unknown),
@@ -81,7 +80,7 @@ pub enum FileValidationError {
     TooShort,
     #[error("Invalid PDF header (expected '%PDF-' at start)")]
     InvalidHeader,
-    #[error("File is entirely UTF-8 encoded (expected a binary file)")]
+    #[error("File is not binary encoded (got a utf8 encoded file)")]
     BinaryWanted,
     #[error("File is not utf8 encoded")]
     Utf8Wanted,
