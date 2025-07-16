@@ -148,40 +148,22 @@ async fn process_case(case: &GenericCase, s3_client: S3Client) -> anyhow::Result
     let sem = Semaphore::new(10); // Allow up to 10 concurrent tasks
     let mut return_case = case.to_owned();
     let mut attachment_tasks = Vec::with_capacity(case.filings.len());
-    let mut attachment_indecies = Vec::with_capacity(case.filings.len());
-    for (filling_index, filing) in case.filings.iter().enumerate() {
-        for (attach_index, attachment) in filing.attachments.iter().enumerate() {
-            attachment_indecies.push(AttachIndex {
-                filling_index,
-                attach_index,
-            });
-            let tmp_closure = async |attach| -> anyhow::Result<RawAttachment> {
-                // Acquire permit from semaphore (waits if none available)
-                let permit = sem.acquire().await.map_err(anyhow::Error::from)?;
-                let result = process_attachment(&s3_client, &attach).await?;
-                drop(permit); // Explicit drop allows Rust compiler to optimize
-                Ok(result)
-            };
-            attachment_tasks.push(tmp_closure(attachment.clone()));
+    for filing in return_case.filings.iter_mut() {
+        for attachment in filing.attachments.iter_mut() {
+            let tmp_closure =
+                async |attach: &mut GenericAttachment| -> anyhow::Result<RawAttachment> {
+                    // Acquire permit from semaphore (waits if none available)
+                    let permit = sem.acquire().await.map_err(anyhow::Error::from)?;
+                    let result = process_attachment(&s3_client, attach).await?;
+                    drop(permit); // Explicit drop allows Rust compiler to optimize
+                    attach.hash = Some(result.hash);
+                    attach.document_extension = Some(result.extension.to_string());
+                    Ok(result)
+                };
+            attachment_tasks.push(tmp_closure(attachment));
         }
     }
-    for (raw_index, raw_attach) in join_all(attachment_tasks).await.into_iter().enumerate() {
-        let AttachIndex {
-            filling_index,
-            attach_index,
-        } = attachment_indecies[raw_index];
-        if let Ok(attach) = raw_attach {
-            let hash_opt = Some(attach.hash);
-            let valid_extension = attach.extension.to_string();
-            return_case.filings[filling_index].attachments[attach_index].hash = hash_opt;
-            return_case.filings[filling_index].attachments[attach_index].document_extension =
-                Some(valid_extension);
-        } else {
-            let err = raw_attach.unwrap_err();
-            tracing::error!(%err,%attach_index,%filling_index,"Encountered error processing attachment");
-        };
-    }
-
+    join_all(attachment_tasks).await;
     let default_jurisdiction = "ny_puc";
     let default_state = "ny";
     let default_country = "usa";
