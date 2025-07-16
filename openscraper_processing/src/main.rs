@@ -3,7 +3,7 @@ use tracing::info;
 use crate::{server::define_routes, worker::start_workers};
 
 use aide::{
-    axum::{ApiRouter, IntoApiResponse, routing::get},
+    axum::{IntoApiResponse, routing::get},
     openapi::{Info, OpenApi},
     swagger::Swagger,
 };
@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
     // This worker runs indefinitely
     info!("App Created, spawning background process:");
     tokio::spawn(async move {
-        start_workers().await;
+        let _ = start_workers().await;
     });
 
     // bind and serve

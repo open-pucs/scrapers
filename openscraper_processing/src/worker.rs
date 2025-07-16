@@ -2,28 +2,20 @@ use crate::s3_stuff::{
     download_file, generate_s3_object_uri_from_key, get_raw_attach_file_key, make_s3_client,
     push_case_to_s3_and_db, push_raw_attach_to_s3,
 };
-use crate::types::env_vars::{
-    CRIMSON_URL, OPENSCRAPERS_REDIS_DOMAIN, OPENSCRAPERS_S3_OBJECT_BUCKET,
-};
+use crate::types::env_vars::{CRIMSON_URL, OPENSCRAPERS_REDIS_DOMAIN};
 use crate::types::file_extension::FileExtension;
 use crate::types::hash::Blake2bHash;
 use crate::types::{
     AttachmentTextQuality, GenericAttachment, GenericCase, RawAttachment, RawAttachmentText,
 };
 use anyhow::{anyhow, bail};
-use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
-use blake2::{Blake2b, Digest};
+use aws_sdk_s3::Client as S3Client;
 use chrono::Utc;
 use futures_util::future::join_all;
 use redis::{AsyncCommands, RedisError};
-use reqwest;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::time::Duration;
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
 use tokio::sync::Semaphore;
 use tokio::time::sleep;
 use tracing::warn;

@@ -145,7 +145,7 @@ mod tests {
             let computed_hash = Blake2bHash::from_bytes(data);
             let computed_hash_bytes = *computed_hash.peek_bytes();
             let expected_bytes = hex::decode(expected_hex)
-                .map_err(|e| format!("Failed to decode hex string: {}", e))?;
+                .map_err(|e| format!("Failed to decode hex string: {e}"))?;
 
             if expected_bytes.len() != 32 {
                 return Err("Expected hash length must be 32 bytes".into());
@@ -159,8 +159,7 @@ mod tests {
                 Ok(())
             } else {
                 Err(format!(
-                    "Hash mismatch\nExpected:{:?}\nGot:{:?}",
-                    expected_hash_bytes, computed_hash_bytes
+                    "Hash mismatch\nExpected:{expected_hash_bytes:?}\nGot:{computed_hash_bytes:?}"
                 ))
             }
         }
@@ -178,8 +177,7 @@ mod tests {
         ];
 
         for (input, expected_hex) in test_cases {
-            test_expected_hash(input, expected_hex)
-                .unwrap_or_else(|e| panic!("Test failed: {}", e));
+            test_expected_hash(input, expected_hex).unwrap_or_else(|e| panic!("Test failed: {e}"));
         }
     }
 }

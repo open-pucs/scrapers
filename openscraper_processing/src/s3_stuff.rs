@@ -1,16 +1,10 @@
-use std::env;
-use std::path::{Path, PathBuf};
-use std::time::{Instant, SystemTime};
+use std::path::Path;
 
 use anyhow::bail;
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::config::Credentials;
-use base64::Engine;
-use base64::prelude::BASE64_URL_SAFE;
-use chrono::{DateTime, offset};
-use rand::Rng;
-use tokio::fs::File;
-use tracing::{debug, error, info, warn};
+use chrono::offset;
+use tracing::{debug, error, info};
 
 use crate::types::s3_uri::S3Location;
 use crate::types::{

@@ -4,13 +4,13 @@ use aide::{
     transform::TransformOperation,
 };
 use axum::{
-    extract::{Path, Query, State},
-    response::{IntoResponse, Json, Response},
+    extract::{Path, Query},
+    response::{IntoResponse, Json},
 };
 use hyper::body::Bytes;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, str::FromStr};
+use std::str::FromStr;
 use tracing::{error, info, warn};
 
 use crate::types::{GenericCase, RawAttachment, hash::Blake2bHash};
@@ -65,14 +65,6 @@ pub fn define_routes() -> ApiRouter {
             ),
         );
 
-    // .api_route(
-    //     "/api/caselist/:state/:jurisdiction_name/indexed_after/:rfc339_date",
-    //     get(handle_caselist_jurisdiction_fetch_date),
-    // )
-    // .api_route(
-    //     "/api/caselist/all/indexed_after/:rfc339_date",
-    //     get(handle_caselist_all_fetch),
-    // )
     info!("Routes defined successfully");
     app
 }
@@ -141,11 +133,6 @@ struct JurisdictionPath {
     state: String,
     /// The name of the jurisdiction.
     jurisdiction_name: String,
-}
-
-#[derive(Deserialize)]
-struct CaseListParams {
-    limit: Option<i32>,
 }
 
 async fn handle_caselist_jurisdiction_fetch_all(
@@ -244,7 +231,7 @@ async fn handle_attachment_file_from_s3(
         Ok(contents) => (axum::http::StatusCode::OK, Bytes::from(contents)).into_response(),
         Err(e) => {
             error!(hash = %blake2b_hash,error = %e, "Error reading attachment file from disk");
-            return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
         }
     }
 }
