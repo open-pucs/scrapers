@@ -239,22 +239,12 @@ async fn handle_attachment_file_from_s3(
         }
     };
     let result = crate::s3_stuff::fetch_attachment_file_from_s3(&s3_client, hash).await;
+
     match result {
-        Ok(path) => {
-            let file_contents = match tokio::fs::read(&path).await {
-                Ok(contents) => contents,
-                Err(e) => {
-                    error!(hash = %blake2b_hash, path = ?path, error = %e, "Error reading attachment file from disk");
-                    return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-                        .into_response();
-                }
-            };
-            info!(hash = %blake2b_hash, "Successfully fetched attachment file");
-            (axum::http::StatusCode::OK, Bytes::from(file_contents)).into_response()
-        }
+        Ok(contents) => (axum::http::StatusCode::OK, Bytes::from(contents)).into_response(),
         Err(e) => {
-            error!(hash = %blake2b_hash, error = %e, "Error fetching attachment file");
-            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+            error!(hash = %blake2b_hash,error = %e, "Error reading attachment file from disk");
+            return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
         }
     }
 }

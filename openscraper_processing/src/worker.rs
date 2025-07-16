@@ -95,8 +95,9 @@ async fn process_attachment(
         Err(err) => bail!(err),
     };
 
-    let file_path = download_file_validated_with_retries(&attachment.url, &extension).await?;
-    let hash = Blake2bHash::from_file(&file_path)?;
+    let file_contents =
+        download_file_content_validated_with_retries(&attachment.url, &extension).await?;
+    let hash = Blake2bHash::from_bytes(&file_contents);
 
     let mut raw_attachment = RawAttachment {
         hash,
@@ -115,24 +116,24 @@ async fn process_attachment(
         };
         raw_attachment.text_objects.push(text_obj);
     }
-    push_raw_attach_to_s3(s3_client, &raw_attachment, &file_path).await?;
+    push_raw_attach_to_s3(s3_client, &raw_attachment, &file_contents).await?;
     Ok(raw_attachment)
 }
 
 const ATTACHMENT_DOWNLOAD_TRIES: usize = 2;
 const DOWNLOAD_RETRY_DELAY_SECONDS: u64 = 2;
-async fn download_file_validated_with_retries(
+async fn download_file_content_validated_with_retries(
     url: &str,
     extension: &FileExtension,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Vec<u8>> {
     let mut last_error: Option<anyhow::Error> = None;
     for _ in 0..ATTACHMENT_DOWNLOAD_TRIES {
         match download_file(url).await {
-            Ok(file_path) => {
-                if let Err(err) = extension.is_valid_file(&file_path) {
+            Ok(file_contents) => {
+                if let Err(err) = extension.is_valid_file_contents(&file_contents) {
                     last_error = Some(anyhow::Error::from(err))
                 } else {
-                    return Ok(file_path);
+                    return Ok(file_contents);
                 }
             }
             Err(err) => {
