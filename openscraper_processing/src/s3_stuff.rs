@@ -61,7 +61,7 @@ pub async fn download_s3_bytes(
     bucket: &str,
     key: &str,
 ) -> anyhow::Result<Vec<u8>> {
-    debug!("Downloading S3 object: {}/", bucket, key);
+    debug!(%bucket, %key,"Downloading S3 object");
     let output = s3_client
         .get_object()
         .bucket(bucket)
@@ -69,7 +69,7 @@ pub async fn download_s3_bytes(
         .send()
         .await
         .map_err(|e| {
-            error!(error = %e, "Failed to download S3 object: {}/", bucket, key);
+            error!(error = %e, %bucket, %key,"Failed to download S3 object");
             e
         })?;
 
@@ -79,15 +79,15 @@ pub async fn download_s3_bytes(
         .await
         .map(|data| data.into_bytes().to_vec())
         .map_err(|e| {
-            error!(error = %e, "Failed to read response body: {}/", bucket, key);
+            error!(error = %e,%bucket, %key, "Failed to read response body");
             e
         })?;
 
     debug!(
-        "Successfully downloaded {} bytes from {}/",
-        bytes.len(),
-        bucket,
-        key
+        %bucket,
+        %key,
+        bytes_len = %bytes.len(),
+        "Successfully downloaded file from s3"
     );
     Ok(bytes)
 }
@@ -297,4 +297,3 @@ pub async fn push_raw_attach_to_s3(
 
     Ok(())
 }
-

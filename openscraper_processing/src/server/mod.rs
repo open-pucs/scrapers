@@ -1,6 +1,9 @@
 use aide::{
     self,
-    axum::{ApiRouter, IntoApiResponse, routing::get_with},
+    axum::{
+        ApiRouter, IntoApiResponse,
+        routing::{get_with, post_with},
+    },
     transform::TransformOperation,
 };
 use axum::{
@@ -66,8 +69,7 @@ pub fn define_routes() -> ApiRouter {
         )
         .api_route(
             "/admin/read_openscrapers_s3",
-            get_with(read_s3_file, read_s3_file_docs)
-                .post_with(read_s3_file, read_s3_file_docs),
+            get_with(read_s3_file, read_s3_file_docs).post_with(read_s3_file, read_s3_file_docs),
         )
         .api_route(
             "/admin/write_openscrapers_s3",
@@ -91,11 +93,7 @@ async fn read_s3_file(Json(payload): Json<S3File>) -> impl IntoApiResponse {
         crate::s3_stuff::download_s3_bytes(&s3_client, &payload.bucket, &payload.key).await;
     match result {
         Ok(contents) => (axum::http::StatusCode::OK, Bytes::from(contents)).into_response(),
-        Err(e) => (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            e.to_string(),
-        )
-            .into_response(),
+        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -114,18 +112,14 @@ async fn write_s3_file(Json(payload): Json<S3File>) -> impl IntoApiResponse {
                 axum::http::StatusCode::BAD_REQUEST,
                 "Missing contents".to_string(),
             )
-                .into_response()
+                .into_response();
         }
     };
     let result =
         crate::s3_stuff::upload_s3_bytes(&s3_client, &payload.bucket, &payload.key, contents).await;
     match result {
         Ok(_) => (axum::http::StatusCode::OK).into_response(),
-        Err(e) => (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            e.to_string(),
-        )
-            .into_response(),
+        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
