@@ -13,10 +13,13 @@ use axum::{
 use hyper::body::Bytes;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::str::FromStr;
 use tracing::{error, info, warn};
 
-use crate::types::{GenericCase, RawAttachment, hash::Blake2bHash};
+use crate::types::{
+    GenericCase, RawAttachment, env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET, hash::Blake2bHash,
+};
 // use aide::{
 //     axum::{IntoApiResponse, routing::get},
 //     openapi::{Info, OpenApi},
@@ -69,11 +72,15 @@ pub fn define_routes() -> ApiRouter {
         )
         .api_route(
             "/admin/read_openscrapers_s3",
-            get_with(read_s3_file, read_s3_file_docs).post_with(read_s3_file, read_s3_file_docs),
+            post_with(read_s3_file, read_s3_file_docs),
         )
         .api_route(
-            "/admin/write_openscrapers_s3",
-            post_with(write_s3_file, write_s3_file_docs),
+            "/admin/write_openscrapers_s3_string",
+            post_with(write_s3_file_string, write_s3_file_docs),
+        )
+        .api_route(
+            "/admin/write_openscrapers_s3_json",
+            post_with(write_s3_file_json, write_s3_file_docs),
         );
 
     info!("Routes defined successfully");
@@ -81,16 +88,17 @@ pub fn define_routes() -> ApiRouter {
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]
-struct S3File {
-    bucket: String,
+struct S3FileLocationParams {
+    bucket: Option<String>,
     key: String,
-    contents: Option<String>,
 }
 
-async fn read_s3_file(Json(payload): Json<S3File>) -> impl IntoApiResponse {
+async fn read_s3_file(Json(payload): Json<S3FileLocationParams>) -> impl IntoApiResponse {
+    let bucket = (payload.bucket)
+        .as_deref()
+        .unwrap_or(&**OPENSCRAPERS_S3_OBJECT_BUCKET);
     let s3_client = crate::s3_stuff::make_s3_client().await;
-    let result =
-        crate::s3_stuff::download_s3_bytes(&s3_client, &payload.bucket, &payload.key).await;
+    let result = crate::s3_stuff::download_s3_bytes(&s3_client, bucket, &payload.key).await;
     match result {
         Ok(contents) => (axum::http::StatusCode::OK, Bytes::from(contents)).into_response(),
         Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -103,20 +111,45 @@ fn read_s3_file_docs(op: TransformOperation) -> TransformOperation {
         .response_with::<500, String, _>(|res| res.description("Error reading file from S3."))
 }
 
-async fn write_s3_file(Json(payload): Json<S3File>) -> impl IntoApiResponse {
+#[derive(Deserialize, Serialize, JsonSchema)]
+struct S3UploadString {
+    bucket: Option<String>,
+    key: String,
+    contents: String,
+}
+async fn write_s3_file_string(Json(payload): Json<S3UploadString>) -> impl IntoApiResponse {
     let s3_client = crate::s3_stuff::make_s3_client().await;
-    let contents = match payload.contents {
-        Some(c) => c.into_bytes(),
-        None => {
-            return (
-                axum::http::StatusCode::BAD_REQUEST,
-                "Missing contents".to_string(),
-            )
-                .into_response();
+    let contents = payload.contents.into_bytes();
+    let bucket = (payload.bucket)
+        .as_deref()
+        .unwrap_or(&**OPENSCRAPERS_S3_OBJECT_BUCKET);
+    let result = crate::s3_stuff::upload_s3_bytes(&s3_client, bucket, &payload.key, contents).await;
+    match result {
+        Ok(_) => (axum::http::StatusCode::OK).into_response(),
+        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
+struct S3UploadJson {
+    bucket: Option<String>,
+    key: String,
+    contents: Value,
+}
+async fn write_s3_file_json(Json(payload): Json<S3UploadJson>) -> impl IntoApiResponse {
+    let s3_client = crate::s3_stuff::make_s3_client().await;
+    let contents = match serde_json::to_string(&payload.contents) {
+        Ok(string) => string.into_bytes(),
+        Err(err) => {
+            error!("Could not reserialize json value");
+            return (axum::http::StatusCode::BAD_REQUEST, err.to_string()).into_response();
         }
     };
-    let result =
-        crate::s3_stuff::upload_s3_bytes(&s3_client, &payload.bucket, &payload.key, contents).await;
+
+    let bucket = (payload.bucket)
+        .as_deref()
+        .unwrap_or(&**OPENSCRAPERS_S3_OBJECT_BUCKET);
+    let result = crate::s3_stuff::upload_s3_bytes(&s3_client, bucket, &payload.key, contents).await;
     match result {
         Ok(_) => (axum::http::StatusCode::OK).into_response(),
         Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -302,15 +335,3 @@ fn handle_attachment_file_from_s3_docs(op: TransformOperation) -> TransformOpera
         .response_with::<400, String, _>(|res| res.description("Invalid hash format."))
         .response_with::<500, String, _>(|res| res.description("Error fetching attachment file."))
 }
-
-// async fn handle_caselist_jurisdiction_fetch_date(
-//     Path((state, jurisdiction_name, rfc339_date)): Path<(String, String, String)>,
-// ) -> impl IntoApiResponse {
-//     // TODO: Implement this
-//     Json("Not implemented")
-// }
-//
-// async fn handle_caselist_all_fetch(Path(rfc339_date): Path<String>) -> impl IntoApiResponse {
-//     // TODO: Implement this
-//     Json("Not implemented")
-// }
