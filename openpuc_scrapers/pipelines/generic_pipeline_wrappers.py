@@ -106,10 +106,18 @@ def process_case(
     for filing in filings:
         generic_filing = scraper.into_generic_filing_data(filing)
         case_specific_generic_cases.append(generic_filing)
+    generic_case.filings = case_specific_generic_cases
+
+    default_logger.info(
+        f"Finished processing case {generic_case.case_name} and pushing it over to the api. Generic Case Type: {type(generic_case)}"
+    )
+    case_json = generic_case.model_dump_json()
+
+    default_logger.info(f"successfully got case json for {generic_case.case_name}")
 
     # NOW THAT THE CASE IS FULLY GENERIC IT SHOULD PUSH ALL THIS STUFF OVER TO RUST
     redis_client = redis.Redis(host=OPENSCRAPERS_REDIS_DOMAIN, port=6379, db=0)
-    redis_client.lpush("generic_cases", generic_case.model_dump_json())
+    redis_client.lpush("generic_cases", case_json)
 
     # INSTEAD OF RETURNING THE CASE REFACTOR THE CODE TO RETURN A SUCCESSFUL SIGNAL
     return GenericCase(
