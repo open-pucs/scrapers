@@ -6,7 +6,6 @@ from typing import Any, List, Optional, Tuple
 import redis
 import json
 
-from openpuc_scrapers.db.s3_utils import push_case_to_s3_and_db
 from openpuc_scrapers.models.constants import (
     OPENSCRAPERS_S3_OBJECT_BUCKET,
 )
@@ -21,8 +20,6 @@ from openpuc_scrapers.models.timestamp import (
     rfctime_serializer,
     time_is_in_yearlist,
 )
-from openpuc_scrapers.pipelines.helper_utils import save_json_sync
-from openpuc_scrapers.pipelines.raw_attachment_handling import process_generic_filing
 from openpuc_scrapers.scrapers.base import (
     GenericScraper,
     StateCaseData,
@@ -110,20 +107,12 @@ def process_case(
         generic_filing = scraper.into_generic_filing_data(filing)
         case_specific_generic_cases.append(generic_filing)
 
-    # NOW THAT THE CASE IS FULLY GENERIC IT SHOULD PUSH ALL THIS STUFF OVER TO RUST
-    redis_client = redis.Redis(host="localhost", port=6379, db=0)
-    redis_client.lpush("generic_cases", generic_case.model_dump_json())
-
     # INSTEAD OF RETURNING THE CASE REFACTOR THE CODE TO RETURN A SUCCESSFUL SIGNAL
     return GenericCase(
         case_number="Success",
         case_name="Success",
-        jurisdiction="Success",
-        state="Success",
         filings=[],
         opened_date=rfc_time_now(),
-        updated_date=rfc_time_now(),
-        source_url="Success",
     )
 
 
