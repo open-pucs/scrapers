@@ -72,7 +72,6 @@ async def fetch_attachment_file_from_s3(hash: Blake2bHash) -> Path:
 async def push_raw_attach_to_s3_and_db(
     raw_att: RawAttachment, file_path: Optional[Path], file_only: bool = False
 ) -> None:
-
     dumped_data = raw_att.model_dump_json()
     obj_key = get_raw_attach_obj_key(raw_att.hash)
     file_key = get_raw_attach_file_key(raw_att.hash)

@@ -92,6 +92,29 @@ async fn download_s3_bytes(
     Ok(bytes)
 }
 
+// Core function to upload bytes to S3
+async fn upload_s3_bytes(
+    s3_client: &S3Client,
+    bucket: &str,
+    key: &str,
+    bytes: Vec<u8>,
+) -> anyhow::Result<()> {
+    debug!(len=%bytes.len(), %bucket, %key,"Uploading bytes to S3 object");
+    s3_client
+        .put_object()
+        .bucket(bucket)
+        .key(key)
+        .body(ByteStream::from(bytes))
+        .send()
+        .await
+        .map_err(|err| {
+            error!(%err,%bucket, %key,"Failed to upload S3 object");
+            anyhow!(err)
+        })?;
+    debug!( %bucket, %key,"Successfully uploaded s3 object");
+    Ok(())
+}
+
 pub async fn download_file(url: &str) -> anyhow::Result<Vec<u8>> {
     info!(url, "Downloading file");
     let response = reqwest::get(url).await?;
@@ -199,17 +222,13 @@ pub async fn push_case_to_s3_and_db(
     debug!("Pushing case with key: {}", key);
     case.indexed_at = offset::Utc::now();
     let case_jsonified = serde_json::to_string(case)?;
-    s3_client
-        .put_object()
-        .bucket(&**OPENSCRAPERS_S3_OBJECT_BUCKET)
-        .key(&key)
-        .body(ByteStream::from(case_jsonified.into_bytes()))
-        .send()
-        .await
-        .map_err(|e| {
-            error!(error = %e, "Failed to push case to S3");
-            e
-        })?;
+    upload_s3_bytes(
+        s3_client,
+        &OPENSCRAPERS_S3_OBJECT_BUCKET,
+        &key,
+        case_jsonified.into_bytes(),
+    )
+    .await?;
     info!("Successfully pushed case to S3");
     // TODO: Implement database update
     Ok(())
@@ -270,31 +289,12 @@ pub async fn push_raw_attach_to_s3(
         "Pushing raw attachment with object key: {} and file key: {}", obj_key, file_key
     );
 
-    if let Err(e) = s3_client
-        .put_object()
-        .bucket(bucket)
-        .key(&obj_key)
-        .body(ByteStream::from(dumped_data.into_bytes()))
-        .send()
-        .await
-    {
-        error!(error = %e, "Failed to push metadata object to S3");
-        bail!(e)
-    }
+    upload_s3_bytes(s3_client, bucket, &obj_key, dumped_data.into_bytes()).await?;
     info!("Successfully pushed metadata object to S3");
 
-    if let Err(e) = s3_client
-        .put_object()
-        .bucket(bucket)
-        .key(&file_key)
-        .body(ByteStream::from(file_contents))
-        .send()
-        .await
-    {
-        error!(error = %e, "Failed to push file to S3");
-        bail!(e)
-    }
+    upload_s3_bytes(s3_client, bucket, &file_key, file_contents).await?;
     info!("Successfully pushed file to S3");
 
     Ok(())
 }
+
