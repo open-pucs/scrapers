@@ -26,5 +26,5 @@ pub static OPENSCRAPERS_REDIS_DOMAIN: LazyLock<String> = LazyLock::new(|| {
 });
 
 pub static CRIMSON_URL: LazyLock<String> = LazyLock::new(|| {
-    env::var("CRIMSON_URL").unwrap_or_else(|_| "http://localhost:8000".to_string())
+    env::var("CRIMSON_URL").unwrap_or_else(|_| "http://localhost:14423".to_string())
 });
