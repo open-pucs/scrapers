@@ -20,11 +20,6 @@ x-airflow-common: &airflow-common
     DEEPINFRA_API_KEY: ${DEEPINFRA_API_KEY}
     CRIMSON_URL: ${CRIMSON_URL}
     OPENSCRAPERS_INTERNAL_API_URL: "http://openscrapers-api:8000"
-    # AIRFLOW__CORE__FERNET_KEY: ""
-    # AIRFLOW__CORE__LOAD_EXAMPLES: "true"
-    # AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
-    # AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
-    # _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
   volumes:
     - ./airflow_dags:/opt/airflow/dags
     - ./openpuc_scrapers:/app/openpuc_scrapers
@@ -52,19 +47,11 @@ x-openscraper-env-variables:
 
 services:
   openscrapers-api:
+    networks:
+      - default
     build:
       context: ./openscraper_processing/
       dockerfile: Dockerfile
-    labels:
-      - "traefik.enable=true"
-      - "traefik.namespace=openscrapers"
-      - "traefik.http.routers.openscrapers-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)"
-      - "traefik.http.routers.blog.tls.domains[0].main=${DOMAIN}"
-      - "traefik.http.routers.openscrapers-api.entrypoints=websecure"
-      - "traefik.http.routers.openscrapers-api.tls.certresolver=myresolver"
-      - "traefik.http.routers.whoami.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.whoami.entrypoints=websecure"
-      - "traefik.http.routers.whoami.tls.certresolver=myresolver"
     volumes:
       - ./openpuc_scrapers:/app/openpuc_scrapers
     expose:
@@ -73,25 +60,6 @@ services:
       - 8002:8000
     environment:
       <<: *openscraper-env-variables
-  reverse-proxy:
-    profiles: ["prod"]
-    image: traefik:v3.0
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.constraints=Label(`traefik.namespace`,`openscrapers`)"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entryPoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.email=mbright@kessler.xyz"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8083:8080"
-    volumes:
-      - "./volumes/letsencrypt:/letsencrypt"
-      - /var/run/docker.sock:/var/run/docker.sock
   # # Airflow Services
   airflow-postgres:
     # image: postgres:13
@@ -128,10 +96,9 @@ services:
       - "3030:8081"
     expose:
       - 8081
-    labels:
-      - "traefik.enable=true"
-      - "traefik.namespace=openscrapers"
-      - "traefik.http.routers.openscrapers-airflow.rule=Host(`${AIRFLOW_DOMAIN}`) && PathPrefix(`/`)"
-      - "traefik.http.routers.openscrapers-airflow.entrypoints=websecure"
-      - "traefik.http.routers.openscrapers-airflow.tls.certresolver=myresolver"
-      - "traefik.http.services.openscrapers-airflow.loadbalancer.server.port=8081"
+    networks:
+      - default
+
+networks:
+  default:
+    driver: bridge
