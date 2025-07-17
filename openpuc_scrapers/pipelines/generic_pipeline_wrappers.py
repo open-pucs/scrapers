@@ -108,6 +108,10 @@ def process_case(
         generic_filing = scraper.into_generic_filing_data(filing)
         case_specific_generic_cases.append(generic_filing)
 
+    # NOW THAT THE CASE IS FULLY GENERIC IT SHOULD PUSH ALL THIS STUFF OVER TO RUST
+    redis_client = redis.Redis(host="localhost", port=6379, db=0)
+    redis_client.lpush("generic_cases", generic_case.model_dump_json())
+
     # INSTEAD OF RETURNING THE CASE REFACTOR THE CODE TO RETURN A SUCCESSFUL SIGNAL
     return GenericCase(
         case_number="Success",
