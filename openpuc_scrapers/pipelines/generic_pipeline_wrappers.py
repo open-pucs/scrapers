@@ -231,7 +231,6 @@ def get_all_caselist_raw(
     caselist_path = f"{base_path}/caselist.json"
     save_json_sync(
         path=caselist_path,
-        bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=caselist_intermediate,
     )
 
@@ -265,7 +264,6 @@ def get_new_caselist_since_date(
     updated_path = f"{base_path}/updated_cases.json"
     save_json_sync(
         path=updated_path,
-        bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=updated_intermediate,
     )
 
