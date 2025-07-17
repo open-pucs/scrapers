@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 
 # Project Imports
-from openpuc_scrapers.db.s3_wrapper import rand_string
+from openpuc_scrapers.models.utils import rand_string
 from openpuc_scrapers.models.case import GenericCase
 from openpuc_scrapers.models.filing import GenericFiling
 
@@ -226,7 +226,6 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
     MAX_DOCUMENTS = 10  # Maximum number of documents to fetch per case
 
     def _get_driver(self):
-
         from selenium import webdriver
         from selenium.webdriver.chrome.options import Options
 
@@ -268,7 +267,6 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
         stop_at_case_identifier: Optional[str] = None,
         after_date: Optional[date] = None,
     ) -> Dict[str, Any]:
-
         from selenium.common.exceptions import TimeoutException
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support import expected_conditions as EC
@@ -296,9 +294,9 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
             )
 
         driver = self._get_driver()
-        extracted_cases: List[Tuple[str, str]] = (
-            []
-        )  # List to store (URL, Number) tuples
+        extracted_cases: List[
+            Tuple[str, str]
+        ] = []  # List to store (URL, Number) tuples
         processed_case_urls = (
             set()
         )  # To handle potential duplicates across pages if pagination glitches
@@ -525,7 +523,6 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
         return cases
 
     def filing_data_intermediate(self, data: ILICCCaseData) -> Dict[str, Any]:
-
         from selenium.common.exceptions import TimeoutException
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support import expected_conditions as EC

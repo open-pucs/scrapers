@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 from annotated_types import doc
-from openpuc_scrapers.db.s3_wrapper import rand_string
+from openpuc_scrapers.models.utils import rand_string
 from openpuc_scrapers.models.attachment import GenericAttachment
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -76,9 +76,9 @@ def process_docket(docket: NYPUCDocket) -> str:
 
     # Validate input before proceeding
     assert docket.case_number, "Docket case number cannot be empty"
-    assert (
-        len(docket.case_number) >= 6
-    ), f"Invalid case number format: {docket.case_number}"
+    assert len(docket.case_number) >= 6, (
+        f"Invalid case number format: {docket.case_number}"
+    )
 
     # Create unique temp directory for user data
     user_data_dir = Path("/tmp/", "selenium-userdir-" + rand_string())
@@ -102,7 +102,9 @@ def process_docket(docket: NYPUCDocket) -> str:
         for attempt in range(20):
             overlay = driver.find_element(By.ID, "GridPlaceHolder_upUpdatePanelGrd")
             current_style = overlay.get_attribute("style")
-            default_logger.debug(f"Overlay status attempt {attempt+1}: {current_style}")
+            default_logger.debug(
+                f"Overlay status attempt {attempt + 1}: {current_style}"
+            )
 
             if current_style == "display: none;":
                 default_logger.info("Page overlay cleared successfully")
@@ -114,9 +116,9 @@ def process_docket(docket: NYPUCDocket) -> str:
         table_element = driver.find_element(By.ID, "tblPubDoc")
         outer_html_table = table_element.get_attribute("outerHTML")
         assert outer_html_table is not None, "Failed to retrieve table HTML content"
-        assert (
-            len(outer_html_table) > 1000
-        ), f"Unexpectedly small table HTML: {len(outer_html_table)} bytes"
+        assert len(outer_html_table) > 1000, (
+            f"Unexpectedly small table HTML: {len(outer_html_table)} bytes"
+        )
 
         default_logger.info(
             f"Successfully retrieved table data for {docket.case_number} "
@@ -286,9 +288,9 @@ def deduplicate_individual_attachments_into_files(
         else:
             dict_nypuc[dedupestr] = file
     return_vals = list(dict_nypuc.values())
-    assert (
-        len(return_vals) != 0
-    ), "Somehow came in with multiple files and deduplicated them down to no files."
+    assert len(return_vals) != 0, (
+        "Somehow came in with multiple files and deduplicated them down to no files."
+    )
     default_logger.info(
         f"Deduplicated {len(raw_files)} raw filings into {len(return_vals)} final files."
     )
@@ -366,25 +368,25 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         intermediate_list = intermediate["industry_intermediates"]
         caselist: List[NYPUCDocket] = []
         for industry_intermediate in intermediate_list:
-            assert isinstance(
-                industry_intermediate, dict
-            ), f"Industry intermediate must be a dictionary, got {type(industry_intermediate)}"
-            assert (
-                "html" in industry_intermediate
-            ), "Missing 'html' key in industry intermediate"
-            assert (
-                "industry" in industry_intermediate
-            ), "Missing 'industry' key in industry intermediate"
-            assert isinstance(
-                industry_intermediate["html"], str
-            ), "HTML content must be a string"
+            assert isinstance(industry_intermediate, dict), (
+                f"Industry intermediate must be a dictionary, got {type(industry_intermediate)}"
+            )
+            assert "html" in industry_intermediate, (
+                "Missing 'html' key in industry intermediate"
+            )
+            assert "industry" in industry_intermediate, (
+                "Missing 'industry' key in industry intermediate"
+            )
+            assert isinstance(industry_intermediate["html"], str), (
+                "HTML content must be a string"
+            )
             assert industry_intermediate["html"] != "", "HTML content cannot be empty"
-            assert isinstance(
-                industry_intermediate["industry"], str
-            ), "Industry name must be a string"
-            assert (
-                industry_intermediate["industry"] != ""
-            ), "Industry name cannot be empty"
+            assert isinstance(industry_intermediate["industry"], str), (
+                "Industry name must be a string"
+            )
+            assert industry_intermediate["industry"] != "", (
+                "Industry name cannot be empty"
+            )
             docket_info = extract_docket_info_from_caselisthtml(industry_intermediate)
             caselist.extend(docket_info)
         return caselist
@@ -397,9 +399,9 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         self, intermediate: Dict[str, Any]
     ) -> List[NYPUCFiling]:
         """Convert docket HTML to filing data"""
-        assert all(
-            key in intermediate for key in ("docket_id", "html")
-        ), "Missing required keys in intermediate"
+        assert all(key in intermediate for key in ("docket_id", "html")), (
+            "Missing required keys in intermediate"
+        )
         assert isinstance(intermediate["docket_id"], str), "docket_id must be a string"
         assert isinstance(intermediate["html"], str), "html must be a string"
 
