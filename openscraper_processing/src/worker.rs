@@ -15,6 +15,7 @@ use futures_util::future::join_all;
 use redis::{AsyncCommands, RedisError};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::time::sleep;
@@ -53,22 +54,41 @@ struct CrimsonStatusResponse {
 //  .query_async(&mut con)
 //  .await;
 // assert_eq!(result, Ok(("foo".to_string(), b"bar".to_vec())));
+
+static CASE_PROCESSING_SEMAPHORE: Semaphore = Semaphore::const_new(10);
+
 pub async fn start_workers() -> anyhow::Result<()> {
-    let s3_client = make_s3_client().await;
+    let s3_client = Arc::new(make_s3_client().await);
     let redis_client = redis::Client::open(&**OPENSCRAPERS_REDIS_DOMAIN)?;
     let mut redis_con = redis_client.get_multiplexed_async_connection().await?;
+    let cases_queue_name = "generic_cases";
 
+    let case_sem_ref = &CASE_PROCESSING_SEMAPHORE;
     loop {
-        let result: Result<String, RedisError> = redis_con.brpop("generic_cases", 0.0).await;
+        let result: Result<String, RedisError> = redis_con.brpop(cases_queue_name, 0.0).await;
         if let Ok(json_data) = result {
-            let case: GenericCase = serde_json::from_str(&json_data)?;
-            let s3_client_clone = s3_client.clone();
-            tokio::spawn(async move {
-                if let Err(e) = process_case(&case, s3_client_clone).await {
-                    warn!(error = e.to_string(), "Error processing case");
+            match serde_json::from_str::<GenericCase>(&json_data) {
+                Ok(case) => {
+                    tracing::info!(case_number= %(case.case_number),"Deserialized case json, waiting to process.");
+                    let s3_client_clone = s3_client.clone();
+                    let sephaor_perm = case_sem_ref.acquire().await.expect("Apparently the semaphore can only give an error if its closed, which this should never be??");
+                    tokio::spawn(async move {
+                        tracing::info!(availible_permits = %case_sem_ref.available_permits(),case_number= %(case.case_number),"Got semaphore beginning to process case");
+                        if let Err(e) = process_case(&case, &s3_client_clone).await {
+                            warn!(error = e.to_string(), "Error processing case");
+                        }
+                        drop(sephaor_perm);
+                    });
                 }
-            });
+                Err(err) => {
+                    tracing::error!(
+                        %err,"Could not deserialize case from redis. This indicates a serious problem."
+                    );
+                    sleep(Duration::from_secs(2)).await;
+                }
+            }
         } else {
+            tracing::info!(cases_queue_name,availible_permits = %case_sem_ref.available_permits(),"Found no cases to process waiting 2 seconds.");
             sleep(Duration::from_secs(2)).await;
         }
     }
@@ -144,7 +164,7 @@ struct AttachIndex {
     filling_index: usize,
 }
 
-async fn process_case(case: &GenericCase, s3_client: S3Client) -> anyhow::Result<()> {
+async fn process_case(case: &GenericCase, s3_client: &S3Client) -> anyhow::Result<()> {
     let sem = Semaphore::new(10); // Allow up to 10 concurrent tasks
     let mut return_case = case.to_owned();
     let mut attachment_tasks = Vec::with_capacity(case.filings.len());
@@ -153,8 +173,20 @@ async fn process_case(case: &GenericCase, s3_client: S3Client) -> anyhow::Result
             let tmp_closure =
                 async |attach: &mut GenericAttachment| -> anyhow::Result<RawAttachment> {
                     // Acquire permit from semaphore (waits if none available)
-                    let permit = sem.acquire().await.map_err(anyhow::Error::from)?;
-                    let result = process_attachment(&s3_client, attach).await?;
+                    let permit = match sem.acquire().await {
+                        Ok(p) => p,
+                        Err(err) => {
+                            tracing::error!(%err,"Failed to acquire semaphore permit");
+                            return Err(anyhow::Error::from(err));
+                        }
+                    };
+                    let result = match process_attachment(&s3_client, attach).await {
+                        Ok(r) => r,
+                        Err(err) => {
+                            tracing::error!(%err,"Failed to process attachment");
+                            return Err(err);
+                        }
+                    };
                     drop(permit); // Explicit drop allows Rust compiler to optimize
                     attach.hash = Some(result.hash);
                     attach.document_extension = Some(result.extension.to_string());
