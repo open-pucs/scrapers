@@ -27,10 +27,35 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
     Json(api)
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("No internet connection available")]
+struct NoInternetError {}
+
+fn do_i_have_internet() -> Result<(), NoInternetError> {
+    use std::net::{TcpStream, ToSocketAddrs};
+    use std::time::Duration;
+
+    let addresses = "google.com:80"
+        .to_socket_addrs()
+        .map_err(|_| NoInternetError {})?;
+
+    for addr in addresses {
+        if TcpStream::connect_timeout(&addr, Duration::from_secs(5)).is_ok() {
+            return Ok(());
+        }
+    }
+
+    Err(NoInternetError {})
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let _ =
         init_subscribers_and_loglevel().expect("Failed to initialize opentelemetry tracing stuff");
+    if let Err(e) = do_i_have_internet() {
+        tracing::error!(err = %e,"NO INTERNET DETECTED");
+        panic!("NO INTERNET DETECTED");
+    }
     // initialise our subscriber
     let routes = define_routes();
     let app = routes
