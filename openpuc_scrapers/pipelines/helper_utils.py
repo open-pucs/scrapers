@@ -1,15 +1,10 @@
 import asyncio
 import json
-from typing import Any
+from typing import Any, Optional
 from pydantic import BaseModel
+import requests
 
-
-from openpuc_scrapers.db.s3_wrapper import S3FileManager
-
-
-# Helper functions
-async def save_to_disk_and_s3_async(path: str, bucket: str, content: str) -> None:
-    await S3FileManager(bucket).save_string_to_remote_file_async(path, content)
+from openpuc_scrapers.models.constants import OPENSCRAPERS_INTERNAL_API_URL
 
 
 # Takes in a dict, a pydantic BaseModel, or a List[BaseModel]
@@ -32,6 +27,11 @@ def create_json_string(data: Any) -> str:
     raise ValueError(f"Unsupported data type: {type(data)}")
 
 
-def save_json_sync(path: str, bucket: str, data: Any) -> None:
+def save_json_sync(path: str, data: Any, bucket: Optional[str] = None) -> None:
     json_str = create_json_string(data)
-    asyncio.run(save_to_disk_and_s3_async(path, bucket, json_str))
+    url = f"{OPENSCRAPERS_INTERNAL_API_URL}/admin/write_openscrapers_s3"
+    payload = {"key": path, "contents": json_str}
+    if bucket is not None:
+        payload["bucket"] = bucket
+    response = requests.post(url, json=payload)
+    response.raise_for_status()

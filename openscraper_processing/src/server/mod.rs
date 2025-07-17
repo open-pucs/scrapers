@@ -63,10 +63,76 @@ pub fn define_routes() -> ApiRouter {
                 handle_attachment_file_from_s3,
                 handle_attachment_file_from_s3_docs,
             ),
+        )
+        .api_route(
+            "/admin/read_openscrapers_s3",
+            get_with(read_s3_file, read_s3_file_docs)
+                .post_with(read_s3_file, read_s3_file_docs),
+        )
+        .api_route(
+            "/admin/write_openscrapers_s3",
+            post_with(write_s3_file, write_s3_file_docs),
         );
 
     info!("Routes defined successfully");
     app
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
+struct S3File {
+    bucket: String,
+    key: String,
+    contents: Option<String>,
+}
+
+async fn read_s3_file(Json(payload): Json<S3File>) -> impl IntoApiResponse {
+    let s3_client = crate::s3_stuff::make_s3_client().await;
+    let result =
+        crate::s3_stuff::download_s3_bytes(&s3_client, &payload.bucket, &payload.key).await;
+    match result {
+        Ok(contents) => (axum::http::StatusCode::OK, Bytes::from(contents)).into_response(),
+        Err(e) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            e.to_string(),
+        )
+            .into_response(),
+    }
+}
+
+fn read_s3_file_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Read a file from S3.")
+        .response::<200, Bytes>()
+        .response_with::<500, String, _>(|res| res.description("Error reading file from S3."))
+}
+
+async fn write_s3_file(Json(payload): Json<S3File>) -> impl IntoApiResponse {
+    let s3_client = crate::s3_stuff::make_s3_client().await;
+    let contents = match payload.contents {
+        Some(c) => c.into_bytes(),
+        None => {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                "Missing contents".to_string(),
+            )
+                .into_response()
+        }
+    };
+    let result =
+        crate::s3_stuff::upload_s3_bytes(&s3_client, &payload.bucket, &payload.key, contents).await;
+    match result {
+        Ok(_) => (axum::http::StatusCode::OK).into_response(),
+        Err(e) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            e.to_string(),
+        )
+            .into_response(),
+    }
+}
+
+fn write_s3_file_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Write a file to S3.")
+        .response::<200, ()>()
+        .response_with::<500, String, _>(|res| res.description("Error writing file to S3."))
 }
 
 async fn health() -> impl IntoApiResponse {

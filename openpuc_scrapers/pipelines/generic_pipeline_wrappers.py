@@ -6,9 +6,7 @@ from typing import Any, List, Optional, Tuple
 import redis
 import json
 
-from openpuc_scrapers.models.constants import (
-    OPENSCRAPERS_S3_OBJECT_BUCKET,
-)
+from openpuc_scrapers.models.constants import OPENSCRAPERS_REDIS_DOMAIN
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
 
@@ -20,6 +18,9 @@ from openpuc_scrapers.models.timestamp import (
     rfctime_serializer,
     time_is_in_yearlist,
 )
+import requests
+
+
 from openpuc_scrapers.pipelines.helper_utils import save_json_sync
 from openpuc_scrapers.scrapers.base import (
     GenericScraper,
@@ -81,14 +82,13 @@ def process_case(
 
     # Save state-specific case data
     case_path = f"{base_path}/initial_cases/case_{case_num}.json"
-    save_json_sync(path=case_path, bucket=OPENSCRAPERS_S3_OBJECT_BUCKET, data=case)
+    save_json_sync(path=case_path, data=case)
 
     # Process filings
     filings_intermediate = scraper.filing_data_intermediate(case)
     filings_path = f"{base_path}/intermediate_caseinfo/case_{case_num}.json"
     save_json_sync(
         path=filings_path,
-        bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=filings_intermediate,
     )
 
@@ -96,7 +96,6 @@ def process_case(
     filings_json_path = f"{base_path}/filings/case_{case_num}.json"
     save_json_sync(
         path=filings_json_path,
-        bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=filings,
     )
     default_logger.info(
@@ -109,7 +108,7 @@ def process_case(
         case_specific_generic_cases.append(generic_filing)
 
     # NOW THAT THE CASE IS FULLY GENERIC IT SHOULD PUSH ALL THIS STUFF OVER TO RUST
-    redis_client = redis.Redis(host="localhost", port=6379, db=0)
+    redis_client = redis.Redis(host=OPENSCRAPERS_REDIS_DOMAIN, port=6379, db=0)
     redis_client.lpush("generic_cases", generic_case.model_dump_json())
 
     # INSTEAD OF RETURNING THE CASE REFACTOR THE CODE TO RETURN A SUCCESSFUL SIGNAL
