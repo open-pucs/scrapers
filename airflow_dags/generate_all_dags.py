@@ -120,7 +120,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
 
                 case_obj = loads(case_data)
                 try:
-                    result = process_case_jsonified(
+                    process_case_jsonified(
                         scraper=scraper,
                         case=case_obj["case_json"],
                         base_path=case_obj["base_path"],

@@ -9,7 +9,7 @@ use aide::{
     openapi::{Info, OpenApi},
     swagger::Swagger,
 };
-use axum::{Extension, Json};
+use axum::{Extension, Json, extract::DefaultBodyLimit};
 
 use std::net::{Ipv4Addr, SocketAddr};
 
@@ -64,7 +64,8 @@ async fn main() -> anyhow::Result<()> {
         .layer(OtelAxumLayer::default())
         .api_route("/health", get(health))
         .route("/api.json", get(serve_api))
-        .route("/swagger", Swagger::new("/api.json").axum_route());
+        .route("/swagger", Swagger::new("/api.json").axum_route())
+        .layer(DefaultBodyLimit::disable());
 
     // Spawn background worker to process PDF tasks
     // This worker runs indefinitely

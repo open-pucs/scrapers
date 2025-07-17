@@ -79,6 +79,7 @@ def process_case(
 ) -> GenericCase:
     generic_case = scraper.into_generic_case_data(case)
     case_num = generic_case.case_number
+    default_logger.info(f"Successfully made generic case object: {case_num} ")
 
     # Save state-specific case data
     case_path = f"{base_path}/initial_cases/case_{case_num}.json"
@@ -159,6 +160,7 @@ def process_case_jsonified(
 ) -> str:
     case_type = scraper.state_case_type
     case_data = case_type.model_validate_json(case)
+    default_logger.info("Successfully deserialized case from json.")
 
     processed_case = process_case(scraper=scraper, case=case_data, base_path=base_path)
     return processed_case.model_dump_json()
