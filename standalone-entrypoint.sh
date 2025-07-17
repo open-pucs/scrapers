@@ -1,7 +1,11 @@
 #!/bin/bash
 
-#!/bin/bash
 echo "The script has started."
+
+if ! curl -s --head --max-time 5 https://google.com >/dev/null; then
+  echo "No internet connectivity detected. Exiting script."
+  exit 1
+fi
 
 # Wait for PostgreSQL to be ready
 until pg_isready -h airflow-postgres -p 5432 -U airflow; do
