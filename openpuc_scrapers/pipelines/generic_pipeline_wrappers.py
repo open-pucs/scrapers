@@ -20,6 +20,7 @@ from openpuc_scrapers.models.timestamp import (
     rfctime_serializer,
     time_is_in_yearlist,
 )
+from openpuc_scrapers.pipelines.helper_utils import save_json_sync
 from openpuc_scrapers.scrapers.base import (
     GenericScraper,
     StateCaseData,

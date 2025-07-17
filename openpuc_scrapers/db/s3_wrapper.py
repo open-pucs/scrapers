@@ -26,7 +26,6 @@ import base64
 import secrets
 
 import logging
-import shutil
 
 default_logger = logging.getLogger(__name__)
 
