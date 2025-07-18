@@ -189,34 +189,42 @@ async fn process_case(case: &GenericCase, s3_client: &S3Client) -> anyhow::Resul
             let tmp_closure =
                 async |attach: &mut GenericAttachment| -> anyhow::Result<RawAttachment> {
                     // Acquire permit from semaphore (waits if none available)
-                    let permit = match sem.acquire().await {
-                        Ok(p) => p,
-                        Err(err) => {
-                            tracing::error!(%err,"Failed to acquire semaphore permit");
-                            return Err(anyhow::Error::from(err));
+                    let permit = sem
+                        .acquire()
+                        .await
+                        .expect("This should never panic since the semaphore never closes.");
+                    let result = tokio::time::timeout(
+                        Duration::from_secs(120),
+                        process_attachment(s3_client, attach),
+                    )
+                    .await;
+                    drop(permit);
+                    match result {
+                        Ok(Ok(raw_attach)) => {
+                            attach.hash = Some(raw_attach.hash);
+                            attach.document_extension = Some(raw_attach.extension.to_string());
+                            Ok(raw_attach)
                         }
-                    };
-                    let result = match process_attachment(&s3_client, attach).await {
-                        Ok(r) => r,
-                        Err(err) => {
+                        Ok(Err(err)) => {
                             tracing::error!(%err,"Failed to process attachment");
-                            return Err(err);
+                            Err(err)
                         }
-                    };
-                    drop(permit); // Explicit drop allows Rust compiler to optimize
-                    attach.hash = Some(result.hash);
-                    attach.document_extension = Some(result.extension.to_string());
-                    Ok(result)
+                        Err(err) => {
+                            tracing::error!(%err, "Attachment processing timed out");
+                            Err(anyhow::Error::from(err))
+                        }
+                    }
                 };
             attachment_tasks.push(tmp_closure(attachment));
         }
     }
+    tracing::info!("Created all attachment processing futures.");
     join_all(attachment_tasks).await;
     let default_jurisdiction = "ny_puc";
     let default_state = "ny";
     let default_country = "usa";
     push_case_to_s3_and_db(
-        &s3_client,
+        s3_client,
         &mut return_case,
         default_jurisdiction,
         default_state,
