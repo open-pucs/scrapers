@@ -14,11 +14,12 @@ use chrono::Utc;
 use futures_util::future::join_all;
 use redis::{AsyncCommands, RedisError};
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
-use tokio::sync::Semaphore;
+use tokio::sync::{Mutex, Semaphore};
 use tokio::time::sleep;
 use tracing::instrument::WithSubscriber;
 use tracing::{Instrument, info_span, warn};
@@ -59,6 +60,18 @@ struct CrimsonStatusResponse {
 
 static CASE_PROCESSING_SEMAPHORE: Semaphore = Semaphore::const_new(10);
 
+static CASE_PROCESSING_QUEUE: LazyLock<Mutex<VecDeque<GenericCase>>> =
+    LazyLock::new(|| Mutex::new(VecDeque::with_capacity(100)));
+
+pub async fn push_case_to_queue(case: GenericCase) {
+    let mut unlocked_queue = (*CASE_PROCESSING_QUEUE).lock().await;
+    unlocked_queue.push_back(case);
+}
+pub async fn get_case_from_queue() -> Option<GenericCase> {
+    let mut unlocked_queue = (*CASE_PROCESSING_QUEUE).lock().await;
+    unlocked_queue.pop_front()
+}
+
 pub async fn start_workers() -> anyhow::Result<Infallible> {
     println!("Starting workers, logged outside of a tracer");
     tracing::info!("Starting workers!!");
@@ -89,6 +102,7 @@ pub async fn start_workers() -> anyhow::Result<Infallible> {
     loop {
         tracing::info!("Beginning processing loop");
         let result: Result<String, RedisError> = redis_con.brpop(cases_queue_name, 0.0).await;
+        tracing::info!(is_ok=%result.is_ok(),"Got info from redis");
         if let Ok(json_data) = result {
             match serde_json::from_str::<GenericCase>(&json_data) {
                 Ok(case) => {
