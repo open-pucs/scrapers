@@ -2,7 +2,7 @@ use crate::s3_stuff::{
     download_file, generate_s3_object_uri_from_key, get_raw_attach_file_key, make_s3_client,
     push_case_to_s3_and_db, push_raw_attach_to_s3,
 };
-use crate::types::env_vars::{CRIMSON_URL, OPENSCRAPERS_REDIS_DOMAIN};
+use crate::types::env_vars::{CRIMSON_URL, OPENSCRAPERS_REDIS_DOMAIN, OPENSCRAPERS_REDIS_STRING};
 use crate::types::file_extension::FileExtension;
 use crate::types::hash::Blake2bHash;
 use crate::types::{
@@ -63,7 +63,7 @@ pub async fn start_workers() -> anyhow::Result<Infallible> {
     println!("Starting workers, logged outside of a tracer");
     tracing::info!("Starting workers!!");
     let s3_client = Arc::new(make_s3_client().await);
-    let redis_client = redis::Client::open(&**OPENSCRAPERS_REDIS_DOMAIN)?;
+    let redis_client = redis::Client::open(&**OPENSCRAPERS_REDIS_STRING)?;
     let mut redis_con = match tokio::time::timeout(
         Duration::from_secs(5),
         redis_client.get_multiplexed_async_connection(),

@@ -22,8 +22,11 @@ pub static OPENSCRAPERS_S3_SECRET_KEY: LazyLock<String> = LazyLock::new(|| {
 });
 
 pub static OPENSCRAPERS_REDIS_DOMAIN: LazyLock<String> = LazyLock::new(|| {
-    env::var("OPENSCRAPERS_REDIS_DOMAIN").unwrap_or_else(|_| "http://localhost:6379".to_string())
+    env::var("OPENSCRAPERS_REDIS_DOMAIN").unwrap_or_else(|_| "localhost:6379".to_string())
 });
+
+pub static OPENSCRAPERS_REDIS_STRING: LazyLock<String> =
+    LazyLock::new(|| format!("redis://{}", *OPENSCRAPERS_REDIS_DOMAIN));
 
 pub static CRIMSON_URL: LazyLock<String> = LazyLock::new(|| {
     env::var("CRIMSON_URL").unwrap_or_else(|_| "http://localhost:14423".to_string())
