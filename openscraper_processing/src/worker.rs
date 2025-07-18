@@ -19,6 +19,7 @@ use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::time::sleep;
+use tracing::instrument::WithSubscriber;
 use tracing::warn;
 
 #[derive(Serialize)]
@@ -58,6 +59,8 @@ struct CrimsonStatusResponse {
 static CASE_PROCESSING_SEMAPHORE: Semaphore = Semaphore::const_new(10);
 
 pub async fn start_workers() -> anyhow::Result<()> {
+    println!("Starting workers, logged outside of a tracer");
+    tracing::info!("Starting workers!!");
     let s3_client = Arc::new(make_s3_client().await);
     let redis_client = redis::Client::open(&**OPENSCRAPERS_REDIS_DOMAIN)?;
     let mut redis_con = redis_client.get_multiplexed_async_connection().await?;
@@ -78,7 +81,7 @@ pub async fn start_workers() -> anyhow::Result<()> {
                             warn!(error = e.to_string(), "Error processing case");
                         }
                         drop(sephaor_perm);
-                    });
+                    }.with_current_subscriber());
                 }
                 Err(err) => {
                     tracing::error!(

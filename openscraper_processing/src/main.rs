@@ -1,6 +1,6 @@
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use misc::otel_setup::init_subscribers_and_loglevel;
-use tracing::info;
+use tracing::{info, instrument::WithSubscriber};
 
 use crate::{server::define_routes, worker::start_workers};
 
@@ -70,9 +70,15 @@ async fn main() -> anyhow::Result<()> {
     // Spawn background worker to process PDF tasks
     // This worker runs indefinitely
     info!("App Created, spawning background process:");
-    tokio::spawn(async move {
-        let _ = start_workers().await;
-    });
+    tokio::spawn(
+        async move {
+            info!("Attempting to diagnose trace inside a tokio spawn?");
+            println!("Attempting to diagnose trace inside a tokio spawn?. Without tracing.");
+
+            let _ = start_workers().await;
+        }
+        .with_current_subscriber(),
+    );
 
     // bind and serve
     let addr = SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 8000);
