@@ -121,7 +121,8 @@ def process_case(
 
     # NOW THAT THE CASE IS FULLY GENERIC IT SHOULD PUSH ALL THIS STUFF OVER TO RUST
     url = f"{OPENSCRAPERS_INTERNAL_API_URL}/api/cases/submit"
-    requests.post(url, data=case_json)
+    response = requests.post(url, data=case_json)
+    response.raise_for_status()
 
     # INSTEAD OF RETURNING THE CASE REFACTOR THE CODE TO RETURN A SUCCESSFUL SIGNAL
     return GenericCase(

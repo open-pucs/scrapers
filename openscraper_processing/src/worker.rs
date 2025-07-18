@@ -2,7 +2,7 @@ use crate::s3_stuff::{
     download_file, generate_s3_object_uri_from_key, get_raw_attach_file_key, make_s3_client,
     push_case_to_s3_and_db, push_raw_attach_to_s3,
 };
-use crate::types::env_vars::{CRIMSON_URL};
+use crate::types::env_vars::CRIMSON_URL;
 use crate::types::file_extension::FileExtension;
 use crate::types::hash::Blake2bHash;
 use crate::types::{
@@ -77,11 +77,13 @@ pub async fn start_workers() -> anyhow::Result<Infallible> {
     let s3_client = Arc::new(make_s3_client().await);
 
     let case_sem_ref = &CASE_PROCESSING_SEMAPHORE;
+
+    let mut cases_without_ingest = 0;
     tracing::info!("Finished worker startup process, entering main loop.");
     loop {
-        tracing::info!("Beginning processing loop");
         if let Some(case) = get_case_from_queue().await {
-            tracing::info!(case_number= %(case.case_number),"Deserialized case json, waiting to process.");
+            tracing::info!(case_number= %(case.case_number),"Got case waiting to process.");
+            cases_without_ingest = 0;
             let s3_client_clone = s3_client.clone();
             let sephaor_perm = case_sem_ref
                 .acquire()
@@ -98,7 +100,11 @@ pub async fn start_workers() -> anyhow::Result<Infallible> {
                 .in_current_span(),
             );
         } else {
-            tracing::info!(availible_permits = %case_sem_ref.available_permits(),"Found no cases to process waiting 2 seconds.");
+            cases_without_ingest += 1;
+            if cases_without_ingest >= 20 {
+                tracing::info!(availible_permits = %case_sem_ref.available_permits(),"Checked {cases_without_ingest} times for cases and found nothing.");
+                cases_without_ingest = 0;
+            }
             sleep(Duration::from_secs(2)).await;
         }
     }
