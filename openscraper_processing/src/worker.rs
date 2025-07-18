@@ -20,8 +20,7 @@ use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 use tokio::sync::{Mutex, Semaphore};
 use tokio::time::sleep;
-use tracing::instrument::WithSubscriber;
-use tracing::{Instrument, info_span, warn};
+use tracing::{Instrument, info, warn};
 
 #[derive(Serialize)]
 struct CrimsonPDFIngestParamsS3 {
@@ -123,9 +122,12 @@ async fn process_attachment(
         Err(err) => bail!(err),
     };
 
+    info!(url=%attachment.url,"Trying to download attachment file.");
+
     let file_contents =
         download_file_content_validated_with_retries(&attachment.url, &extension).await?;
     let hash = Blake2bHash::from_bytes(&file_contents);
+    info!(%hash, url=%attachment.url,"Successfully downloaded file.");
 
     let mut raw_attachment = RawAttachment {
         hash,
@@ -135,7 +137,10 @@ async fn process_attachment(
     };
 
     if raw_attachment.extension == FileExtension::Pdf {
+        info!(%hash,"Sending request to crimson to process pdf.");
         let text = process_pdf_text_using_crimson(raw_attachment.hash).await?;
+
+        info!(%hash,"Completed text processing.");
         let text_obj = RawAttachmentText {
             quality: AttachmentTextQuality::Low,
             language: "en".to_string(),
@@ -159,17 +164,22 @@ async fn download_file_content_validated_with_retries(
         match download_file(url).await {
             Ok(file_contents) => {
                 if let Err(err) = extension.is_valid_file_contents(&file_contents) {
+                    tracing::error!(%extension,%url, %err,"Downloaded file did not match extension");
                     last_error = Some(anyhow::Error::from(err))
                 } else {
                     return Ok(file_contents);
                 }
             }
             Err(err) => {
+                tracing::error!(%url, %err,"Encountered error downloading file");
                 last_error = Some(err);
             }
         };
         sleep(Duration::from_secs(DOWNLOAD_RETRY_DELAY_SECONDS)).await;
     }
+
+    tracing::error!(%extension,%url,"Could not download file from url dispite a bunch of retries.");
+
     Err(last_error.unwrap_or(anyhow!(
         "UNREACHABLE CODE: Should have not gotten to last step without error being set"
     )))
@@ -218,8 +228,9 @@ async fn process_case(case: &GenericCase, s3_client: &S3Client) -> anyhow::Resul
             attachment_tasks.push(tmp_closure(attachment));
         }
     }
-    tracing::info!("Created all attachment processing futures.");
+    tracing::info!(case_num=%case.case_number,"Created all attachment processing futures.");
     join_all(attachment_tasks).await;
+
     let default_jurisdiction = "ny_puc";
     let default_state = "ny";
     let default_country = "usa";
