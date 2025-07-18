@@ -74,9 +74,13 @@ async fn main() -> anyhow::Result<()> {
         async move {
             info!("Attempting to diagnose trace inside a tokio spawn?");
 
-            let _ = start_workers().await;
+            let result = start_workers().await;
+            let Err(err) = result;
+            tracing::error!(%err,"Encountered error while running the workers. The worker has stopped.");
+            println!("Encountered error while running the workers. The worker has stopped: {err}");
+            eprintln!("Encountered error while running the workers. The worker has stopped: {err}");
         }
-        .instrument(info_span!("case_processing")),
+        .in_current_span(),
     );
 
     // bind and serve

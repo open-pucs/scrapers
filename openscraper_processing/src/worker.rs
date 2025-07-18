@@ -14,6 +14,7 @@ use chrono::Utc;
 use futures_util::future::join_all;
 use redis::{AsyncCommands, RedisError};
 use serde::{Deserialize, Serialize};
+use std::convert::Infallible;
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
@@ -58,7 +59,7 @@ struct CrimsonStatusResponse {
 
 static CASE_PROCESSING_SEMAPHORE: Semaphore = Semaphore::const_new(10);
 
-pub async fn start_workers() -> anyhow::Result<()> {
+pub async fn start_workers() -> anyhow::Result<Infallible> {
     println!("Starting workers, logged outside of a tracer");
     tracing::info!("Starting workers!!");
     let s3_client = Arc::new(make_s3_client().await);
@@ -71,10 +72,12 @@ pub async fn start_workers() -> anyhow::Result<()> {
     {
         Ok(Ok(conn)) => conn,
         Ok(Err(err)) => {
+            println!("Encountered redis connection error");
             tracing::error!(%err,"Redis connection error");
             return Err(anyhow::Error::from(err));
         }
         Err(_) => {
+            println!("Encountered redis timeout");
             tracing::error!("Redis connection timeout after 5 seconds");
             return Err(anyhow!("Redis connection timeout"));
         }
@@ -98,7 +101,7 @@ pub async fn start_workers() -> anyhow::Result<()> {
                             warn!(error = e.to_string(), "Error processing case");
                         }
                         drop(sephaor_perm);
-                    }.instrument(info_span!("case_processing_executor")));
+                    }.in_current_span());
                 }
                 Err(err) => {
                     tracing::error!(
