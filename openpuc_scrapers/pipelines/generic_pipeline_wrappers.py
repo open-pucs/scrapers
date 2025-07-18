@@ -6,7 +6,10 @@ from typing import Any, List, Optional, Tuple
 import redis
 import json
 
-from openpuc_scrapers.models.constants import OPENSCRAPERS_REDIS_DOMAIN
+from openpuc_scrapers.models.constants import (
+    OPENSCRAPERS_INTERNAL_API_URL,
+    OPENSCRAPERS_REDIS_DOMAIN,
+)
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
 
@@ -117,8 +120,8 @@ def process_case(
     default_logger.info(f"successfully got case json for {generic_case.case_name}")
 
     # NOW THAT THE CASE IS FULLY GENERIC IT SHOULD PUSH ALL THIS STUFF OVER TO RUST
-    redis_client = redis.Redis(host=OPENSCRAPERS_REDIS_DOMAIN, port=6379, db=0)
-    redis_client.lpush("generic_cases", case_json)
+    url = f"{OPENSCRAPERS_INTERNAL_API_URL}/api/cases/submit"
+    requests.post(url, data=case_json)
 
     # INSTEAD OF RETURNING THE CASE REFACTOR THE CODE TO RETURN A SUCCESSFUL SIGNAL
     return GenericCase(

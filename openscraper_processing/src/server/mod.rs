@@ -17,8 +17,11 @@ use serde_json::Value;
 use std::str::FromStr;
 use tracing::{error, info, warn};
 
-use crate::types::{
-    GenericCase, RawAttachment, env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET, hash::Blake2bHash,
+use crate::{
+    types::{
+        GenericCase, RawAttachment, env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET, hash::Blake2bHash,
+    },
+    worker::push_case_to_queue,
 };
 // use aide::{
 //     axum::{IntoApiResponse, routing::get},
@@ -48,6 +51,10 @@ pub fn define_routes() -> ApiRouter {
         .api_route(
             "/api/cases/{state}/{jurisdiction_name}/{case_name}",
             get_with(handle_case_filing_from_s3, handle_case_filing_from_s3_docs),
+        )
+        .api_route(
+            "/api/cases/submit",
+            post_with(submit_case_to_queue, submit_case_to_queue_docs),
         )
         .api_route(
             "/api/caselist/{state}/{jurisdiction_name}/all",
@@ -164,7 +171,7 @@ fn write_s3_file_docs(op: TransformOperation) -> TransformOperation {
 
 async fn health() -> impl IntoApiResponse {
     info!("Health check requested");
-    let response = Json("{\"is_healthy\": true}");
+    let response = Json("{"is_healthy": true}");
     info!("Health check successful");
     response
 }
@@ -334,4 +341,15 @@ fn handle_attachment_file_from_s3_docs(op: TransformOperation) -> TransformOpera
         .response::<200, Bytes>()
         .response_with::<400, String, _>(|res| res.description("Invalid hash format."))
         .response_with::<500, String, _>(|res| res.description("Error fetching attachment file."))
+}
+
+async fn submit_case_to_queue(Json(case): Json<GenericCase>) -> impl IntoApiResponse {
+    info!(case_number = %case.case_number, "Request received to submit case to queue");
+    push_case_to_queue(case).await;
+    (axum::http::StatusCode::OK).into_response()
+}
+
+fn submit_case_to_queue_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Submit a case to the processing queue.")
+        .response::<200, ()>()
 }

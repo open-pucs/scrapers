@@ -2,7 +2,7 @@ use crate::s3_stuff::{
     download_file, generate_s3_object_uri_from_key, get_raw_attach_file_key, make_s3_client,
     push_case_to_s3_and_db, push_raw_attach_to_s3,
 };
-use crate::types::env_vars::{CRIMSON_URL, OPENSCRAPERS_REDIS_DOMAIN, OPENSCRAPERS_REDIS_STRING};
+use crate::types::env_vars::{CRIMSON_URL};
 use crate::types::file_extension::FileExtension;
 use crate::types::hash::Blake2bHash;
 use crate::types::{
@@ -12,7 +12,6 @@ use anyhow::{anyhow, bail};
 use aws_sdk_s3::Client as S3Client;
 use chrono::Utc;
 use futures_util::future::join_all;
-use redis::{AsyncCommands, RedisError};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::convert::Infallible;
@@ -76,56 +75,30 @@ pub async fn start_workers() -> anyhow::Result<Infallible> {
     println!("Starting workers, logged outside of a tracer");
     tracing::info!("Starting workers!!");
     let s3_client = Arc::new(make_s3_client().await);
-    let redis_client = redis::Client::open(&**OPENSCRAPERS_REDIS_STRING)?;
-    let mut redis_con = match tokio::time::timeout(
-        Duration::from_secs(5),
-        redis_client.get_multiplexed_async_connection(),
-    )
-    .await
-    {
-        Ok(Ok(conn)) => conn,
-        Ok(Err(err)) => {
-            println!("Encountered redis connection error");
-            tracing::error!(%err,"Redis connection error");
-            return Err(anyhow::Error::from(err));
-        }
-        Err(_) => {
-            println!("Encountered redis timeout");
-            tracing::error!("Redis connection timeout after 5 seconds");
-            return Err(anyhow!("Redis connection timeout"));
-        }
-    };
-    let cases_queue_name = "generic_cases";
 
     let case_sem_ref = &CASE_PROCESSING_SEMAPHORE;
     tracing::info!("Finished worker startup process, entering main loop.");
     loop {
         tracing::info!("Beginning processing loop");
-        let result: Result<String, RedisError> = redis_con.brpop(cases_queue_name, 0.0).await;
-        tracing::info!(is_ok=%result.is_ok(),"Got info from redis");
-        if let Ok(json_data) = result {
-            match serde_json::from_str::<GenericCase>(&json_data) {
-                Ok(case) => {
-                    tracing::info!(case_number= %(case.case_number),"Deserialized case json, waiting to process.");
-                    let s3_client_clone = s3_client.clone();
-                    let sephaor_perm = case_sem_ref.acquire().await.expect("Apparently the semaphore can only give an error if its closed, which this should never be??");
-                    tokio::spawn(async move {
-                        tracing::info!(availible_permits = %case_sem_ref.available_permits(),case_number= %(case.case_number),"Got semaphore beginning to process case");
-                        if let Err(e) = process_case(&case, &s3_client_clone).await {
-                            warn!(error = e.to_string(), "Error processing case");
-                        }
-                        drop(sephaor_perm);
-                    }.in_current_span());
+        if let Some(case) = get_case_from_queue().await {
+            tracing::info!(case_number= %(case.case_number),"Deserialized case json, waiting to process.");
+            let s3_client_clone = s3_client.clone();
+            let sephaor_perm = case_sem_ref
+                .acquire()
+                .await
+                .expect("Apparently the semaphore can only give an error if its closed, which this should never be??");
+            tokio::spawn(
+                async move {
+                    tracing::info!(availible_permits = %case_sem_ref.available_permits(),case_number= %(case.case_number),"Got semaphore beginning to process case");
+                    if let Err(e) = process_case(&case, &s3_client_clone).await {
+                        warn!(error = e.to_string(), "Error processing case");
+                    }
+                    drop(sephaor_perm);
                 }
-                Err(err) => {
-                    tracing::error!(
-                        %err,"Could not deserialize case from redis. This indicates a serious problem."
-                    );
-                    sleep(Duration::from_secs(2)).await;
-                }
-            }
+                .in_current_span(),
+            );
         } else {
-            tracing::info!(cases_queue_name,availible_permits = %case_sem_ref.available_permits(),"Found no cases to process waiting 2 seconds.");
+            tracing::info!(availible_permits = %case_sem_ref.available_permits(),"Found no cases to process waiting 2 seconds.");
             sleep(Duration::from_secs(2)).await;
         }
     }

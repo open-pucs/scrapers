@@ -17,7 +17,7 @@ aide = { version = "0.15", features = ["axum", "axum-extra", "axum-extra-query",
 schemars = { version = "0.9", features = ["chrono04", "uuid1"] }
 aws-sdk-s3 = "1.85.0"
 aws-config = "1.6.2"
-redis = { version = "0.32.3", features = ["tokio-comp", "uuid"] }
+
 anyhow = "1.0.98"
 hex = "0.4.3"
 rand_core = "0.9.3"
