@@ -20,7 +20,7 @@ use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::time::sleep;
 use tracing::instrument::WithSubscriber;
-use tracing::warn;
+use tracing::{Instrument, info_span, warn};
 
 #[derive(Serialize)]
 struct CrimsonPDFIngestParamsS3 {
@@ -63,11 +63,28 @@ pub async fn start_workers() -> anyhow::Result<()> {
     tracing::info!("Starting workers!!");
     let s3_client = Arc::new(make_s3_client().await);
     let redis_client = redis::Client::open(&**OPENSCRAPERS_REDIS_DOMAIN)?;
-    let mut redis_con = redis_client.get_multiplexed_async_connection().await?;
+    let mut redis_con = match tokio::time::timeout(
+        Duration::from_secs(5),
+        redis_client.get_multiplexed_async_connection(),
+    )
+    .await
+    {
+        Ok(Ok(conn)) => conn,
+        Ok(Err(err)) => {
+            tracing::error!(%err,"Redis connection error");
+            return Err(anyhow::Error::from(err));
+        }
+        Err(_) => {
+            tracing::error!("Redis connection timeout after 5 seconds");
+            return Err(anyhow!("Redis connection timeout"));
+        }
+    };
     let cases_queue_name = "generic_cases";
 
     let case_sem_ref = &CASE_PROCESSING_SEMAPHORE;
+    tracing::info!("Finished worker startup process, entering main loop.");
     loop {
+        tracing::info!("Beginning processing loop");
         let result: Result<String, RedisError> = redis_con.brpop(cases_queue_name, 0.0).await;
         if let Ok(json_data) = result {
             match serde_json::from_str::<GenericCase>(&json_data) {
@@ -81,7 +98,7 @@ pub async fn start_workers() -> anyhow::Result<()> {
                             warn!(error = e.to_string(), "Error processing case");
                         }
                         drop(sephaor_perm);
-                    }.with_current_subscriber());
+                    }.instrument(info_span!("case_processing_executor")));
                 }
                 Err(err) => {
                     tracing::error!(

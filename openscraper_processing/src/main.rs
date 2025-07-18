@@ -1,6 +1,6 @@
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use misc::otel_setup::init_subscribers_and_loglevel;
-use tracing::{info, instrument::WithSubscriber};
+use tracing::{Instrument, info, info_span, instrument::WithSubscriber};
 
 use crate::{server::define_routes, worker::start_workers};
 
@@ -73,11 +73,10 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(
         async move {
             info!("Attempting to diagnose trace inside a tokio spawn?");
-            println!("Attempting to diagnose trace inside a tokio spawn?. Without tracing.");
 
             let _ = start_workers().await;
         }
-        .with_current_subscriber(),
+        .instrument(info_span!("case_processing")),
     );
 
     // bind and serve
