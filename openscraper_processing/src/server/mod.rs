@@ -13,7 +13,7 @@ use axum::{
 use hyper::body::Bytes;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::str::FromStr;
 use tracing::{error, info, warn};
 
@@ -171,9 +171,9 @@ fn write_s3_file_docs(op: TransformOperation) -> TransformOperation {
 
 async fn health() -> impl IntoApiResponse {
     info!("Health check requested");
-    let response = Json("{"is_healthy": true}");
+    let response = json!({"is_healthy": true});
     info!("Health check successful");
-    response
+    Json(response)
 }
 
 fn health_docs(op: TransformOperation) -> TransformOperation {
