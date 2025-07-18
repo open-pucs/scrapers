@@ -3,6 +3,9 @@ use std::str::FromStr;
 use std::{fs, path::Path, str};
 use tracing::warn;
 
+#[derive(Debug, thiserror::Error)]
+#[error("File Extension was empty or contained only whitespace")]
+pub struct EmptyExtensionError {}
 macro_rules! define_file_extensions {
     ($($variant:ident => ($ext_str:expr, $encoding:expr)),* $(,)?) => {
         #[derive(Clone, Debug, PartialEq, Eq)]
@@ -12,12 +15,12 @@ macro_rules! define_file_extensions {
         }
 
         impl FromStr for FileExtension {
-            type Err = &'static str;
+            type Err = EmptyExtensionError;
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 let ext = s.split_whitespace().next()
                     .map(|s| s.to_lowercase())
-                    .ok_or("Extension was empty")?;
+                    .ok_or(EmptyExtensionError{})?;
 
                 match ext.as_str() {
                     $(
