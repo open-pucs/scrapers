@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::time::Duration;
 
 use anyhow::{anyhow, bail};
 use aws_config::{BehaviorVersion, Region};
@@ -115,9 +116,24 @@ pub async fn upload_s3_bytes(
     Ok(())
 }
 
-pub async fn download_file(url: &str) -> anyhow::Result<Vec<u8>> {
+pub async fn download_file(url: &str, timeout: Option<Duration>) -> anyhow::Result<Vec<u8>> {
     info!(url, "Downloading file");
-    let response = reqwest::get(url).await?;
+    let client = reqwest::Client::new();
+    let mut request = client.get(url);
+
+    if let Some(t) = timeout {
+        request = request.timeout(t);
+    }
+
+    let response = request.send().await?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_msg = format!("HTTP request failed with status code: {status}");
+        error!(url, %status, "Download failed");
+        bail!(error_msg);
+    }
+
     let bytes = response.bytes().await?.to_vec();
     info!("Successfully downloaded {} bytes", bytes.len());
     Ok(bytes)

@@ -161,7 +161,7 @@ async fn download_file_content_validated_with_retries(
 ) -> anyhow::Result<Vec<u8>> {
     let mut last_error: Option<anyhow::Error> = None;
     for _ in 0..ATTACHMENT_DOWNLOAD_TRIES {
-        match download_file(url).await {
+        match download_file(url, Some(Duration::from_secs(20))).await {
             Ok(file_contents) => {
                 if let Err(err) = extension.is_valid_file_contents(&file_contents) {
                     tracing::error!(%extension,%url, %err,"Downloaded file did not match extension");
