@@ -61,13 +61,15 @@ static CASE_PROCESSING_SEMAPHORE: Semaphore = Semaphore::const_new(10);
 static CASE_PROCESSING_QUEUE: LazyLock<Mutex<VecDeque<GenericCase>>> =
     LazyLock::new(|| Mutex::new(VecDeque::with_capacity(100)));
 
-pub async fn push_case_to_queue(case: GenericCase) {
+pub async fn push_case_to_queue(case: GenericCase) -> usize {
     let mut unlocked_queue = (*CASE_PROCESSING_QUEUE).lock().await;
     unlocked_queue.push_back(case);
+    unlocked_queue.len()
 }
-pub async fn get_case_from_queue() -> Option<GenericCase> {
+pub async fn get_case_from_queue() -> (Option<GenericCase>, usize) {
     let mut unlocked_queue = (*CASE_PROCESSING_QUEUE).lock().await;
-    unlocked_queue.pop_front()
+    let res = unlocked_queue.pop_front();
+    (res, unlocked_queue.len())
 }
 
 pub async fn start_workers() -> anyhow::Result<Infallible> {
@@ -80,8 +82,8 @@ pub async fn start_workers() -> anyhow::Result<Infallible> {
     let mut cases_without_ingest = 0;
     tracing::info!("Finished worker startup process, entering main loop.");
     loop {
-        if let Some(case) = get_case_from_queue().await {
-            tracing::info!(case_number= %(case.case_number),"Got case waiting to process.");
+        if let (Some(case), queue_length) = get_case_from_queue().await {
+            tracing::info!(case_number= %(case.case_number), queue_length,"Got case waiting to process.");
             cases_without_ingest = 0;
             let s3_client_clone = s3_client.clone();
             let sephaor_perm = case_sem_ref
@@ -90,7 +92,10 @@ pub async fn start_workers() -> anyhow::Result<Infallible> {
                 .expect("Apparently the semaphore can only give an error if its closed, which this should never be??");
             tokio::spawn(
                 async move {
-                    tracing::info!(availible_permits = %case_sem_ref.available_permits(),case_number= %(case.case_number),"Got semaphore beginning to process case");
+                    tracing::info!(
+                        availible_permits = %case_sem_ref.available_permits(),
+                        case_number= %(case.case_number),
+                        "Got semaphore beginning to process case");
                     if let Err(e) = process_case(&case, &s3_client_clone).await {
                         warn!(error = e.to_string(), "Error processing case");
                     }
@@ -185,11 +190,6 @@ async fn download_file_content_validated_with_retries(
     )))
 }
 
-struct AttachIndex {
-    attach_index: usize,
-    filling_index: usize,
-}
-
 async fn process_case(case: &GenericCase, s3_client: &S3Client) -> anyhow::Result<()> {
     let sem = Semaphore::new(10); // Allow up to 10 concurrent tasks
     let mut return_case = case.to_owned();
@@ -274,7 +274,9 @@ async fn process_pdf_text_using_crimson(
     let s3_url = generate_s3_object_uri_from_key(&file_key);
 
     let crimson_params = CrimsonPDFIngestParamsS3 { s3_uri: s3_url };
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()?;
     let crimson_url = &**CRIMSON_URL;
     let post_url = format!("{crimson_url}/v1/ingest/s3");
 

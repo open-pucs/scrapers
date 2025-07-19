@@ -1,5 +1,5 @@
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-use misc::otel_setup::init_subscribers_and_loglevel;
+use misc::{internet_check::do_i_have_internet, otel_setup::init_subscribers_and_loglevel};
 use tracing::{Instrument, info, info_span, instrument::WithSubscriber};
 
 use crate::{server::define_routes, worker::start_workers};
@@ -25,27 +25,6 @@ mod worker;
 // or even store it as a serialized string.
 async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
     Json(api)
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("No internet connection available")]
-struct NoInternetError {}
-
-fn do_i_have_internet() -> Result<(), NoInternetError> {
-    use std::net::{TcpStream, ToSocketAddrs};
-    use std::time::Duration;
-
-    let addresses = "google.com:80"
-        .to_socket_addrs()
-        .map_err(|_| NoInternetError {})?;
-
-    for addr in addresses {
-        if TcpStream::connect_timeout(&addr, Duration::from_secs(5)).is_ok() {
-            return Ok(());
-        }
-    }
-
-    Err(NoInternetError {})
 }
 
 #[tokio::main]
@@ -84,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // bind and serve
-    let addr = SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 8000);
+    let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 8000);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     info!("Listening on http://{}", addr);
     let mut api = OpenApi {
@@ -109,9 +88,4 @@ async fn main() -> anyhow::Result<()> {
     // });
 
     Ok(())
-}
-
-/// Get health of the API.
-async fn health() -> &'static str {
-    "Service is Healthy"
 }
