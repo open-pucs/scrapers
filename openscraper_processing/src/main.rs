@@ -41,7 +41,6 @@ async fn main() -> anyhow::Result<()> {
         .layer(OtelInResponseLayer)
         //start OpenTelemetry trace on incoming request
         .layer(OtelAxumLayer::default())
-        .api_route("/health", get(health))
         .route("/api.json", get(serve_api))
         .route("/swagger", Swagger::new("/api.json").axum_route())
         .layer(DefaultBodyLimit::disable());
