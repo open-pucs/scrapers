@@ -6,7 +6,7 @@ use crate::types::env_vars::CRIMSON_URL;
 use crate::types::file_extension::FileExtension;
 use crate::types::hash::Blake2bHash;
 use crate::types::{
-    AttachmentTextQuality, GenericAttachment, GenericCase, RawAttachment, RawAttachmentText,
+    AttachmentTextQuality, CaseWithJurisdiction, GenericAttachment, GenericCase, RawAttachment, RawAttachmentText
 };
 use anyhow::{anyhow, bail};
 use aws_sdk_s3::Client as S3Client;
@@ -40,7 +40,8 @@ struct CrimsonStatusResponse {
 const ATTACHMENT_DOWNLOAD_TRIES: usize = 2;
 const DOWNLOAD_RETRY_DELAY_SECONDS: u64 = 2;
 
-pub async fn process_case(case: &GenericCase, s3_client: &S3Client) -> anyhow::Result<()> {
+pub async fn process_case(jurisdiction_case:&CaseWithJurisdiction , s3_client: &S3Client) -> anyhow::Result<()> {
+    let case = &jurisdiction_case.case;
     let sem = Semaphore::new(10); // Allow up to 10 concurrent tasks
     let mut return_case = case.to_owned();
     let mut attachment_tasks = Vec::with_capacity(case.filings.len());
@@ -81,19 +82,19 @@ pub async fn process_case(case: &GenericCase, s3_client: &S3Client) -> anyhow::R
     tracing::info!(case_num=%case.case_number,"Created all attachment processing futures.");
     join_all(attachment_tasks).await;
 
-    let default_jurisdiction = "ny_puc";
+    let jurisdiction = "ny_puc";
     let default_state = "ny";
     let default_country = "usa";
     tracing::info!(
         case_num=%case.case_number,
         state=%default_state,
-        jurisdiction=%default_jurisdiction,
+        jurisdiction=%jurisdiction,
         "Finished all attachments, pushing case to db."
     );
     let s3_result = push_case_to_s3_and_db(
         s3_client,
         &mut return_case,
-        default_jurisdiction,
+        jurisdiction,
         default_state,
         default_country,
     )
@@ -103,7 +104,7 @@ pub async fn process_case(case: &GenericCase, s3_client: &S3Client) -> anyhow::R
             case_num=%case.case_number, 
             %err, 
             state=%default_state,
-            jurisdiction=%default_jurisdiction,
+            jurisdiction=%jurisdiction,
             "Failed to push case to S3/DB");
         return Err(err);
     }
@@ -111,7 +112,7 @@ pub async fn process_case(case: &GenericCase, s3_client: &S3Client) -> anyhow::R
     tracing::info!(
         case_num=%case.case_number,
         state=%default_state,
-        jurisdiction=%default_jurisdiction,
+        jurisdiction=%jurisdiction,
         "Successfully pushed case to db."
     );
     Ok(())
@@ -208,8 +209,9 @@ async fn process_pdf_text_using_crimson(
     let initial_data: CrimsonInitialResponse = initial_response.json().await?;
 
     let check_url = format!(
-        "{}/v1/ingest/status/{}"
-    , crimson_url, initial_data.request_check_leaf);
+        "{}/v1/ingest/status/{}",
+        crimson_url, initial_data.request_check_leaf
+    );
 
     for _ in 1..1000 {
         sleep(Duration::from_secs(3)).await;
@@ -221,8 +223,9 @@ async fn process_pdf_text_using_crimson(
                 return Ok(status_data.markdown.unwrap_or_default());
             } else {
                 bail!(
-                    "Crimson processing failed: {}"
-                , status_data.error.unwrap_or_default());
+                    "Crimson processing failed: {}",
+                    status_data.error.unwrap_or_default()
+                );
             }
         }
     }

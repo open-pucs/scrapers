@@ -14,6 +14,7 @@ from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
 
 
+from openpuc_scrapers.models.jurisdictions import CaseWithJurisdiction, JurisdictionInfo
 from openpuc_scrapers.models.timestamp import (
     RFC3339Time,
     is_after,
@@ -115,7 +116,12 @@ def process_case(
     default_logger.info(
         f"Finished processing case {generic_case.case_name} and pushing it over to the api. Generic Case Type: {type(generic_case)}"
     )
-    case_json = generic_case.model_dump_json()
+
+    jurisdiction_info = JurisdictionInfo(
+        country="usa", state=scraper.state, jurisdiction=scraper.jurisdiction_name
+    )
+    final_obj = CaseWithJurisdiction(case=generic_case, jurisdiction=jurisdiction_info)
+    case_json = final_obj.model_dump_json()
     case_json_pythonable = json.loads(case_json)
 
     default_logger.info(f"successfully got case json for {generic_case.case_name}")

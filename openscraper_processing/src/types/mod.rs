@@ -12,6 +12,29 @@ pub mod hash;
 pub mod s3_uri;
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+pub struct JurisdictionInfo {
+    pub country: String,
+    pub state: String,
+    pub jurisdiction: String,
+}
+
+impl JurisdictionInfo {
+    pub fn new_usa(jurisdiction: &str, state: &str) -> Self {
+        JurisdictionInfo {
+            country: "usa".to_string(),
+            state: state.to_string(),
+            jurisdiction: jurisdiction.to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+pub struct CaseWithJurisdiction {
+    pub case: GenericCase,
+    pub jurisdiction: JurisdictionInfo,
+}
+
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct GenericAttachment {
     pub name: String,
     pub url: String,

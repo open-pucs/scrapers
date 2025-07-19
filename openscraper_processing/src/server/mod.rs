@@ -19,7 +19,8 @@ use tracing::{error, info, warn};
 
 use crate::{
     types::{
-        GenericCase, RawAttachment, env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET, hash::Blake2bHash,
+        CaseWithJurisdiction, GenericCase, RawAttachment, env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
+        hash::Blake2bHash,
     },
     worker::push_case_to_queue,
 };
@@ -343,8 +344,8 @@ fn handle_attachment_file_from_s3_docs(op: TransformOperation) -> TransformOpera
         .response_with::<500, String, _>(|res| res.description("Error fetching attachment file."))
 }
 
-async fn submit_case_to_queue(Json(case): Json<GenericCase>) -> impl IntoApiResponse {
-    info!(case_number = %case.case_number, "Request received to submit case to queue");
+async fn submit_case_to_queue(Json(case): Json<CaseWithJurisdiction>) -> impl IntoApiResponse {
+    info!(case_number = %case.case.case_number, "Request received to submit case to queue");
     push_case_to_queue(case).await;
     (axum::http::StatusCode::OK).into_response()
 }

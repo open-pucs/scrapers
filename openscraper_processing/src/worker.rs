@@ -1,6 +1,6 @@
 use crate::processing::process_case;
 use crate::s3_stuff::make_s3_client;
-use crate::types::GenericCase;
+use crate::types::{CaseWithJurisdiction, GenericCase};
 use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::sync::{Arc, LazyLock};
@@ -11,15 +11,15 @@ use tracing::{Instrument, warn};
 
 static CASE_PROCESSING_SEMAPHORE: Semaphore = Semaphore::const_new(10);
 
-static CASE_PROCESSING_QUEUE: LazyLock<Mutex<VecDeque<GenericCase>>> =
+static CASE_PROCESSING_QUEUE: LazyLock<Mutex<VecDeque<CaseWithJurisdiction>>> =
     LazyLock::new(|| Mutex::new(VecDeque::with_capacity(100)));
 
-pub async fn push_case_to_queue(case: GenericCase) -> usize {
+pub async fn push_case_to_queue(case: CaseWithJurisdiction) -> usize {
     let mut unlocked_queue = (*CASE_PROCESSING_QUEUE).lock().await;
     unlocked_queue.push_back(case);
     unlocked_queue.len()
 }
-pub async fn get_case_from_queue() -> (Option<GenericCase>, usize) {
+pub async fn get_case_from_queue() -> (Option<CaseWithJurisdiction>, usize) {
     let mut unlocked_queue = (*CASE_PROCESSING_QUEUE).lock().await;
     let res = unlocked_queue.pop_front();
     (res, unlocked_queue.len())
@@ -36,7 +36,7 @@ pub async fn start_workers() -> anyhow::Result<Infallible> {
     tracing::info!("Finished worker startup process, entering main loop.");
     loop {
         if let (Some(case), queue_length) = get_case_from_queue().await {
-            tracing::info!(case_number= %(case.case_number), queue_length,"Got case waiting to process.");
+            tracing::info!(case_number= %(case.case.case_number), queue_length,"Got case waiting to process.");
             cases_without_ingest = 0;
             let s3_client_clone = s3_client.clone();
             let sephaor_perm = case_sem_ref
@@ -47,7 +47,7 @@ pub async fn start_workers() -> anyhow::Result<Infallible> {
                 async move {
                     tracing::info!(
                         availible_permits = %case_sem_ref.available_permits(),
-                        case_number= %(case.case_number),
+                        case_number= %(case.case.case_number),
                         "Got semaphore beginning to process case");
                     if let Err(e) = process_case(&case, &s3_client_clone).await {
                         warn!(error = e.to_string(), "Error processing case");
