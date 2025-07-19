@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use misc::{internet_check::do_i_have_internet, otel_setup::init_subscribers_and_loglevel};
-use tracing::{Instrument, info, info_span, instrument::WithSubscriber};
+use tracing::{Instrument, info};
 
 use crate::{server::define_routes, worker::start_workers};
 

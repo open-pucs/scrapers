@@ -22,7 +22,7 @@ pub fn do_i_have_internet() -> Result<(), NoInternetError> {
 }
 
 pub async fn do_i_have_internet_async() -> Result<(), NoInternetError> {
-    use reqwest::{Client, Url};
+    use reqwest::Client;
     use tracing::error;
 
     let client = Client::builder()

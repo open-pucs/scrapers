@@ -165,7 +165,7 @@ impl JsonSchema for FileExtension {
     fn schema_name() -> std::borrow::Cow<'static, str> {
         "FileExtension".into()
     }
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
         json_schema!({
         "type": "string",
         "title": "File Extension",
