@@ -154,16 +154,22 @@ async fn process_attachment(
 
     if raw_attachment.extension == FileExtension::Pdf {
         info!(%hash,"Sending request to crimson to process pdf.");
-        let text = process_pdf_text_using_crimson(raw_attachment.hash).await?;
-
-        info!(%hash,"Completed text processing.");
-        let text_obj = RawAttachmentText {
-            quality: AttachmentTextQuality::Low,
-            language: "en".to_string(),
-            text,
-            timestamp: Utc::now(),
-        };
-        raw_attachment.text_objects.push(text_obj);
+        let text_result = process_pdf_text_using_crimson(raw_attachment.hash).await;
+        match text_result {
+            Ok(text) => {
+                info!(%hash,"Completed text processing.");
+                let text_obj = RawAttachmentText {
+                    quality: AttachmentTextQuality::Low,
+                    language: "en".to_string(),
+                    text,
+                    timestamp: Utc::now(),
+                };
+                raw_attachment.text_objects.push(text_obj);
+            }
+            Err(err) => {
+                tracing::error!(%err,%hash,"Encountered error processing text for pdf.")
+            }
+        }
     }
     push_raw_attach_object_to_s3(s3_client, &raw_attachment).await?;
     Ok(raw_attachment)
