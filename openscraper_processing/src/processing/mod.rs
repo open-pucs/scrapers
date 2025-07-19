@@ -226,16 +226,30 @@ async fn process_pdf_text_using_crimson(
     for _ in 1..1000 {
         sleep(Duration::from_secs(3)).await;
         let status_response = client.get(&check_url).send().await?;
-        let status_data: CrimsonStatusResponse = status_response.json().await?;
+        let status_data: serde_json::Value = status_response.json().await?;
 
-        if status_data.completed {
-            if status_data.success {
-                return Ok(status_data.markdown.unwrap_or_default());
+        let completed = status_data
+            .get("completed")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let success = status_data
+            .get("success")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        if completed {
+            if success {
+                let markdown = status_data
+                    .get("markdown")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                return Ok(markdown.to_string());
             } else {
-                bail!(
-                    "Crimson processing failed: {}",
-                    status_data.error.unwrap_or_default()
-                );
+                let error = status_data
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown Crimson error");
+                bail!("Crimson processing failed: {}", error);
             }
         }
     }
