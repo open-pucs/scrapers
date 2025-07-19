@@ -1,12 +1,13 @@
 use crate::s3_stuff::{
     download_file, generate_s3_object_uri_from_key, get_raw_attach_file_key,
-    push_case_to_s3_and_db, push_raw_attach_to_s3,
+    push_case_to_s3_and_db, push_raw_attach_file_to_s3, push_raw_attach_object_to_s3,
 };
 use crate::types::env_vars::CRIMSON_URL;
 use crate::types::file_extension::FileExtension;
 use crate::types::hash::Blake2bHash;
 use crate::types::{
-    AttachmentTextQuality, CaseWithJurisdiction, GenericAttachment, GenericCase, RawAttachment, RawAttachmentText
+    AttachmentTextQuality, CaseWithJurisdiction, GenericAttachment, RawAttachment,
+    RawAttachmentText,
 };
 use anyhow::{anyhow, bail};
 use aws_sdk_s3::Client as S3Client;
@@ -40,7 +41,10 @@ struct CrimsonStatusResponse {
 const ATTACHMENT_DOWNLOAD_TRIES: usize = 2;
 const DOWNLOAD_RETRY_DELAY_SECONDS: u64 = 2;
 
-pub async fn process_case(jurisdiction_case:&CaseWithJurisdiction , s3_client: &S3Client) -> anyhow::Result<()> {
+pub async fn process_case(
+    jurisdiction_case: &CaseWithJurisdiction,
+    s3_client: &S3Client,
+) -> anyhow::Result<()> {
     let case = &jurisdiction_case.case;
     let sem = Semaphore::new(10); // Allow up to 10 concurrent tasks
     let mut return_case = case.to_owned();
@@ -145,6 +149,9 @@ async fn process_attachment(
         text_objects: vec![],
     };
 
+    push_raw_attach_file_to_s3(s3_client, &raw_attachment, file_contents).await?;
+    info!(%hash,"Pushed raw file to s3.");
+
     if raw_attachment.extension == FileExtension::Pdf {
         info!(%hash,"Sending request to crimson to process pdf.");
         let text = process_pdf_text_using_crimson(raw_attachment.hash).await?;
@@ -158,7 +165,7 @@ async fn process_attachment(
         };
         raw_attachment.text_objects.push(text_obj);
     }
-    push_raw_attach_to_s3(s3_client, &raw_attachment, file_contents).await?;
+    push_raw_attach_object_to_s3(s3_client, &raw_attachment).await?;
     Ok(raw_attachment)
 }
 

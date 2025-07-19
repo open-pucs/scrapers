@@ -292,26 +292,32 @@ pub async fn list_cases_for_jurisdiction(
     Ok(case_names)
 }
 
-pub async fn push_raw_attach_to_s3(
+pub async fn push_raw_attach_file_to_s3(
     s3_client: &S3Client,
     raw_att: &RawAttachment,
     file_contents: Vec<u8>,
 ) -> anyhow::Result<()> {
-    info!(hash = %raw_att.hash, "Pushing raw attachment to S3");
-    let dumped_data = serde_json::to_string(&raw_att)?;
-    let obj_key = get_raw_attach_obj_key(raw_att.hash);
+    info!(hash = %raw_att.hash, "Pushing raw attachment file to S3");
     let file_key = get_raw_attach_file_key(raw_att.hash);
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
-    debug!(
-        bucket,
-        "Pushing raw attachment with object key: {} and file key: {}", obj_key, file_key
-    );
-
-    upload_s3_bytes(s3_client, bucket, &obj_key, dumped_data.into_bytes()).await?;
-    info!("Successfully pushed metadata object to S3");
 
     upload_s3_bytes(s3_client, bucket, &file_key, file_contents).await?;
     info!("Successfully pushed file to S3");
+
+    Ok(())
+}
+
+pub async fn push_raw_attach_object_to_s3(
+    s3_client: &S3Client,
+    raw_att: &RawAttachment,
+) -> anyhow::Result<()> {
+    info!(hash = %raw_att.hash, "Pushing raw attachment file to S3");
+    let dumped_data = serde_json::to_string(&raw_att)?;
+    let obj_key = get_raw_attach_obj_key(raw_att.hash);
+    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
+
+    upload_s3_bytes(s3_client, bucket, &obj_key, dumped_data.into_bytes()).await?;
+    info!("Successfully pushed metadata object to S3");
 
     Ok(())
 }

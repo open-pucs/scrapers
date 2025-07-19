@@ -1,6 +1,6 @@
 use crate::processing::process_case;
 use crate::s3_stuff::make_s3_client;
-use crate::types::{CaseWithJurisdiction, GenericCase};
+use crate::types::CaseWithJurisdiction;
 use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::sync::{Arc, LazyLock};
