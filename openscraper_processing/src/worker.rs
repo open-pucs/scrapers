@@ -234,14 +234,36 @@ async fn process_case(case: &GenericCase, s3_client: &S3Client) -> anyhow::Resul
     let default_jurisdiction = "ny_puc";
     let default_state = "ny";
     let default_country = "usa";
-    push_case_to_s3_and_db(
+    tracing::info!(
+        case_num=%case.case_number,
+        state=%default_state,
+        jurisdiction=%default_jurisdiction,
+        "Finished all attachments, pushing case to db."
+    );
+    let s3_result = push_case_to_s3_and_db(
         s3_client,
         &mut return_case,
         default_jurisdiction,
         default_state,
         default_country,
     )
-    .await?;
+    .await;
+    if let Err(err) = s3_result {
+        tracing::error!(
+            case_num=%case.case_number, 
+            %err, 
+            state=%default_state,
+            jurisdiction=%default_jurisdiction,
+            "Failed to push case to S3/DB");
+        return Err(err);
+    }
+
+    tracing::info!(
+        case_num=%case.case_number,
+        state=%default_state,
+        jurisdiction=%default_jurisdiction,
+        "Successfully pushed case to db."
+    );
     Ok(())
 }
 
