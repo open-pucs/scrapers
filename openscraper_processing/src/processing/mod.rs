@@ -225,8 +225,28 @@ async fn process_pdf_text_using_crimson(
 
     for _ in 1..1000 {
         sleep(Duration::from_secs(3)).await;
-        let status_response = client.get(&check_url).send().await?;
-        let status_data: serde_json::Value = status_response.json().await?;
+        let status_response = match client.get(&check_url).send().await {
+            Ok(val) => val,
+            Err(err) => {
+                tracing::error!(%err,"got bad response from crimson");
+                return Err(err.into());
+            }
+        };
+        let response_text = match status_response.text().await {
+            Ok(text) => text,
+            Err(err) => {
+                tracing::error!(%err, "Failed to get text from Crimson response");
+                return Err(err.into());
+            }
+        };
+        
+        let status_data: serde_json::Value = match serde_json::from_str(&response_text) {
+            Ok(data) => data,
+            Err(err) => {
+                tracing::error!(%err, response_text, "Crimson did not return valid JSON");
+                return Err(err.into());
+            }
+        };
 
         let completed = status_data
             .get("completed")
