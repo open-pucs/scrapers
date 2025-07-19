@@ -15,6 +15,7 @@ use axum::{Extension, Json, extract::DefaultBodyLimit};
 use std::net::{Ipv4Addr, SocketAddr};
 
 mod misc;
+mod processing;
 mod s3_stuff;
 mod server;
 mod types;

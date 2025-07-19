@@ -20,7 +20,7 @@ pub struct GenericAttachment {
     pub hash: Option<Blake2bHash>,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Default)]
 pub struct GenericFiling {
     pub name: String,
     pub filed_date: DateTime<Utc>,
@@ -31,7 +31,7 @@ pub struct GenericFiling {
     pub extra_metadata: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Default)]
 pub struct GenericCase {
     pub case_number: String,
     pub case_name: String,
