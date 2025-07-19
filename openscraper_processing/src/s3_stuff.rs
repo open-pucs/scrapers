@@ -117,15 +117,18 @@ pub async fn upload_s3_bytes(
 }
 
 pub async fn download_file(url: &str, timeout: Option<Duration>) -> anyhow::Result<Vec<u8>> {
+    let timeout = timeout.unwrap_or(Duration::from_secs(20));
     info!(url, "Downloading file");
     let client = reqwest::Client::new();
-    let mut request = client.get(url);
+    let response_result = client.get(url).timeout(timeout).send().await;
 
-    if let Some(t) = timeout {
-        request = request.timeout(t);
-    }
-
-    let response = request.send().await?;
+    let response = match response_result {
+        Ok(res) => res,
+        Err(err) => {
+            tracing::error!(%err,"Encountered network error getting file.");
+            return Err(anyhow::Error::from(err));
+        }
+    };
 
     if !response.status().is_success() {
         let status = response.status();
