@@ -219,8 +219,9 @@ async fn process_pdf_text_using_crimson(
     let initial_data: CrimsonInitialResponse = initial_response.json().await?;
 
     let check_url = format!(
-        "{}/v1/ingest/status/{}",
-        crimson_url, initial_data.request_check_leaf
+        "{}/{}",
+        crimson_url.trim_end_matches('/'),
+        initial_data.request_check_leaf.trim_start_matches('/')
     );
 
     for _ in 1..1000 {
@@ -228,19 +229,19 @@ async fn process_pdf_text_using_crimson(
         let status_response = match client.get(&check_url).send().await {
             Ok(val) => val,
             Err(err) => {
-                tracing::error!(%err,"got bad response from crimson");
+                tracing::error!(%err,%check_url,"got bad response from crimson");
                 return Err(err.into());
             }
         };
         let response_text = match status_response.text().await {
             Ok(text) => text,
             Err(err) => {
-                tracing::error!(%err, "Failed to get text from Crimson response");
+                tracing::error!(%err,%check_url, "Failed to get text from Crimson response");
                 return Err(err.into());
             }
         };
         
-        let status_data: serde_json::Value = match serde_json::from_str(&response_text) {
+        let status_data: CrimsonStatusResponse = match serde_json::from_str(&response_text) {
             Ok(data) => data,
             Err(err) => {
                 tracing::error!(%err, response_text, "Crimson did not return valid JSON");
@@ -248,27 +249,14 @@ async fn process_pdf_text_using_crimson(
             }
         };
 
-        let completed = status_data
-            .get("completed")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        let success = status_data
-            .get("success")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
 
-        if completed {
-            if success {
-                let markdown = status_data
-                    .get("markdown")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+        if status_data.completed {
+            if status_data.success {
+                let markdown = status_data.markdown.unwrap_or_default();
                 return Ok(markdown.to_string());
             } else {
-                let error = status_data
-                    .get("error")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown Crimson error");
+                let error = status_data.error.unwrap_or_default();
+                tracing::error!(crimson_error_string = error,%check_url,"Crimson processing failed");
                 bail!("Crimson processing failed: {}", error);
             }
         }
