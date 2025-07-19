@@ -19,8 +19,8 @@ use tracing::{error, info, warn};
 
 use crate::{
     types::{
-        CaseWithJurisdiction, GenericCase, RawAttachment, env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
-        hash::Blake2bHash,
+        CaseWithJurisdiction, GenericCase, JurisdictionInfo, RawAttachment,
+        env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET, hash::Blake2bHash,
     },
     worker::push_case_to_queue,
 };
@@ -201,15 +201,10 @@ async fn handle_case_filing_from_s3(
 ) -> impl IntoApiResponse {
     info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Request received for case filing");
     let s3_client = crate::s3_stuff::make_s3_client().await;
-    let country = "usa"; // Or get from somewhere else
-    let result = crate::s3_stuff::fetch_case_filing_from_s3(
-        &s3_client,
-        &case_name,
-        &jurisdiction_name,
-        &state,
-        country,
-    )
-    .await;
+    let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
+    let result =
+        crate::s3_stuff::fetch_case_filing_from_s3(&s3_client, &case_name, &jurisdiction_info)
+            .await;
     match result {
         Ok(case) => {
             info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Successfully fetched case filing");

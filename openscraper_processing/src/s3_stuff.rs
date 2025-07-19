@@ -7,6 +7,7 @@ use aws_sdk_s3::config::Credentials;
 use chrono::offset;
 use tracing::{debug, error, info};
 
+use crate::types::JurisdictionInfo;
 use crate::types::s3_uri::S3Location;
 use crate::types::{
     GenericCase, RawAttachment,
@@ -144,12 +145,10 @@ pub async fn download_file(url: &str, timeout: Duration) -> anyhow::Result<Vec<u
 pub async fn fetch_case_filing_from_s3(
     s3_client: &S3Client,
     case_name: &str,
-    jurisdiction_name: &str,
-    state: &str,
-    country: &str,
+    jurisdiction: &JurisdictionInfo,
 ) -> anyhow::Result<GenericCase> {
-    info!(case_name, jurisdiction_name, "Fetching case filing from S3");
-    let key = get_case_s3_key(case_name, jurisdiction_name, state, country);
+    info!(case_name, jurisdiction_name=%jurisdiction.jurisdiction, "Fetching case filing from S3");
+    let key = get_case_s3_key(case_name, jurisdiction);
     let bytes = download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await?;
     let case = serde_json::from_slice(&bytes)?;
     info!("Successfully deserialized case filing");
@@ -185,12 +184,10 @@ pub async fn fetch_attachment_file_from_s3(
     let key = get_raw_attach_file_key(hash);
     download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await
 }
-pub fn get_case_s3_key(
-    case_name: &str,
-    jurisdiction_name: &str,
-    state: &str,
-    country: &str,
-) -> String {
+pub fn get_case_s3_key(case_name: &str, jurisdiction: &JurisdictionInfo) -> String {
+    let country = &*jurisdiction.country;
+    let state = &*jurisdiction.state;
+    let jurisdiction_name = &*jurisdiction.jurisdiction;
     let key = format!("objects/{country}/{state}/{jurisdiction_name}/{case_name}.json");
     debug!(
         case_name,
@@ -231,12 +228,10 @@ pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blak
 pub async fn push_case_to_s3_and_db(
     s3_client: &S3Client,
     case: &mut GenericCase,
-    jurisdiction_name: &str,
-    state: &str,
-    country: &str,
+    jurisdiction: &JurisdictionInfo,
 ) -> anyhow::Result<()> {
     info!(case_number = %case.case_number, "Pushing case to S3 and DB");
-    let key = get_case_s3_key(&case.case_number, jurisdiction_name, state, country);
+    let key = get_case_s3_key(&case.case_number, &jurisdiction);
     debug!("Pushing case with key: {}", key);
     case.indexed_at = offset::Utc::now();
     let case_jsonified = serde_json::to_string(case)?;
