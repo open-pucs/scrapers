@@ -116,8 +116,7 @@ pub async fn upload_s3_bytes(
     Ok(())
 }
 
-pub async fn download_file(url: &str, timeout: Option<Duration>) -> anyhow::Result<Vec<u8>> {
-    let timeout = timeout.unwrap_or(Duration::from_secs(20));
+pub async fn download_file(url: &str, timeout: Duration) -> anyhow::Result<Vec<u8>> {
     info!(url, "Downloading file");
     let client = reqwest::Client::new();
     let response_result = client.get(url).timeout(timeout).send().await;
