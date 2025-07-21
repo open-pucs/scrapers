@@ -1,3 +1,4 @@
+**/node_modules
 # Project Specific Stuff 
 volumes/
 ai-metaprogramming/outputs/
