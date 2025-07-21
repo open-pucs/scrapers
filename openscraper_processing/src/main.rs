@@ -1,16 +1,21 @@
-use tracing::info;
+#![allow(dead_code)]
+use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
+use misc::{internet_check::do_i_have_internet, otel_setup::init_subscribers_and_loglevel};
+use tracing::{Instrument, info};
 
 use crate::{server::define_routes, worker::start_workers};
 
 use aide::{
-    axum::{ApiRouter, IntoApiResponse, routing::get},
+    axum::{IntoApiResponse, routing::get},
     openapi::{Info, OpenApi},
     swagger::Swagger,
 };
-use axum::{Extension, Json};
+use axum::{Extension, Json, extract::DefaultBodyLimit};
 
 use std::net::{Ipv4Addr, SocketAddr};
 
+mod misc;
+mod processing;
 mod s3_stuff;
 mod server;
 mod types;
@@ -26,23 +31,40 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    info!("Tracing Subscriber is up and running, trying to create app");
+    let _ =
+        init_subscribers_and_loglevel().expect("Failed to initialize opentelemetry tracing stuff");
+    if let Err(e) = do_i_have_internet() {
+        tracing::error!(err = %e,"NO INTERNET DETECTED");
+        panic!("NO INTERNET DETECTED");
+    }
     // initialise our subscriber
-    let routes = define_routes().await;
+    let routes = define_routes();
     let app = routes
-        .api_route("/health", get(health))
+        .layer(OtelInResponseLayer)
+        //start OpenTelemetry trace on incoming request
+        .layer(OtelAxumLayer::default())
         .route("/api.json", get(serve_api))
-        .route("/swagger", Swagger::new("/api.json").axum_route());
+        .route("/swagger", Swagger::new("/api.json").axum_route())
+        .layer(DefaultBodyLimit::disable());
 
     // Spawn background worker to process PDF tasks
     // This worker runs indefinitely
     info!("App Created, spawning background process:");
-    tokio::spawn(async move {
-        start_workers().await;
-    });
+    tokio::spawn(
+        async move {
+            info!("Attempting to diagnose trace inside a tokio spawn?");
+
+            let result = start_workers().await;
+            let Err(err) = result;
+            tracing::error!(%err,"Encountered error while running the workers. The worker has stopped.");
+            println!("Encountered error while running the workers. The worker has stopped: {err}");
+            eprintln!("Encountered error while running the workers. The worker has stopped: {err}");
+        }
+        .in_current_span(),
+    );
 
     // bind and serve
-    let addr = SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 8080);
+    let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 8000);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     info!("Listening on http://{}", addr);
     let mut api = OpenApi {
@@ -67,9 +89,4 @@ async fn main() -> anyhow::Result<()> {
     // });
 
     Ok(())
-}
-
-/// Get health of the API.
-async fn health() -> &'static str {
-    "Service is Healthy"
 }

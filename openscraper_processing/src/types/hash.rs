@@ -40,7 +40,7 @@ impl Blake2bHash {
         Ok(Blake2bHash(hasher.finalize().into()))
     }
 
-    pub fn peek_bytes(&self) -> &[u8; 32] {
+    pub const fn peek_bytes(&self) -> &[u8; 32] {
         &self.0
     }
 }
@@ -99,7 +99,7 @@ impl JsonSchema for Blake2bHash {
         Cow::Borrowed("Blake2bHash")
     }
 
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> Schema {
         json_schema!({
         "type": "string",
         "pattern": "^[a-zA-Z0-9_-]{43}$",
@@ -130,7 +130,7 @@ mod tests {
             // Convert back from string
             let decoded = match s.parse::<Blake2bHash>() {
                 Ok(h) => h,
-                Err(e) => panic!("Error decoding string: {}", e),
+                Err(e) => panic!("Error decoding string: {e}"),
             };
 
             // Verify match
@@ -145,7 +145,7 @@ mod tests {
             let computed_hash = Blake2bHash::from_bytes(data);
             let computed_hash_bytes = *computed_hash.peek_bytes();
             let expected_bytes = hex::decode(expected_hex)
-                .map_err(|e| format!("Failed to decode hex string: {}", e))?;
+                .map_err(|e| format!("Failed to decode hex string: {e}"))?;
 
             if expected_bytes.len() != 32 {
                 return Err("Expected hash length must be 32 bytes".into());
@@ -159,8 +159,7 @@ mod tests {
                 Ok(())
             } else {
                 Err(format!(
-                    "Hash mismatch\nExpected:{:?}\nGot:{:?}",
-                    expected_hash_bytes, computed_hash_bytes
+                    "Hash mismatch\nExpected:{expected_hash_bytes:?}\nGot:{computed_hash_bytes:?}"
                 ))
             }
         }
@@ -178,8 +177,7 @@ mod tests {
         ];
 
         for (input, expected_hex) in test_cases {
-            test_expected_hash(input, expected_hex)
-                .unwrap_or_else(|e| panic!("Test failed: {}", e));
+            test_expected_hash(input, expected_hex).unwrap_or_else(|e| panic!("Test failed: {e}"));
         }
     }
 }

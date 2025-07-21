@@ -6,14 +6,15 @@ from typing import Any, List, Optional, Tuple
 import redis
 import json
 
-from openpuc_scrapers.db.s3_utils import push_case_to_s3_and_db
 from openpuc_scrapers.models.constants import (
-    OPENSCRAPERS_S3_OBJECT_BUCKET,
+    OPENSCRAPERS_INTERNAL_API_URL,
+    OPENSCRAPERS_REDIS_DOMAIN,
 )
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
 
 
+from openpuc_scrapers.models.jurisdictions import CaseWithJurisdiction, JurisdictionInfo
 from openpuc_scrapers.models.timestamp import (
     RFC3339Time,
     is_after,
@@ -21,8 +22,10 @@ from openpuc_scrapers.models.timestamp import (
     rfctime_serializer,
     time_is_in_yearlist,
 )
+import requests
+
+
 from openpuc_scrapers.pipelines.helper_utils import save_json_sync
-from openpuc_scrapers.pipelines.raw_attachment_handling import process_generic_filing
 from openpuc_scrapers.scrapers.base import (
     GenericScraper,
     StateCaseData,
@@ -80,17 +83,17 @@ def process_case(
 ) -> GenericCase:
     generic_case = scraper.into_generic_case_data(case)
     case_num = generic_case.case_number
+    default_logger.info(f"Successfully made generic case object: {case_num} ")
 
     # Save state-specific case data
     case_path = f"{base_path}/initial_cases/case_{case_num}.json"
-    save_json_sync(path=case_path, bucket=OPENSCRAPERS_S3_OBJECT_BUCKET, data=case)
+    save_json_sync(path=case_path, data=case)
 
     # Process filings
     filings_intermediate = scraper.filing_data_intermediate(case)
     filings_path = f"{base_path}/intermediate_caseinfo/case_{case_num}.json"
     save_json_sync(
         path=filings_path,
-        bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=filings_intermediate,
     )
 
@@ -98,7 +101,6 @@ def process_case(
     filings_json_path = f"{base_path}/filings/case_{case_num}.json"
     save_json_sync(
         path=filings_json_path,
-        bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=filings,
     )
     default_logger.info(
@@ -109,21 +111,32 @@ def process_case(
     for filing in filings:
         generic_filing = scraper.into_generic_filing_data(filing)
         case_specific_generic_cases.append(generic_filing)
+    generic_case.filings = case_specific_generic_cases
+
+    default_logger.info(
+        f"Finished processing case {generic_case.case_name} and pushing it over to the api. Generic Case Type: {type(generic_case)}"
+    )
+
+    jurisdiction_info = JurisdictionInfo(
+        country="usa", state=scraper.state, jurisdiction=scraper.jurisdiction_name
+    )
+    final_obj = CaseWithJurisdiction(case=generic_case, jurisdiction=jurisdiction_info)
+    case_json = final_obj.model_dump_json()
+    case_json_pythonable = json.loads(case_json)
+
+    default_logger.info(f"successfully got case json for {generic_case.case_name}")
 
     # NOW THAT THE CASE IS FULLY GENERIC IT SHOULD PUSH ALL THIS STUFF OVER TO RUST
-    redis_client = redis.Redis(host="localhost", port=6379, db=0)
-    redis_client.lpush("generic_cases", generic_case.model_dump_json())
+    url = f"{OPENSCRAPERS_INTERNAL_API_URL}/api/cases/submit"
+    response = requests.post(url, json=case_json_pythonable)
+    response.raise_for_status()
 
     # INSTEAD OF RETURNING THE CASE REFACTOR THE CODE TO RETURN A SUCCESSFUL SIGNAL
     return GenericCase(
         case_number="Success",
         case_name="Success",
-        jurisdiction="Success",
-        state="Success",
         filings=[],
         opened_date=rfc_time_now(),
-        updated_date=rfc_time_now(),
-        source_url="Success",
     )
 
 
@@ -158,6 +171,7 @@ def process_case_jsonified(
 ) -> str:
     case_type = scraper.state_case_type
     case_data = case_type.model_validate_json(case)
+    default_logger.info("Successfully deserialized case from json.")
 
     processed_case = process_case(scraper=scraper, case=case_data, base_path=base_path)
     return processed_case.model_dump_json()
@@ -238,7 +252,6 @@ def get_all_caselist_raw(
     caselist_path = f"{base_path}/caselist.json"
     save_json_sync(
         path=caselist_path,
-        bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=caselist_intermediate,
     )
 
@@ -272,7 +285,6 @@ def get_new_caselist_since_date(
     updated_path = f"{base_path}/updated_cases.json"
     save_json_sync(
         path=updated_path,
-        bucket=OPENSCRAPERS_S3_OBJECT_BUCKET,
         data=updated_intermediate,
     )
 

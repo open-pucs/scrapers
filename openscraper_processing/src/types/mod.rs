@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use file_extension::FileExtension;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -6,9 +7,34 @@ use std::collections::HashMap;
 use crate::types::hash::Blake2bHash;
 
 pub mod env_vars;
+pub mod file_extension;
 pub mod hash;
+pub mod s3_uri;
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+pub struct JurisdictionInfo {
+    pub country: String,
+    pub state: String,
+    pub jurisdiction: String,
+}
+
+impl JurisdictionInfo {
+    pub fn new_usa(jurisdiction: &str, state: &str) -> Self {
+        JurisdictionInfo {
+            country: "usa".to_string(),
+            state: state.to_string(),
+            jurisdiction: jurisdiction.to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+pub struct CaseWithJurisdiction {
+    pub case: GenericCase,
+    pub jurisdiction: JurisdictionInfo,
+}
+
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct GenericAttachment {
     pub name: String,
     pub url: String,
@@ -17,7 +43,7 @@ pub struct GenericAttachment {
     pub hash: Option<Blake2bHash>,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Default)]
 pub struct GenericFiling {
     pub name: String,
     pub filed_date: DateTime<Utc>,
@@ -28,7 +54,7 @@ pub struct GenericFiling {
     pub extra_metadata: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Default)]
 pub struct GenericCase {
     pub case_number: String,
     pub case_name: String,
@@ -45,7 +71,7 @@ pub struct GenericCase {
     pub indexed_at: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, JsonSchema)]
 pub enum AttachmentTextQuality {
     #[serde(rename = "low")]
     Low,
@@ -53,7 +79,7 @@ pub enum AttachmentTextQuality {
     High,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
 pub struct RawAttachmentText {
     pub quality: AttachmentTextQuality,
     pub language: String,
@@ -61,10 +87,10 @@ pub struct RawAttachmentText {
     pub timestamp: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct RawAttachment {
     pub hash: Blake2bHash,
     pub name: String,
-    pub extension: String,
+    pub extension: FileExtension,
     pub text_objects: Vec<RawAttachmentText>,
 }

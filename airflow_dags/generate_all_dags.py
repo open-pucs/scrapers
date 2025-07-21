@@ -3,7 +3,7 @@ import json
 import os
 from typing import Any, List, Tuple
 from airflow.decorators import dag, task
-from openpuc_scrapers.db.s3_wrapper import rand_string
+from openpuc_scrapers.models.utils import rand_string
 from openpuc_scrapers.models.timestamp import rfc_time_now, rfctime_serializer
 from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
     generate_intermediate_object_save_path,
@@ -46,7 +46,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
             import logging
 
             logger = logging.getLogger("initialize_caselist")
-            year_list = json.loads(f"{params["year_list"]}")
+            year_list = json.loads(f"{params['year_list']}")
             logger.info(
                 f"Successfully parsed year list, scraping from cases started in:{year_list}"
             )
@@ -120,7 +120,7 @@ def create_scraper_allcases_dag(scraper_info: ScraperInfoObject) -> Any:
 
                 case_obj = loads(case_data)
                 try:
-                    result = process_case_jsonified(
+                    process_case_jsonified(
                         scraper=scraper,
                         case=case_obj["case_json"],
                         base_path=case_obj["base_path"],
@@ -223,7 +223,6 @@ def create_single_docket_test_dag(scraper_info: ScraperInfoObject) -> Any:
         tags=["scrapers", "test", scraper_info.id],
     )
     def scraper_dag():
-
         @task
         def process_case_airflow(scraper: Any, case: str, base_path: str) -> str:
             return process_case_jsonified(
