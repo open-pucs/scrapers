@@ -29,13 +29,16 @@ describe("template spec", () => {
     cy.wait(100);
     cy.get("#srchCForm\\:logDatePostedCompOpr").select("BETWEEN");
 
-    cy.wait(100);
-    cy.get("#srchCForm\\:srchBtn > .ui-button-text").click();
     /* ==== Generated with Cypress Studio ==== */
-    cy.get('#srchCForm\\:logDatePostedInput').clear();
-    cy.get('#srchCForm\\:logDatePostedInput').type('01/01/2024,01/01/2025');
-    cy.get('#dataTableForm\\:srchRsltDataTable\\:j_id34').select('250');
+    cy.get("#srchCForm\\:logDatePostedInput").clear();
+    cy.get("#srchCForm\\:logDatePostedInput").type("01/01/2010,01/01/2026");
+    cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id34").select("250");
     /* ==== End Cypress Studio ==== */
+
+    cy.wait(400);
+    cy.get("#srchCForm\\:srchBtn > .ui-button-text").click();
+
+    cy.get(":nth-child(10) > a > img").click();
   });
 });
 // Click on the button with this css selector.
