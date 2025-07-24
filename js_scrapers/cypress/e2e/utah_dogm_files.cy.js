@@ -11,34 +11,45 @@ describe("template spec", () => {
     //   "li.ui-selectcheckboxmenu-item:nth-child(11) > div:nth-child(1) > div:nth-child(2)",
     // ).click();
     //
+    //
+    cy.wait(100);
     cy.get("#srchCForm\\:srchCCheckboxMenu_label").click();
 
-    cy.wait(100);
+    cy.wait(300);
     cy.get(
       ":nth-child(11) > .ui-chkbox > .ui-chkbox-box > .ui-chkbox-icon",
     ).click();
 
-    cy.wait(100);
+    cy.wait(300);
     cy.get(
       '[style="font-weight: bold;width: 170px;border: none;"] > label',
     ).click();
     cy.get("#srchCForm\\:logDatePostedInput").clear();
     cy.wait(300);
-    cy.get("#srchCForm\\:logDatePostedInput").type("01/01/2024,01/01/2025");
+    cy.get("#srchCForm\\:logDatePostedInput").type("01/01/2024,01/02/2024");
 
-    cy.wait(100);
+    cy.wait(300);
     cy.get("#srchCForm\\:logDatePostedCompOpr").select("BETWEEN");
 
+    cy.wait(300);
+
+    // cy.wait(300);
+    //
+    // cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id34").select("250");
+    //
+    // cy.get(":nth-child(10) > a > img").click();
+    // /* ==== Generated with Cypress Studio ==== */
+    // cy.get("#srchCForm\\:srchBtn > .ui-button-text").click();
+    //
+    // cy.wait(1000);
+    // cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id35").select("250");
+    // /* ==== End Cypress Studio ==== */
     /* ==== Generated with Cypress Studio ==== */
-    cy.get("#srchCForm\\:logDatePostedInput").clear();
-    cy.get("#srchCForm\\:logDatePostedInput").type("01/01/2010,01/01/2026");
-    cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id34").select("250");
-    /* ==== End Cypress Studio ==== */
+    cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id7").select("250");
 
-    cy.wait(400);
+    cy.wait(300);
     cy.get("#srchCForm\\:srchBtn > .ui-button-text").click();
-
-    cy.get(":nth-child(10) > a > img").click();
+    /* ==== End Cypress Studio ==== */
   });
 });
 // Click on the button with this css selector.
