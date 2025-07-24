@@ -35,19 +35,23 @@ describe("Utah DOGM Scraper", () => {
       cy.get("#srchCForm\\:srchBtn > .ui-button-text").click();
       cy.wait(5000); // Wait for results to load
 
-      cy.get("#dataTableForm\\:srchRsltDataTable_data tr").if("exists").then(($rows) => {
-        const data = [];
-        $rows.each((index, row) => {
-          const columns = Cypress.$(row).find("td");
-          const rowData = [];
-          columns.each((i, col) => {
-            rowData.push(`"${Cypress.$(col).text().trim()}"`);
-          });
-          data.push(rowData);
-        });
+      cy.get("body").then(($body) => {
+        if ($body.find("#dataTableForm\\:srchRsltDataTable_data tr").length > 0) {
+          cy.get("#dataTableForm\\:srchRsltDataTable_data tr").then(($rows) => {
+            const data = [];
+            $rows.each((index, row) => {
+              const columns = Cypress.$(row).find("td");
+              const rowData = [];
+              columns.each((i, col) => {
+                rowData.push(`"${Cypress.$(col).text().trim()}"`);
+              });
+              data.push(rowData);
+            });
 
-        if (data.length > 0) {
-          cy.task("appendToCsv", { filename: "cypress/downloads/utah_dogm_well_data.csv", data });
+            if (data.length > 0) {
+              cy.task("appendToCsv", { filename: "cypress/downloads/utah_dogm_well_data.csv", data });
+            }
+          });
         }
       });
 
