@@ -1,76 +1,57 @@
-describe("template spec", () => {
-  it("passes", () => {
-    cy.visit(
-      "https://oilgas.ogm.utah.gov/oilgasweb/live-data-search/lds-logs/logs-lu.xhtml",
-    );
+describe("Utah DOGM Scraper", () => {
+  it("scrapes well data and appends to a CSV", () => {
+    const today = new Date();
+    const fiveYearsAgo = new Date(today.getFullYear() - 5, today.getMonth(), today.getDate());
 
-    cy.get("#srchCForm\\:wellIdCloseBtn").click();
+    let startDate = fiveYearsAgo;
 
-    // cy.get(".ui-selectcheckboxmenu-trigger").click();
-    // cy.get(
-    //   "li.ui-selectcheckboxmenu-item:nth-child(11) > div:nth-child(1) > div:nth-child(2)",
-    // ).click();
-    //
-    //
-    cy.wait(100);
-    cy.get("#srchCForm\\:srchCCheckboxMenu_label").click();
+    while (startDate < today) {
+      let endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, startDate.getDate());
+      if (endDate > today) {
+        endDate = today;
+      }
 
-    cy.wait(300);
-    cy.get(
-      ":nth-child(11) > .ui-chkbox > .ui-chkbox-box > .ui-chkbox-icon",
-    ).click();
+      const startDateString = `${(startDate.getMonth() + 1).toString().padStart(2, '0')}/${startDate.getDate().toString().padStart(2, '0')}/${startDate.getFullYear()}`;
+      const endDateString = `${(endDate.getMonth() + 1).toString().padStart(2, '0')}/${endDate.getDate().toString().padStart(2, '0')}/${endDate.getFullYear()}`;
+      const dateRange = `${startDateString},${endDateString}`;
 
-    cy.wait(300);
-    cy.get(
-      '[style="font-weight: bold;width: 170px;border: none;"] > label',
-    ).click();
-    cy.get("#srchCForm\\:logDatePostedInput").clear();
-    cy.wait(300);
-    cy.get("#srchCForm\\:logDatePostedInput").type("01/01/2024,01/02/2024");
+      cy.visit("https://oilgas.ogm.utah.gov/oilgasweb/live-data-search/lds-logs/logs-lu.xhtml");
 
-    cy.wait(300);
-    cy.get("#srchCForm\\:logDatePostedCompOpr").select("BETWEEN");
+      cy.get("#srchCForm\\:wellIdCloseBtn").click();
+      cy.wait(100);
+      cy.get("#srchCForm\\:srchCCheckboxMenu_label").click();
+      cy.wait(300);
+      cy.get(":nth-child(11) > .ui-chkbox > .ui-chkbox-box > .ui-chkbox-icon").click();
+      cy.wait(300);
+      cy.get('[style="font-weight: bold;width: 170px;border: none;"] > label').click();
+      cy.get("#srchCForm\\:logDatePostedInput").clear();
+      cy.wait(300);
+      cy.get("#srchCForm\\:logDatePostedInput").type(dateRange);
+      cy.wait(300);
+      cy.get("#srchCForm\\:logDatePostedCompOpr").select("BETWEEN");
+      cy.wait(300);
+      cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id7").select("250");
+      cy.wait(300);
+      cy.get("#srchCForm\\:srchBtn > .ui-button-text").click();
+      cy.wait(5000); // Wait for results to load
 
-    cy.wait(300);
+      cy.get("#dataTableForm\\:srchRsltDataTable_data tr").if("exists").then(($rows) => {
+        const data = [];
+        $rows.each((index, row) => {
+          const columns = Cypress.$(row).find("td");
+          const rowData = [];
+          columns.each((i, col) => {
+            rowData.push(`"${Cypress.$(col).text().trim()}"`);
+          });
+          data.push(rowData);
+        });
 
-    // cy.wait(300);
-    //
-    // cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id34").select("250");
-    //
-    // cy.get(":nth-child(10) > a > img").click();
-    // /* ==== Generated with Cypress Studio ==== */
-    // cy.get("#srchCForm\\:srchBtn > .ui-button-text").click();
-    //
-    // cy.wait(1000);
-    // cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id35").select("250");
-    // /* ==== End Cypress Studio ==== */
-    /* ==== Generated with Cypress Studio ==== */
-    cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id7").select("250");
+        if (data.length > 0) {
+          cy.task("appendToCsv", { filename: "cypress/downloads/utah_dogm_well_data.csv", data });
+        }
+      });
 
-    cy.wait(300);
-    cy.get("#srchCForm\\:srchBtn > .ui-button-text").click();
-    /* ==== End Cypress Studio ==== */
+      startDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, startDate.getDate());
+    }
   });
 });
-// Click on the button with this css selector.
-// #srchCForm\:wellIdCloseBtn
-//
-// Click on this selector button:
-// .ui-selectcheckboxmenu-trigger
-//
-// then go ahead and enable this field:
-// li.ui-selectcheckboxmenu-item:nth-child(11) > div:nth-child(1) > div:nth-child(2)
-//
-// Then go ahead and type the string into the input field
-//#srchCForm\:logDatePostedInput
-// Select date posted to web and throw it in this value.
-// "01/01/2024,01/01/2025""
-
-// Then select the between option of this selector
-//#srchCForm\:logDatePostedCompOpr
-//
-// If the selection for the option would be best here that is
-//#srchCForm\:logDatePostedCompOpr > option:nth-child(3)
-//
-// Now that all this is done go ahead and click the search button at:
-//  #srchCForm\:srchBtn
