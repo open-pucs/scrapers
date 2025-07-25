@@ -160,6 +160,22 @@ with open(
 
 # Commit changes and close the connection
 db.commit()
+
+# Create the computed view
+cursor.execute("DROP VIEW IF EXISTS wells_with_permit_summary;")
+cursor.execute("""
+CREATE VIEW IF NOT EXISTS wells_with_permit_summary AS
+SELECT
+  w.*,
+  COUNT(p.permit_id) AS permit_count,
+  MIN(p.date_posted) AS earliest_permit_date,
+  MAX(p.date_posted) AS latest_permit_date
+FROM wells w
+JOIN permits p ON w.api_well_number = p.api_well_number
+GROUP BY w.api_well_number;
+""")
+
+db.commit()
 db.close()
 
 print("Data loaded successfully!")
