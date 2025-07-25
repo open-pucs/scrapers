@@ -98,7 +98,9 @@ with open(
                 "coalbed_methane_well": well.get("Coalbed\nMethane\nWell?"),
                 "cumulative_oil_barrels": cum_oil,
                 "cumulative_natural_gas_mcf": cum_gas,
-                "cumulative_water_barrels": float(well.get("Cumulative\nWater\n(Barrels)", 0) or 0),
+                "cumulative_water_barrels": float(
+                    well.get("Cumulative\nWater\n(Barrels)", 0) or 0
+                ),
                 "field_name": well.get("Field Name"),
                 "surface_ownership": well.get("Surface\nOwnership"),
                 "mineral_lease": well.get("Mineral\nLease"),
@@ -124,8 +126,11 @@ with open(
         )
 
 # Load and insert permits data
+old_permit_data_path = "/home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/cypress/downloads/utah_dogm_file_data-round-1.csv"
+new_permit_data_path = "/home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/cypress/downloads/get_all_permit_data_ad_hoc.csv"
+
 with open(
-    "/home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/cypress/downloads/utah_dogm_file_data-round-1.csv",
+    new_permit_data_path,
     "r",
     encoding="utf-8",
 ) as permits_file:

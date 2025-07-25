@@ -4,7 +4,7 @@ describe("template spec", () => {
       "https://oilgas.ogm.utah.gov/oilgasweb/live-data-search/lds-logs/logs-lu.xhtml",
     );
 
-    cy.get("#srchCForm\\:wellIdCloseBtn").click();
+    // cy.get("#srchCForm\\:wellIdCloseBtn").click();
 
     // cy.get(".ui-selectcheckboxmenu-trigger").click();
     // cy.get(
@@ -12,28 +12,21 @@ describe("template spec", () => {
     // ).click();
     //
     //
-    cy.wait(100);
-    cy.get("#srchCForm\\:srchCCheckboxMenu_label").click();
-
-    cy.wait(300);
-    cy.get(
-      ":nth-child(11) > .ui-chkbox > .ui-chkbox-box > .ui-chkbox-icon",
-    ).click();
-
-    cy.wait(300);
-    cy.get(
-      '[style="font-weight: bold;width: 170px;border: none;"] > label',
-    ).click();
-    cy.get("#srchCForm\\:logDatePostedInput").clear();
-    cy.wait(300);
-    cy.get("#srchCForm\\:logDatePostedInput").type("01/01/2024,02/02/2024");
-    /* ==== Generated with Cypress Studio ==== */
-
-    cy.wait(300);
-    cy.get("#srchCForm\\:srchBtn > .ui-button-text").click();
-    cy.wait(3000);
-    cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id34").select("250");
-    /* ==== End Cypress Studio ==== */
+    // cy.wait(100);
+    // cy.get("#srchCForm\\:srchCCheckboxMenu_label").click();
+    //
+    // cy.wait(300);
+    // cy.get(
+    //   ":nth-child(11) > .ui-chkbox > .ui-chkbox-box > .ui-chkbox-icon",
+    // ).click();
+    //
+    // cy.wait(300);
+    // cy.get(
+    //   '[style="font-weight: bold;width: 170px;border: none;"] > label',
+    // ).click();
+    // cy.get("#srchCForm\\:logDatePostedInput").clear();
+    // cy.wait(300);
+    // cy.get("#srchCForm\\:logDatePostedInput").type("01/01/2024,02/02/2024");
   });
 });
 // Click on the button with this css selector.
