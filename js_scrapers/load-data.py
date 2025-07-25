@@ -5,6 +5,25 @@ import sqlite3
 db = sqlite3.connect("wells.db")
 cursor = db.cursor()
 
+
+# "API Well Number","Operator","Well Name","Well Status","Well Type","Coalbed
+# Methane
+# Well?","Cumulative
+# Oil
+# (Barrels)","Cumulative
+# Natural Gas
+# (MCF)","Cumulative
+# Water
+# (Barrels)","Field Name","Surface
+# Ownership","Mineral
+# Lease","County","Qtr/Qtr","Section","Township-Range","FNL/FSL","FEL/FWL","UTM
+# Eastings","UTM
+# Northings","Latitude","Longitude","Elev .GR","Elev. DF","Elev. KB","Slant","TD","PBTD","Confidential"
+# "4300130001","Bridger Petroleum Corp","Federal 1","Plugged & Abandoned","Dry Hole","N","0","0","0","WILDCAT                  ","Federal","Federal","BEAVER","C-SE","15","26S-17W","1320 S","1320 E","261573.0","4269690.0","38.543694","-113.73574","5205.0","","","Directional","8540.0","","N"
+# "4300130003","Husky Oil Company","Federal 6-12","Location Abandoned - APD rescinded","Oil Well","N","0","0","0","WILDCAT                  ","Federal","Federal","BEAVER","SENW","12","26S-17W","1980 N","1980 W","264233.0","4271825.0","38.56362","-113.70597","5168.0","","","","","","N"
+# "4300130004","Husky Oil Company","Federal 10-13","Plugged & Abandoned","Dry Hole","N","0","0","0","WILDCAT                  ","Federal","Federal","BEAVER","NWSE","13","26S-17W","1980 S","1980 E","264585.0","4269803.0","38.545513","-113.701256","5194.0","","","","7048.0","","N"
+# "4300130005","Badger Oil Corporation","Lulu State 1","Plugged & Abandoned","Dry Hole","N","0","0","0","WILDCAT                  ","Fee","Federal","BEAVER","SENE","2","29S-8W","2158 N","510 E","350050.0","4242422.0","38.317383","-112.71527","5800.0","","","","11367.0","","N"
+# "4300130006","Hunt Oil Company","USA 1-25","Plugged & Abandoned","Dry Hole","N","0","0","0","WILDCAT                  ","Federal","Federal","BEAVER","NENW","25","27S-16W","937 N","1975 W","273442.0","4257732.0","38.43914","-113.59582","","","6171.0","","12400.0","","N"
 # Create tables
 cursor.execute("""
   CREATE TABLE IF NOT EXISTS wells (
@@ -35,6 +54,13 @@ cursor.execute("""
   );
 """)
 
+
+# Permit data csv (THE TITLES OF THE CSV DONT MEAN ANYTHING AND ARE MISALIGNED, FIGURE OUT WHAT THINGS SHOULD BE NAMED FROM THE DEFINITIONS)
+# API Well Number,Well Name,Operator,Lease / Unit,Log Category,Log Type,Date Posted,PDF
+# "4301353839","OTHER","PDF","08/04/2020","7966","13470","3778 KB","Download","SM Energy Company","Fritz 14-24-1S-2W","Oil Well","Producing","BLUEBELL","DUCHESNE","1S-2W","24"
+# "4301353839","CEMENT BOND","PDF","08/04/2020","0","14248","10664 KB","Download","SM Energy Company","Fritz 14-24-1S-2W","Oil Well","Producing","BLUEBELL","DUCHESNE","1S-2W","24"
+# "4301353839","OTHER","PDF","08/04/2020","8600","14248","2772 KB","Download","SM Energy Company","Fritz 14-24-1S-2W","Oil Well","Producing","BLUEBELL","DUCHESNE","1S-2W","24"
+# "4301353839","SONIC","PDF","08/04/2020","8600","14248","2527 KB","Download","SM Energy Company","Fritz 14-24-1S-2W","Oil Well","Producing","BLUEBELL","DUCHESNE","1S-2W","24"
 cursor.execute("""
   CREATE TABLE IF NOT EXISTS permits (
     permit_id INTEGER PRIMARY KEY AUTOINCREMENT,
