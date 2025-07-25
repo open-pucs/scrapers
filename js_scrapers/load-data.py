@@ -1,5 +1,6 @@
 import csv
 import sqlite3
+from datetime import datetime
 
 # Connect to the SQLite database
 db = sqlite3.connect("wells.db")
@@ -51,7 +52,7 @@ cursor.execute("""
     api_well_number TEXT,
     log_category TEXT,
     log_type TEXT,
-    date_posted TEXT,
+    date_posted DATE,
     pdf_link TEXT,
     operator TEXT,
     well_status TEXT,
@@ -150,7 +151,7 @@ with open(
                 "api_well_number": permit_row[0],
                 "log_category": permit_row[1],
                 "log_type": permit_row[2],
-                "date_posted": permit_row[3],
+                "date_posted": datetime.strptime(permit_row[3], "%m/%d/%Y").date() if permit_row[3] else None,
                 "pdf_link": permit_row[7],
                 "operator": permit_row[8],
                 "well_status": permit_row[11],
