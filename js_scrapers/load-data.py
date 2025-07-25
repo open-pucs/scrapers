@@ -14,6 +14,8 @@ cursor = db.cursor()
 # (MCF)} * 0.055))
 
 
+# From this file namely this is the one you should use exclusively: /home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/cypress/downloads/well_data_both_options.csv
+
 # "API Well Number","Operator","Well Name","Well Status","Well Type","Coalbed
 # Methane
 # Well?","Cumulative
@@ -63,6 +65,8 @@ cursor.execute("""
 """)
 
 
+# From this file: /home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/cypress/downloads/utah_dogm_file_data-round-1.csv
+# use this file instead of any other files.
 # Permit data csv (THE TITLES OF THE CSV DONT MEAN ANYTHING AND ARE MISALIGNED, FIGURE OUT WHAT THINGS SHOULD BE NAMED FROM THE DEFINITIONS)
 # API Well Number,Well Name,Operator,Lease / Unit,Log Category,Log Type,Date Posted,PDF
 # "4301353839","OTHER","PDF","08/04/2020","7966","13470","3778 KB","Download","SM Energy Company","Fritz 14-24-1S-2W","Oil Well","Producing","BLUEBELL","DUCHESNE","1S-2W","24"
