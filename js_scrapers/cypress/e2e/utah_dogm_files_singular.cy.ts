@@ -26,29 +26,13 @@ describe("template spec", () => {
     ).click();
     cy.get("#srchCForm\\:logDatePostedInput").clear();
     cy.wait(300);
-    cy.get("#srchCForm\\:logDatePostedInput").type("01/01/2024,01/02/2024");
-
-    cy.wait(300);
-    cy.get("#srchCForm\\:logDatePostedCompOpr").select("BETWEEN");
-
-    cy.wait(300);
-
-    // cy.wait(300);
-    //
-    // cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id34").select("250");
-    //
-    // cy.get(":nth-child(10) > a > img").click();
-    // /* ==== Generated with Cypress Studio ==== */
-    // cy.get("#srchCForm\\:srchBtn > .ui-button-text").click();
-    //
-    // cy.wait(1000);
-    // cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id35").select("250");
-    // /* ==== End Cypress Studio ==== */
+    cy.get("#srchCForm\\:logDatePostedInput").type("01/01/2024,02/02/2024");
     /* ==== Generated with Cypress Studio ==== */
-    cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id7").select("250");
 
     cy.wait(300);
     cy.get("#srchCForm\\:srchBtn > .ui-button-text").click();
+    cy.wait(3000);
+    cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id34").select("250");
     /* ==== End Cypress Studio ==== */
   });
 });

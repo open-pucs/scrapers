@@ -2,7 +2,7 @@ describe("Utah DOGM Scraper", () => {
   it("scrapes well data and appends to a CSV", () => {
     const today = new Date();
     const fiveYearsAgo = new Date(
-      today.getFullYear() - 5,
+      today.getFullYear() - 15,
       today.getMonth(),
       today.getDate(),
     );
@@ -46,9 +46,33 @@ describe("Utah DOGM Scraper", () => {
         cy.get("#srchCForm\\:logDatePostedCompOpr").select("BETWEEN");
         cy.wait(300);
         cy.get("#dataTableForm\\:srchRsltDataTable\\:j_id7").select("250");
+
         cy.wait(300);
         cy.get("#srchCForm\\:srchBtn > .ui-button-text").click();
-        cy.wait(5000); // Wait for results to load
+        cy.wait(3000);
+        // I want this call to not fuck up the entire script if it fails. if it fails I just want to extract what would normally be on the page as if the click didnt happen.
+        //
+        // -------------------- CRITICAL MODIFICATION START --------------------
+        // Safely attempt pagination selection without failing entire test
+        const paginationSelector =
+          "#dataTableForm\\:srchRsltDataTable\\:j_id34";
+        cy.get("body").then(($body) => {
+          const $dropdown = $body.find(paginationSelector);
+
+          if ($dropdown.length && $dropdown[0] instanceof HTMLSelectElement) {
+            // Check current selection to avoid unnecessary reloads
+            if ($dropdown.val() !== "250") {
+              $dropdown.val("250");
+              $dropdown.trigger("change");
+            }
+          } else {
+            console.log(
+              "Pagination dropdown not found. Continuing with current results count.",
+            );
+          }
+        });
+        // -------------------- CRITICAL MODIFICATION END --------------------
+        cy.wait(6000); // Wait for results to load
 
         cy.get("body").then(($body) => {
           if (
@@ -89,4 +113,3 @@ describe("Utah DOGM Scraper", () => {
     }
   });
 });
-
