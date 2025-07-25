@@ -6,6 +6,14 @@ db = sqlite3.connect("wells.db")
 cursor = db.cursor()
 
 
+# Also it would be helpful if you could add a column into the sqlite file that would calculate the total amount of carbon emitted by each well. It should be something like :
+# (({Cumulative
+# Oil
+# (Barrels)} * 0.43) + ({Cumulative
+# Natural Gas
+# (MCF)} * 0.055))
+
+
 # "API Well Number","Operator","Well Name","Well Status","Well Type","Coalbed
 # Methane
 # Well?","Cumulative
