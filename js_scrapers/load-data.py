@@ -53,6 +53,8 @@ cursor.execute("""
     log_type TEXT,
     date_posted TEXT,
     pdf_link TEXT,
+    operator TEXT,
+    well_status TEXT,
     FOREIGN KEY (api_well_number) REFERENCES wells(api_well_number)
   );
 """)
@@ -96,9 +98,7 @@ with open(
                 "coalbed_methane_well": well.get("Coalbed\nMethane\nWell?"),
                 "cumulative_oil_barrels": cum_oil,
                 "cumulative_natural_gas_mcf": cum_gas,
-                "cumulative_water_barrels": float(
-                    well.get("Cumulative\nWater\n(Barrels)", 0) or 0
-                ),
+                "cumulative_water_barrels": float(well.get("Cumulative\nWater\n(Barrels)", 0) or 0),
                 "field_name": well.get("Field Name"),
                 "surface_ownership": well.get("Surface\nOwnership"),
                 "mineral_lease": well.get("Mineral\nLease"),
@@ -123,37 +123,32 @@ with open(
             },
         )
 
-
-# From this file: /home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/cypress/downloads/utah_dogm_file_data-round-1.csv
-# use this file instead of any other files.
-# Permit data csv (THE TITLES OF THE CSV DONT MEAN ANYTHING AND ARE MISALIGNED, FIGURE OUT WHAT THINGS SHOULD BE NAMED FROM THE DEFINITIONS)
-# API Well Number,Well Name,Operator,Lease / Unit,Log Category,Log Type,Date Posted,PDF
-# "4301353839","OTHER","PDF","08/04/2020","7966","13470","3778 KB","Download","SM Energy Company","Fritz 14-24-1S-2W","Oil Well","Producing","BLUEBELL","DUCHESNE","1S-2W","24"
-# "4301353839","CEMENT BOND","PDF","08/04/2020","0","14248","10664 KB","Download","SM Energy Company","Fritz 14-24-1S-2W","Oil Well","Producing","BLUEBELL","DUCHESNE","1S-2W","24"
-# "4301353839","OTHER","PDF","08/04/2020","8600","14248","2772 KB","Download","SM Energy Company","Fritz 14-24-1S-2W","Oil Well","Producing","BLUEBELL","DUCHESNE","1S-2W","24"
-# "4301353839","SONIC","PDF","08/04/2020","8600","14248","2527 KB","Download","SM Energy Company","Fritz 14-24-1S-2W","Oil Well","Producing","BLUEBELL","DUCHESNE","1S-2W","24"
 # Load and insert permits data
 with open(
     "/home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/cypress/downloads/utah_dogm_file_data-round-1.csv",
     "r",
     encoding="utf-8",
 ) as permits_file:
-    permits_reader = csv.DictReader(permits_file)
-    for permit in permits_reader:
+    # Skip the header row as it's misaligned
+    permits_reader = csv.reader(permits_file)
+    next(permits_reader)  # Skip header row
+    for permit_row in permits_reader:
         cursor.execute(
             """
             INSERT INTO permits (
-                api_well_number, log_category, log_type, date_posted, pdf_link
+                api_well_number, log_category, log_type, date_posted, pdf_link, operator, well_status
             ) VALUES (
-                :api_well_number, :log_category, :log_type, :date_posted, :pdf_link
+                :api_well_number, :log_category, :log_type, :date_posted, :pdf_link, :operator, :well_status
             )
         """,
             {
-                "api_well_number": permit.get("API Well Number"),
-                "log_category": permit.get("Log Category"),
-                "log_type": permit.get("Log Type"),
-                "date_posted": permit.get("Date Posted"),
-                "pdf_link": permit.get("PDF"),
+                "api_well_number": permit_row[0],
+                "log_category": permit_row[1],
+                "log_type": permit_row[2],
+                "date_posted": permit_row[3],
+                "pdf_link": permit_row[7],
+                "operator": permit_row[8],
+                "well_status": permit_row[11],
             },
         )
 
