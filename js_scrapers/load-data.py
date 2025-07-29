@@ -153,6 +153,7 @@ with open(
     next(permits_reader)  # Skip header row
     permit_statements = []
     for permit_row in permits_reader:
+        date_posted = datetime.strptime(permit_row[3], "%m/%d/%Y").date() if permit_row[3] else None
         permit_statements.append(libsql_client.Statement(
             """
             INSERT INTO permits (
@@ -165,7 +166,7 @@ with open(
                 "api_well_number": permit_row[0],
                 "log_category": permit_row[1],
                 "log_type": permit_row[2],
-                "date_posted": datetime.strptime(permit_row[3], "%m/%d/%Y").date() if permit_row[3] else None,
+                "date_posted": date_posted.isoformat() if date_posted else None,
                 "pdf_link": permit_row[7],
                 "operator": permit_row[8],
                 "well_status": permit_row[11],
