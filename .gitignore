@@ -1,3 +1,6 @@
+**/*.db
+
+
 **/node_modules
 # Project Specific Stuff 
 volumes/

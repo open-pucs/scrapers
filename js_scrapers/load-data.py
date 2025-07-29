@@ -1,64 +1,75 @@
 import csv
-import sqlite3
+import os
+import libsql_client
 from datetime import datetime
 
-# Connect to the SQLite database
-db = sqlite3.connect("wells.db")
-cursor = db.cursor()
+# Connect to the database
+db_url = os.environ.get("TURSO_DATABASE_URL")
+auth_token = os.environ.get("TURSO_AUTH_TOKEN")
+
+if db_url:
+    # Connect to a remote Turso database
+    db = libsql_client.create_client_sync(url=db_url, auth_token=auth_token)
+else:
+    # Connect to a local database file
+    db = libsql_client.create_client_sync(url="file:wells.db")
 
 # Drop tables if they exist to ensure schema updates
-cursor.execute("DROP TABLE IF EXISTS wells;")
-cursor.execute("DROP TABLE IF EXISTS permits;")
+db.batch([
+    libsql_client.Statement("DROP TABLE IF EXISTS wells;"),
+    libsql_client.Statement("DROP TABLE IF EXISTS permits;")
+])
 
 # Create tables
-cursor.execute("""
-  CREATE TABLE IF NOT EXISTS wells (
-    api_well_number TEXT PRIMARY KEY,
-    operator TEXT,
-    well_name TEXT,
-    well_status TEXT,
-    well_type TEXT,
-    coalbed_methane_well TEXT,
-    cumulative_oil_barrels REAL,
-    cumulative_natural_gas_mcf REAL,
-    cumulative_water_barrels REAL,
-    field_name TEXT,
-    surface_ownership TEXT,
-    mineral_lease TEXT,
-    county TEXT,
-    qtr_qtr TEXT,
-    section TEXT,
-    township_range TEXT,
-    fnl_fsl TEXT,
-    fel_fwl TEXT,
-    utm_eastings REAL,
-    utm_northings REAL,
-    latitude REAL,
-    longitude REAL,
-    elev_gr REAL,
-    elev_df REAL,
-    elev_kb REAL,
-    slant TEXT,
-    td REAL,
-    pbtd REAL,
-    confidential TEXT,
-    total_carbon_emissions REAL
-  );
-""")
-
-cursor.execute("""
-  CREATE TABLE IF NOT EXISTS permits (
-    permit_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    api_well_number TEXT,
-    log_category TEXT,
-    log_type TEXT,
-    date_posted DATE,
-    pdf_link TEXT,
-    operator TEXT,
-    well_status TEXT,
-    FOREIGN KEY (api_well_number) REFERENCES wells(api_well_number)
-  );
-""")
+db.batch([
+    libsql_client.Statement("""
+      CREATE TABLE IF NOT EXISTS wells (
+        api_well_number TEXT PRIMARY KEY,
+        operator TEXT,
+        well_name TEXT,
+        well_status TEXT,
+        well_type TEXT,
+        coalbed_methane_well TEXT,
+        cumulative_oil_barrels REAL,
+        cumulative_natural_gas_mcf REAL,
+        cumulative_water_barrels REAL,
+        field_name TEXT,
+        surface_ownership TEXT,
+        mineral_lease TEXT,
+        county TEXT,
+        qtr_qtr TEXT,
+        section TEXT,
+        township_range TEXT,
+        fnl_fsl TEXT,
+        fel_fwl TEXT,
+        utm_eastings REAL,
+        utm_northings REAL,
+        latitude REAL,
+        longitude REAL,
+        elev_gr REAL,
+        elev_df REAL,
+        elev_kb REAL,
+        slant TEXT,
+        td REAL,
+        pbtd REAL,
+        confidential TEXT,
+        total_carbon_emissions REAL
+      );
+    """),
+    libsql_client.Statement("""
+      CREATE TABLE IF NOT EXISTS permits (
+        permit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        api_well_number TEXT,
+        log_category TEXT,
+        log_type TEXT,
+        date_posted DATE,
+        pdf_link TEXT,
+        operator TEXT,
+        well_status TEXT,
+        FOREIGN KEY (api_well_number) REFERENCES wells(api_well_number)
+      );
+    """)
+])
 
 # Load and insert wells data
 with open(
@@ -67,12 +78,13 @@ with open(
     encoding="utf-8",
 ) as wells_file:
     wells_reader = csv.DictReader(wells_file)
+    well_statements = []
     for well in wells_reader:
         cum_oil = float(well.get("Cumulative\nOil\n(Barrels)", 0) or 0)
         cum_gas = float(well.get("Cumulative\nNatural Gas\n(MCF)", 0) or 0)
         total_carbon_emissions = (cum_oil * 0.43) + (cum_gas * 0.055)
 
-        cursor.execute(
+        well_statements.append(libsql_client.Statement(
             """
             INSERT OR IGNORE INTO wells (
                 api_well_number, operator, well_name, well_status, well_type,
@@ -89,7 +101,7 @@ with open(
                 :utm_eastings, :utm_northings, :latitude, :longitude, :elev_gr, :elev_df,
                 :elev_kb, :slant, :td, :pbtd, :confidential, :total_carbon_emissions
             )
-        """,
+            """,
             {
                 "api_well_number": well.get("API Well Number"),
                 "operator": well.get("Operator"),
@@ -124,7 +136,8 @@ with open(
                 "confidential": well.get("Confidential"),
                 "total_carbon_emissions": total_carbon_emissions,
             },
-        )
+        ))
+    db.batch(well_statements)
 
 # Load and insert permits data
 old_permit_data_path = "/home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/cypress/downloads/utah_dogm_file_data-round-1.csv"
@@ -138,8 +151,9 @@ with open(
     # Skip the header row as it's misaligned
     permits_reader = csv.reader(permits_file)
     next(permits_reader)  # Skip header row
+    permit_statements = []
     for permit_row in permits_reader:
-        cursor.execute(
+        permit_statements.append(libsql_client.Statement(
             """
             INSERT INTO permits (
                 api_well_number, log_category, log_type, date_posted, pdf_link, operator, well_status
@@ -156,14 +170,12 @@ with open(
                 "operator": permit_row[8],
                 "well_status": permit_row[11],
             },
-        )
-
-# Commit changes and close the connection
-db.commit()
+        ))
+    db.batch(permit_statements)
 
 # Create the computed view
-cursor.execute("DROP VIEW IF EXISTS wells_with_permit_summary;")
-cursor.execute("""
+db.execute("DROP VIEW IF EXISTS wells_with_permit_summary;")
+db.execute("""
 CREATE VIEW IF NOT EXISTS wells_with_permit_summary AS
 SELECT
   w.*,
@@ -175,7 +187,6 @@ JOIN permits p ON w.api_well_number = p.api_well_number
 GROUP BY w.api_well_number;
 """)
 
-db.commit()
 db.close()
 
 print("Data loaded successfully!")

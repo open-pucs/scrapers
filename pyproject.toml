@@ -18,6 +18,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "langchain-community>=0.3.23",
     "langchain-core>=0.3.58",
+    "libsql-client>=0.3.1",
     "psycopg2-binary>=2.9.10",
     "pydantic>=2.10.6",
     "pymupdf>=1.25.5",
