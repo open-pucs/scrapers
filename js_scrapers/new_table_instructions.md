@@ -1,3 +1,17 @@
+# Notes about libsql
+
+The following extensions are always-on and available:
+Extension Version Description
+JSON Built-in Work with JSON data in SQLite.
+FTS5 Built-in Full-text search and indexing.
+R\*Tree Built-in Indexing and querying spatial data.
+SQLean Crypto 0.24.1 Hashing, message digest, encoding, and decoding.
+SQLean Fuzzy 0.24.1 Fuzzy string matching and phonetics. A fork of Spellfix1 with improvements.
+SQLean Math 0.24.1 Advanced mathematical calculations.
+SQLean Stats 0.24.1 Common statistical functions with SQLite.
+SQLean Text 0.24.1 String manipulation (reverse, split) with SQLite.
+SQLean UUID 0.24.1 Limited support for RFC 4122 compliant UUIDs.
+
 # New Tables:
 
 Could you create new tables with the following data:

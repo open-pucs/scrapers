@@ -19,6 +19,7 @@ db.batch(
     [
         libsql_client.Statement("DROP TABLE IF EXISTS wells;"),
         libsql_client.Statement("DROP TABLE IF EXISTS permit_file_data;"),
+        libsql_client.Statement("DROP TABLE IF EXISTS wells_rtree;"),
     ]
 )
 
@@ -45,10 +46,6 @@ db.batch(
         township_range TEXT,
         fnl_fsl TEXT,
         fel_fwl TEXT,
-        utm_eastings REAL,
-        utm_northings REAL,
-        latitude REAL,
-        longitude REAL,
         elev_gr REAL,
         elev_df REAL,
         elev_kb REAL,
@@ -72,18 +69,26 @@ db.batch(
         FOREIGN KEY (api_well_number) REFERENCES wells(api_well_number)
       );
     """),
+        libsql_client.Statement("""
+      CREATE VIRTUAL TABLE IF NOT EXISTS wells_rtree USING rtree(
+        id,
+        min_lon, max_lon,
+        min_lat, max_lat
+      );
+    """),
     ]
 )
 
 
 # Load and insert wells data
 with open(
-    "/home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/raw_data/downloads/well_data_both_options.csv",
+    "/home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/raw_data/utah_dogm_well_metadata.csv",
     "r",
     encoding="utf-8",
 ) as wells_file:
     wells_reader = csv.DictReader(wells_file)
     well_statements = []
+    rtree_statements = []
     for well in wells_reader:
         cum_oil = float(well.get("Cumulative\nOil\n(Barrels)", 0) or 0)
         cum_gas = float(well.get("Cumulative\nNatural Gas\n(MCF)", 0) or 0)
@@ -97,15 +102,13 @@ with open(
                 coalbed_methane_well, cumulative_oil_barrels, cumulative_natural_gas_mcf,
                 cumulative_water_barrels, field_name, surface_ownership, mineral_lease,
                 county, qtr_qtr, section, township_range, fnl_fsl, fel_fwl,
-                utm_eastings, utm_northings, latitude, longitude, elev_gr, elev_df,
-                elev_kb, slant, td, pbtd, confidential, total_carbon_emissions
+                elev_gr, elev_df, elev_kb, slant, td, pbtd, confidential, total_carbon_emissions
             ) VALUES (
                 :api_well_number, :operator, :well_name, :well_status, :well_type,
                 :coalbed_methane_well, :cumulative_oil_barrels, :cumulative_natural_gas_mcf,
                 :cumulative_water_barrels, :field_name, :surface_ownership, :mineral_lease,
                 :county, :qtr_qtr, :section, :township_range, :fnl_fsl, :fel_fwl,
-                :utm_eastings, :utm_northings, :latitude, :longitude, :elev_gr, :elev_df,
-                :elev_kb, :slant, :td, :pbtd, :confidential, :total_carbon_emissions
+                :elev_gr, :elev_df, :elev_kb, :slant, :td, :pbtd, :confidential, :total_carbon_emissions
             )
             """,
                 {
@@ -129,10 +132,6 @@ with open(
                     "township_range": well.get("Township-Range"),
                     "fnl_fsl": well.get("FNL/FSL"),
                     "fel_fwl": well.get("FEL/FWL"),
-                    "utm_eastings": float(well.get("UTM\nEastings", 0) or 0),
-                    "utm_northings": float(well.get("UTM\nNorthings", 0) or 0),
-                    "latitude": float(well.get("Latitude", 0) or 0),
-                    "longitude": float(well.get("Longitude", 0) or 0),
                     "elev_gr": float(well.get("Elev .GR", 0) or 0),
                     "elev_df": float(well.get("Elev. DF", 0) or 0),
                     "elev_kb": float(well.get("Elev. KB", 0) or 0),
@@ -144,10 +143,31 @@ with open(
                 },
             )
         )
+        api_well_number = well.get("API Well Number")
+        longitude = float(well.get("Longitude", 0) or 0)
+        latitude = float(well.get("Latitude", 0) or 0)
+
+        if api_well_number and longitude and latitude:
+            rtree_statements.append(
+                libsql_client.Statement(
+                    """
+                INSERT INTO wells_rtree (id, min_lon, max_lon, min_lat, max_lat)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                    [
+                        int(api_well_number),
+                        longitude,
+                        longitude,
+                        latitude,
+                        latitude,
+                    ],
+                )
+            )
     db.batch(well_statements)
+    db.batch(rtree_statements)
 
 # Load and insert permits data
-new_permit_data_path = "/home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/cypress/downloads/get_all_permit_file_data.csv"
+new_permit_data_path = "/home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/raw_data/get_all_permit_file_data.csv"
 
 with open(
     new_permit_data_path,
