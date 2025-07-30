@@ -1,4 +1,5 @@
 **/*.db
+js_scrapers/raw_data
 
 
 **/node_modules
