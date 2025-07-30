@@ -570,15 +570,33 @@ SELECT
   MIN(p.date_posted) AS earliest_permit_file_submission_date,
   MAX(p.date_posted) AS earliest_permit_file_submission_date,
   MAX(apd.date_approved) AS apd_approval_date,
-  MAX(expiry.date_permit_will_expire) AS apd_expiry_date
+  MAX(expiry.date_permit_will_expire) AS apd_expiry_date_if_availible
 FROM wells w
-LEFT JOIN api_well_number_repository apir ON w.api_well_number = apir.api_well_number
+INNER JOIN api_well_number_repository apir ON w.api_well_number = apir.api_well_number
+INNER JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
+INNER JOIN application_for_permit_drilling_granted apd ON apir.api_well_number = apd.api_number
+LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
+GROUP BY w.api_well_number;
+""")
+
+
+db.execute("DROP VIEW IF EXISTS wells_with_permit_summary_all_inclusive;")
+db.execute("""
+CREATE VIEW IF NOT EXISTS wells_with_permit_summary_all_inclusive AS
+SELECT
+  w.*,
+  COUNT(p.permit_id) AS permit_file_submission_count,
+  MIN(p.date_posted) AS earliest_permit_file_submission_date,
+  MAX(p.date_posted) AS earliest_permit_file_submission_date,
+  MAX(apd.date_approved) AS apd_approval_date,
+  MAX(expiry.date_permit_will_expire) AS apd_expiry_date_if_availible
+FROM wells w
+INNER JOIN api_well_number_repository apir ON w.api_well_number = apir.api_well_number
 LEFT JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
 LEFT JOIN application_for_permit_drilling_granted apd ON apir.api_well_number = apd.api_number
 LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
 GROUP BY w.api_well_number;
 """)
-
 db.close()
 
 print("Data loaded successfully!")
