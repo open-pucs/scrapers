@@ -169,6 +169,7 @@ with open(
 # Load and insert permits data
 new_permit_data_path = "/home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/raw_data/get_all_permit_file_data.csv"
 
+
 with open(
     new_permit_data_path,
     "r",
@@ -181,7 +182,7 @@ with open(
     for permit_row in permits_reader:
         date_posted = (
             datetime.strptime(permit_row[3], "%m/%d/%Y").date()
-            if permit_row[3]
+            if len(permit_row) > 3
             else None
         )
         permit_statements.append(
