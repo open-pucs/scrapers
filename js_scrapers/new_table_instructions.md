@@ -56,9 +56,9 @@ Well?"
 "4300130007","DRILL","06/10/2008","08/21/2008","09/20/2008","11/22/2008","","","","Plugged & Abandoned","","","11854.0","","0.0","0.0","","","","","","","","N","N","N","","Vertical","0","N"
 ```
 
-- Name: apd_permit_expiary
+- Name: apd_permit_expiry
 - FileName:
-  /home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/raw_data/all_permit_expiary_dates.csv
+  /home/nicole/Documents/mycorrhiza/scrapers/js_scrapers/raw_data/all_permit_expiry_dates.csv
 
 ```csv
 "Operator","API
