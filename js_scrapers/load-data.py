@@ -572,17 +572,19 @@ SELECT
   MAX(apd.date_approved) AS apd_approval_date,
   MAX(expiry.date_permit_will_expire) AS apd_expiry_date
 FROM wells w
-LEFT JOIN permit_file_data p ON w.api_well_number = p.api_well_number
-LEFT JOIN application_for_permit_drilling_granted apd ON w.api_well_number = apd.api_number
-LEFT JOIN apd_permit_expiry expiry ON w.api_well_number = expiry.api_number
+LEFT JOIN api_well_number_repository apir w.api_well_number = apir.api_well_number
+LEFT JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
+LEFT JOIN application_for_permit_drilling_granted apd ON apir.api_well_number = apd.api_number
+LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
 GROUP BY w.api_well_number;
 """)
 
 db.close()
 
 print("Data loaded successfully!")
-
-# SELECT *
-# FROM wells_with_permit_summary
-# WHERE well_status = 'Producing'
-# ORDER BY total_carbon_emissions DESC;
+"""
+SELECT *
+FROM wells_with_permit_summary
+WHERE well_status = 'Producing'
+ORDER BY total_carbon_emissions DESC;
+"""
