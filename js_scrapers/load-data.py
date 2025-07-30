@@ -377,6 +377,7 @@ with open(
         )
     db.batch(permit_statements)
 
+
 def parse_date(date_string):
     if not date_string:
         return None
@@ -386,6 +387,7 @@ def parse_date(date_string):
         except ValueError:
             pass
     return None
+
 
 def load_application_for_permit_drilling_granted(db):
     with open(
@@ -437,18 +439,15 @@ def load_application_for_permit_drilling_granted(db):
                         "latitude": float(row.get("Latitude", 0) or 0),
                         "longitude": float(row.get("Longitude", 0) or 0),
                         "elevation": float(row.get("Elevation", 0) or 0),
-                        "planned_depth_md": int(
-                            row.get("Planned\nDepth (MD)", 0) or 0
-                        ),
+                        "planned_depth_md": int(row.get("Planned\nDepth (MD)", 0) or 0),
                         "proposed_zone": row.get("Proposed\nZone"),
-                        "directional_horizontal": row.get(
-                            "Directional/\nHorizontal"
-                        ),
+                        "directional_horizontal": row.get("Directional/\nHorizontal"),
                         "confidential_well": row.get("Confidential\nWell?"),
                     },
                 )
             )
         db.batch(statements)
+
 
 def load_historical_well_metadata(db):
     with open(
@@ -486,7 +485,9 @@ def load_historical_well_metadata(db):
                         "spud_date_rotary": parse_date(
                             row.get("Spud Date <br /> Rotary")
                         ),
-                        "completion_date": parse_date(row.get("Completion <br /> Date")),
+                        "completion_date": parse_date(
+                            row.get("Completion <br /> Date")
+                        ),
                         "sundry_of_intent": row.get("Sundry of <br /> Intent"),
                         "sundry_work_complete": row.get("Sundry Work <br /> Complete"),
                         "first_production": row.get("First <br /> Production"),
@@ -497,7 +498,9 @@ def load_historical_well_metadata(db):
                         "td_tvd": float(row.get("TD- <br /> TVD", 0) or 0),
                         "pbtd_md": float(row.get("PBTD- <br /> MD", 0) or 0),
                         "pbtd_tvd": float(row.get("PBTD- <br /> TVD", 0) or 0),
-                        "production_test_method": row.get("Production <br /> Test Method"),
+                        "production_test_method": row.get(
+                            "Production <br /> Test Method"
+                        ),
                         "oil_24hr_test": row.get("Oil <br /> 24hr Test"),
                         "gas_24hr_test": row.get("Gas <br /> 24hr Test"),
                         "water_24hr_test": row.get("Water <br /> 24hr Test"),
@@ -509,12 +512,15 @@ def load_historical_well_metadata(db):
                         "dst": row.get("DST"),
                         "completion_type": row.get("Completion <br /> Type"),
                         "directional": row.get("Directional"),
-                        "horiz_laterals": int(row.get("Horiz. <br /> Laterals", 0) or 0),
+                        "horiz_laterals": int(
+                            row.get("Horiz. <br /> Laterals", 0) or 0
+                        ),
                         "confidential": row.get("Confidential?"),
                     },
                 )
             )
         db.batch(statements)
+
 
 def load_apd_permit_expiry(db):
     with open(
@@ -548,6 +554,7 @@ def load_apd_permit_expiry(db):
             )
         db.batch(statements)
 
+
 load_application_for_permit_drilling_granted(db)
 load_historical_well_metadata(db)
 load_apd_permit_expiry(db)
@@ -559,14 +566,23 @@ db.execute("""
 CREATE VIEW IF NOT EXISTS wells_with_permit_summary AS
 SELECT
   w.*,
-  COUNT(p.permit_id) AS permit_count,
-  MIN(p.date_posted) AS earliest_permit_date,
-  MAX(p.date_posted) AS latest_permit_date
+  COUNT(p.permit_id) AS permit_file_submission_count,
+  MIN(p.date_posted) AS earliest_permit_file_submission_date,
+  MAX(p.date_posted) AS earliest_permit_file_submission_date,
+  MAX(apd.date_approved) AS apd_approval_date,
+  MAX(expiry.date_permit_will_expire) AS apd_expiry_date
 FROM wells w
-JOIN permit_file_data p ON w.api_well_number = p.api_well_number
+LEFT JOIN permit_file_data p ON w.api_well_number = p.api_well_number
+LEFT JOIN application_for_permit_drilling_granted apd ON w.api_well_number = apd.api_number
+LEFT JOIN apd_permit_expiry expiry ON w.api_well_number = expiry.api_number
 GROUP BY w.api_well_number;
 """)
 
 db.close()
 
 print("Data loaded successfully!")
+
+# SELECT *
+# FROM wells_with_permit_summary
+# WHERE well_status = 'Producing'
+# ORDER BY total_carbon_emissions DESC;
