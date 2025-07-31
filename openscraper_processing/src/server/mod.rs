@@ -21,7 +21,6 @@ pub fn define_routes() -> ApiRouter {
     println!("Defining API Routes but without tracing.");
     info!("Defining API Routes");
     let app = ApiRouter::new()
-        .api_route("/api/health", get_with(health, health_docs))
         .api_route(
             "/api/cases/{state}/{jurisdiction_name}/{case_name}",
             get_with(

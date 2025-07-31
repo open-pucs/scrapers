@@ -10,9 +10,12 @@ use aide::{
     openapi::{Info, OpenApi},
     swagger::Swagger,
 };
-use axum::{Extension, Json, extract::DefaultBodyLimit};
+use axum::{Extension, Json, extract::DefaultBodyLimit, response::IntoResponse};
 
-use std::net::{Ipv4Addr, SocketAddr};
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    sync::{LazyLock, OnceLock},
+};
 
 mod misc;
 mod processing;
@@ -25,8 +28,47 @@ mod worker;
 // Note that this clones the document on each request.
 // To be more efficient, we could wrap it into an Arc,
 // or even store it as a serialized string.
+static PRESERIALIZED_API_STRING: OnceLock<String> = OnceLock::new();
 async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
-    Json(api)
+    // First, check if we have a cached serialized version
+    if let Some(cached_json) = PRESERIALIZED_API_STRING.get() {
+        return cached_json.clone().into_response();
+    }
+
+    // No cached version exists, so we need to serialize and cache it
+    match serde_json::to_string(&api) {
+        Ok(serialized) => {
+            // Successfully serialized, now cache it
+            let returned_val = PRESERIALIZED_API_STRING.get_or_init(|| serialized);
+
+            // Return the serialized JSON string
+            returned_val.clone().into_response()
+        }
+        Err(e) => {
+            // Serialization failed - return detailed error information
+            let error_response = format!(
+                "Failed to serialize OpenAPI specification: {}\n\
+                Error type: {}\n\
+                This typically occurs when:\n\
+                - The OpenAPI struct contains non-serializable fields\n\
+                - There are circular references in the data structure\n\
+                - Custom types don't implement Serialize properly\n\
+                - There are invalid UTF-8 sequences in string fields
+                Debug Object:\n{:?}",
+                e,
+                std::any::type_name_of_val(&e),
+                &api
+            );
+
+            // Return error as plain text response with appropriate status
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                [("content-type", "text/plain")],
+                error_response,
+            )
+                .into_response()
+        }
+    }
 }
 
 #[tokio::main]
