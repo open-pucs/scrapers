@@ -248,4 +248,3 @@ pub fn handle_attachment_file_from_s3_docs(op: TransformOperation) -> TransformO
         .response_with::<400, String, _>(|res| res.description("Invalid hash format."))
         .response_with::<500, String, _>(|res| res.description("Error fetching attachment file."))
 }
-

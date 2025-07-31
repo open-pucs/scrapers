@@ -1,20 +1,17 @@
 use aide::{
     self,
     axum::{
-        ApiRouter,
+        ApiRouter, IntoApiResponse,
         routing::{get_with, post_with},
-        IntoApiResponse,
     },
     transform::TransformOperation,
 };
-use axum::{
-    response::Json,
-};
-use serde_json::{json, Value};
+use axum::response::Json;
+use serde_json::{Value, json};
 use tracing::info;
 
-pub mod s3_routes;
 pub mod queue_routes;
+pub mod s3_routes;
 
 pub fn define_routes() -> ApiRouter {
     println!("Defining API Routes but without tracing.");
@@ -23,11 +20,17 @@ pub fn define_routes() -> ApiRouter {
         .api_route("/api/health", get_with(health, health_docs))
         .api_route(
             "/api/cases/{state}/{jurisdiction_name}/{case_name}",
-            get_with(s3_routes::handle_case_filing_from_s3, s3_routes::handle_case_filing_from_s3_docs),
+            get_with(
+                s3_routes::handle_case_filing_from_s3,
+                s3_routes::handle_case_filing_from_s3_docs,
+            ),
         )
         .api_route(
             "/api/cases/submit",
-            post_with(queue_routes::submit_case_to_queue, queue_routes::submit_case_to_queue_docs),
+            post_with(
+                queue_routes::submit_case_to_queue,
+                queue_routes::submit_case_to_queue_docs,
+            ),
         )
         .api_route(
             "/api/caselist/{state}/{jurisdiction_name}/all",
@@ -56,7 +59,10 @@ pub fn define_routes() -> ApiRouter {
         )
         .api_route(
             "/admin/write_openscrapers_s3_string",
-            post_with(s3_routes::write_s3_file_string, s3_routes::write_s3_file_docs),
+            post_with(
+                s3_routes::write_s3_file_string,
+                s3_routes::write_s3_file_docs,
+            ),
         )
         .api_route(
             "/admin/write_openscrapers_s3_json",
@@ -78,3 +84,4 @@ fn health_docs(op: TransformOperation) -> TransformOperation {
     op.description("Check the health of the server.")
         .response::<200, Json<Value>>()
 }
+
