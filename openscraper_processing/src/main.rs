@@ -5,7 +5,6 @@ use tracing::{Instrument, info};
 
 use crate::{server::define_routes, worker::start_workers};
 
-use aide::{axum::routing::get, swagger::Swagger};
 use axum::extract::DefaultBodyLimit;
 
 use std::net::{Ipv4Addr, SocketAddr};
@@ -37,8 +36,6 @@ async fn main() -> anyhow::Result<()> {
         .layer(OtelInResponseLayer)
         //start OpenTelemetry trace on incoming request
         .layer(OtelAxumLayer::default())
-        .route("/api.json", get(api_documentation::serve_api))
-        .route("/swagger", Swagger::new("/api.json").axum_route())
         .layer(DefaultBodyLimit::disable());
 
     // Spawn background worker to process PDF tasks

@@ -9,13 +9,19 @@ use axum::response::IntoResponse;
 
 use std::sync::OnceLock;
 
+use aide::{axum::routing::get, swagger::Swagger};
 static PRESERIALIZED_API_STRING: OnceLock<String> = OnceLock::new();
 pub async fn serve_api() -> impl IntoApiResponse {
     // First, check if we have a cached serialized version
     if let Some(cached_json) = PRESERIALIZED_API_STRING.get() {
-        return cached_json.clone().into_response();
+        let static_json: &'static str = cached_json;
+        return static_json.into_response();
     }
-    panic!("Error creating json api")
+    (
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+        "The API doesnt exist, this should have caused the listener to never start, seems weird.",
+    )
+        .into_response()
 }
 
 pub async fn generate_api_docs_and_serve(
@@ -32,6 +38,8 @@ pub async fn generate_api_docs_and_serve(
     };
     info!("Initialized OpenAPI");
     let full_service = app
+        .route("/api.json", get(serve_api))
+        .route("/swagger", Swagger::new("/api.json").axum_route())
         // Generate the documentation.
         .finish_api(&mut api)
         .into_make_service();
