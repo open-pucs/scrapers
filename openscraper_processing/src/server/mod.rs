@@ -2,14 +2,18 @@ use aide::{
     self,
     axum::{
         ApiRouter, IntoApiResponse,
-        routing::{get_with, post_with},
+        routing::{get_with, post, post_with},
     },
     transform::TransformOperation,
 };
 use axum::response::Json;
+use direct_file_fetch::{
+    handle_directly_process_file_request, handle_directly_process_file_request_docs,
+};
 use serde_json::{Value, json};
 use tracing::info;
 
+pub mod direct_file_fetch;
 pub mod queue_routes;
 pub mod s3_routes;
 
@@ -67,6 +71,13 @@ pub fn define_routes() -> ApiRouter {
         .api_route(
             "/admin/write_openscrapers_s3_json",
             post_with(s3_routes::write_s3_file_json, s3_routes::write_s3_file_docs),
+        )
+        .api_route(
+            "/admin/direct_file_attachment_process",
+            post_with(
+                handle_directly_process_file_request,
+                handle_directly_process_file_request_docs,
+            ),
         );
 
     info!("Routes defined successfully");
@@ -84,4 +95,3 @@ fn health_docs(op: TransformOperation) -> TransformOperation {
     op.description("Check the health of the server.")
         .response::<200, Json<Value>>()
 }
-

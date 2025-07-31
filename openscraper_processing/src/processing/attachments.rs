@@ -6,21 +6,26 @@ use crate::s3_stuff::{
 use crate::types::env_vars::CRIMSON_URL;
 use crate::types::file_extension::FileExtension;
 use crate::types::hash::Blake2bHash;
-use crate::types::{AttachmentTextQuality, GenericAttachment, RawAttachment, RawAttachmentText};
+use crate::types::{
+    AttachmentTextQuality, GenericAttachment, JurisdictionInfo, RawAttachment, RawAttachmentText,
+};
 use anyhow::{anyhow, bail};
 use aws_sdk_s3::Client as S3Client;
 use chrono::Utc;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::info;
 
-use super::file_fetching::InternetFileFetch;
+use super::file_fetching::{AdvancedFetchData, InternetFileFetch};
 
 const ATTACHMENT_DOWNLOAD_TRIES: usize = 2;
 const DOWNLOAD_RETRY_DELAY_SECONDS: u64 = 2;
 pub async fn process_attachment_in_regular_pipeline(
     s3_client: &S3Client,
+    jurisdiction_info: &JurisdictionInfo,
     attachment: &GenericAttachment,
 ) -> anyhow::Result<RawAttachment> {
     if attachment.document_extension.is_none() {
@@ -39,17 +44,27 @@ pub async fn process_attachment_in_regular_pipeline(
     let hash = Blake2bHash::from_bytes(&file_contents);
     info!(%hash, url=%attachment.url,"Successfully downloaded file.");
 
-    let mut raw_attachment = RawAttachment {
+    let raw_attachment = RawAttachment {
+        jurisdiction_info: jurisdiction_info.to_owned(),
         hash,
         name: attachment.name.clone(),
         extension: extension.clone(),
         text_objects: vec![],
     };
+    shipout_attachment_to_s3(file_contents, raw_attachment, true, s3_client).await
+}
 
+async fn shipout_attachment_to_s3(
+    file_contents: Vec<u8>,
+    mut raw_attachment: RawAttachment,
+    should_process_text: bool,
+    s3_client: &S3Client,
+) -> anyhow::Result<RawAttachment> {
+    let hash = raw_attachment.hash;
     push_raw_attach_file_to_s3(s3_client, &raw_attachment, file_contents).await?;
-    info!(%hash,"Pushed raw file to s3.");
+    info!(%hash, "Pushed raw file to s3.");
 
-    if raw_attachment.extension == FileExtension::Pdf {
+    if should_process_text && raw_attachment.extension == FileExtension::Pdf {
         info!(%hash,"Sending request to crimson to process pdf.");
         let text_result = process_pdf_text_using_crimson(raw_attachment.hash).await;
         match text_result {
@@ -69,11 +84,62 @@ pub async fn process_attachment_in_regular_pipeline(
         }
     }
     push_raw_attach_object_to_s3(s3_client, &raw_attachment).await?;
+
     Ok(raw_attachment)
 }
 
-async fn download_file_content_validated_with_retries<T: InternetFileFetch>(
-    to_fetch: T,
+#[derive(Serialize, Deserialize, Clone, JsonSchema)]
+pub struct DirectAttachmentProcessInfo {
+    file_name: String,
+    extension: FileExtension,
+    fetch_info: AdvancedFetchData,
+    jurisdiction_info: JurisdictionInfo,
+    wait_for_s3_upload: bool,
+    process_text_before_upload: bool,
+}
+
+pub async fn process_attachment_with_direct_request(
+    direct_info: &DirectAttachmentProcessInfo,
+    s3_client_owned: S3Client,
+) -> anyhow::Result<RawAttachment> {
+    let file_contents = download_file_content_validated_with_retries(
+        &direct_info.fetch_info,
+        &direct_info.extension,
+    )
+    .await?;
+    let hash = Blake2bHash::from_bytes(&file_contents);
+    info!(%hash, fetch_info=?direct_info.fetch_info,"Successfully downloaded file.");
+
+    let raw_attachment = RawAttachment {
+        jurisdiction_info: direct_info.jurisdiction_info.clone(),
+        hash,
+        name: direct_info.file_name.clone(),
+        extension: direct_info.extension.clone(),
+        text_objects: vec![],
+    };
+    let server_return_attach = raw_attachment.clone();
+    let should_process_text = direct_info.process_text_before_upload;
+    let s3_process_future = async move || -> anyhow::Result<RawAttachment> {
+        let s3_client = &s3_client_owned;
+        shipout_attachment_to_s3(
+            file_contents,
+            raw_attachment,
+            should_process_text,
+            s3_client,
+        )
+        .await
+    };
+    match direct_info.wait_for_s3_upload {
+        true => s3_process_future().await,
+        false => {
+            tokio::spawn(s3_process_future());
+            Ok(server_return_attach)
+        }
+    }
+}
+
+async fn download_file_content_validated_with_retries<T: InternetFileFetch + ?Sized>(
+    to_fetch: &T,
     extension: &FileExtension,
 ) -> anyhow::Result<Vec<u8>> {
     let mut last_error: Option<anyhow::Error> = None;

@@ -1,6 +1,8 @@
 use std::{collections::HashMap, fmt::Debug, str::FromStr, time::Duration};
 
 use anyhow::bail;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{error, info};
 
@@ -12,7 +14,7 @@ pub trait InternetFileFetch: Debug {
         self.download_file_with_timeout(DEFAULT_TIMEOUT).await
     }
 }
-impl<T: AsRef<str> + Debug> InternetFileFetch for T {
+impl<T: AsRef<str> + Debug + ?Sized> InternetFileFetch for T {
     async fn download_file_with_timeout(&self, timeout: Duration) -> anyhow::Result<Vec<u8>> {
         let self_str = self.as_ref();
         info!(self_str, "Downloading file");
@@ -40,18 +42,18 @@ impl<T: AsRef<str> + Debug> InternetFileFetch for T {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 enum RequestMethod {
     Get,
     Post,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct AdvancedFetchData {
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct AdvancedFetchData {
     url: String,
     request_type: RequestMethod,
-    request_body: Value,
-    headers: HashMap<String, String>,
+    request_body: Option<Value>,
+    headers: Option<HashMap<String, String>>,
 }
 
 impl InternetFileFetch for AdvancedFetchData {
@@ -59,10 +61,12 @@ impl InternetFileFetch for AdvancedFetchData {
         let client = reqwest::Client::new();
 
         let mut headers = reqwest::header::HeaderMap::new();
-        for (key, value) in &self.headers {
-            let header_name = reqwest::header::HeaderName::from_str(key)?;
-            let header_value = reqwest::header::HeaderValue::from_str(value)?;
-            headers.insert(header_name, header_value);
+        if let Some(header_hashmap) = &self.headers {
+            for (key, value) in header_hashmap {
+                let header_name = reqwest::header::HeaderName::from_str(key)?;
+                let header_value = reqwest::header::HeaderValue::from_str(value)?;
+                headers.insert(header_name, header_value);
+            }
         }
 
         let request_builder = match self.request_type {

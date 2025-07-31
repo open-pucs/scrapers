@@ -88,9 +88,10 @@ pub struct RawAttachmentText {
     pub timestamp: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct RawAttachment {
     pub hash: Blake2bHash,
+    pub jurisdiction_info: JurisdictionInfo,
     pub name: String,
     pub extension: FileExtension,
     pub text_objects: Vec<RawAttachmentText>,

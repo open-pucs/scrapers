@@ -36,6 +36,7 @@ pub async fn process_case(
     s3_client: &S3Client,
 ) -> anyhow::Result<()> {
     let case = &jurisdiction_case.case;
+    let jurisdiction_info = &jurisdiction_case.jurisdiction;
     let sem = Semaphore::new(10); // Allow up to 10 concurrent tasks
     let mut return_case = case.to_owned();
     let mut attachment_tasks = Vec::with_capacity(case.filings.len());
@@ -50,7 +51,7 @@ pub async fn process_case(
                         .expect("This should never panic since the semaphore never closes.");
                     let result = tokio::time::timeout(
                         Duration::from_secs(120),
-                        process_attachment_in_regular_pipeline(s3_client, attach),
+                        process_attachment_in_regular_pipeline(s3_client,jurisdiction_info, attach),
                     )
                     .await;
                     drop(permit);
