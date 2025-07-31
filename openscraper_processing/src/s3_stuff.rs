@@ -117,31 +117,6 @@ pub async fn upload_s3_bytes(
     Ok(())
 }
 
-pub async fn download_file(url: &str, timeout: Duration) -> anyhow::Result<Vec<u8>> {
-    info!(url, "Downloading file");
-    let client = reqwest::Client::new();
-    let response_result = client.get(url).timeout(timeout).send().await;
-
-    let response = match response_result {
-        Ok(res) => res,
-        Err(err) => {
-            tracing::error!(%err,"Encountered network error getting file.");
-            return Err(anyhow::Error::from(err));
-        }
-    };
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let error_msg = format!("HTTP request failed with status code: {status}");
-        error!(url, %status, "Download failed");
-        bail!(error_msg);
-    }
-
-    let bytes = response.bytes().await?.to_vec();
-    info!("Successfully downloaded {} bytes", bytes.len());
-    Ok(bytes)
-}
-
 pub async fn fetch_case_filing_from_s3(
     s3_client: &S3Client,
     case_name: &str,

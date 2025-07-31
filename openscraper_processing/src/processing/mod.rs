@@ -2,7 +2,7 @@ use crate::s3_stuff::push_case_to_s3_and_db;
 use crate::types::{
     CaseWithJurisdiction, GenericAttachment, RawAttachment,
 };
-use attachments::process_attachment;
+use attachments::process_attachment_in_regular_pipeline;
 use aws_sdk_s3::Client as S3Client;
 use futures_util::future::join_all;
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,7 @@ use std::time::Duration;
 use tokio::sync::Semaphore;
 
 pub mod attachments;
+pub mod file_fetching;
 
 #[derive(Serialize)]
 struct CrimsonPDFIngestParamsS3 {
@@ -29,8 +30,6 @@ struct CrimsonStatusResponse {
     error: Option<String>,
 }
 
-const ATTACHMENT_DOWNLOAD_TRIES: usize = 2;
-const DOWNLOAD_RETRY_DELAY_SECONDS: u64 = 2;
 
 pub async fn process_case(
     jurisdiction_case: &CaseWithJurisdiction,
@@ -51,7 +50,7 @@ pub async fn process_case(
                         .expect("This should never panic since the semaphore never closes.");
                     let result = tokio::time::timeout(
                         Duration::from_secs(120),
-                        process_attachment(s3_client, attach),
+                        process_attachment_in_regular_pipeline(s3_client, attach),
                     )
                     .await;
                     drop(permit);

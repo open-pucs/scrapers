@@ -1,7 +1,7 @@
 use crate::processing::{CrimsonInitialResponse, CrimsonPDFIngestParamsS3, CrimsonStatusResponse};
 use crate::s3_stuff::{
-    download_file, generate_s3_object_uri_from_key, get_raw_attach_file_key,
-    push_raw_attach_file_to_s3, push_raw_attach_object_to_s3,
+    generate_s3_object_uri_from_key, get_raw_attach_file_key, push_raw_attach_file_to_s3,
+    push_raw_attach_object_to_s3,
 };
 use crate::types::env_vars::CRIMSON_URL;
 use crate::types::file_extension::FileExtension;
@@ -15,9 +15,11 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::info;
 
+use super::file_fetching::InternetFileFetch;
+
 const ATTACHMENT_DOWNLOAD_TRIES: usize = 2;
 const DOWNLOAD_RETRY_DELAY_SECONDS: u64 = 2;
-pub async fn process_attachment(
+pub async fn process_attachment_in_regular_pipeline(
     s3_client: &S3Client,
     attachment: &GenericAttachment,
 ) -> anyhow::Result<RawAttachment> {
@@ -33,7 +35,7 @@ pub async fn process_attachment(
     info!(url=%attachment.url,"Trying to download attachment file.");
 
     let file_contents =
-        download_file_content_validated_with_retries(&attachment.url, &extension).await?;
+        download_file_content_validated_with_retries(&*attachment.url, &extension).await?;
     let hash = Blake2bHash::from_bytes(&file_contents);
     info!(%hash, url=%attachment.url,"Successfully downloaded file.");
 
@@ -70,30 +72,33 @@ pub async fn process_attachment(
     Ok(raw_attachment)
 }
 
-async fn download_file_content_validated_with_retries(
-    url: &str,
+async fn download_file_content_validated_with_retries<T: InternetFileFetch>(
+    to_fetch: T,
     extension: &FileExtension,
 ) -> anyhow::Result<Vec<u8>> {
     let mut last_error: Option<anyhow::Error> = None;
     for _ in 0..ATTACHMENT_DOWNLOAD_TRIES {
-        match download_file(url, Duration::from_secs(20)).await {
+        match to_fetch
+            .download_file_with_timeout(Duration::from_secs(20))
+            .await
+        {
             Ok(file_contents) => {
                 if let Err(err) = extension.is_valid_file_contents(&file_contents) {
-                    tracing::error!(%extension,%url, %err,"Downloaded file did not match extension");
+                    tracing::error!(%extension,?to_fetch, %err,"Downloaded file did not match extension");
                     last_error = Some(anyhow::Error::from(err))
                 } else {
                     return Ok(file_contents);
                 }
             }
             Err(err) => {
-                tracing::error!(%url, %err,"Encountered error downloading file");
+                tracing::error!(?to_fetch, %err,"Encountered error downloading file");
                 last_error = Some(err);
             }
         };
         sleep(Duration::from_secs(DOWNLOAD_RETRY_DELAY_SECONDS)).await;
     }
 
-    tracing::error!(%extension,%url,"Could not download file from url dispite a bunch of retries.");
+    tracing::error!(%extension,?to_fetch,"Could not download file from url dispite a bunch of retries.");
 
     Err(last_error.unwrap_or(anyhow!(
         "UNREACHABLE CODE: Should have not gotten to last step without error being set"
