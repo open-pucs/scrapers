@@ -5,18 +5,12 @@ use tracing::{Instrument, info};
 
 use crate::{server::define_routes, worker::start_workers};
 
-use aide::{
-    axum::{IntoApiResponse, routing::get},
-    openapi::{Info, OpenApi},
-    swagger::Swagger,
-};
-use axum::{Extension, Json, extract::DefaultBodyLimit, response::IntoResponse};
+use aide::{axum::routing::get, swagger::Swagger};
+use axum::extract::DefaultBodyLimit;
 
-use std::{
-    net::{Ipv4Addr, SocketAddr},
-    sync::{LazyLock, OnceLock},
-};
+use std::net::{Ipv4Addr, SocketAddr};
 
+mod api_documentation;
 mod misc;
 mod processing;
 mod s3_stuff;
@@ -28,48 +22,6 @@ mod worker;
 // Note that this clones the document on each request.
 // To be more efficient, we could wrap it into an Arc,
 // or even store it as a serialized string.
-static PRESERIALIZED_API_STRING: OnceLock<String> = OnceLock::new();
-async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
-    // First, check if we have a cached serialized version
-    if let Some(cached_json) = PRESERIALIZED_API_STRING.get() {
-        return cached_json.clone().into_response();
-    }
-
-    // No cached version exists, so we need to serialize and cache it
-    match serde_json::to_string(&api) {
-        Ok(serialized) => {
-            // Successfully serialized, now cache it
-            let returned_val = PRESERIALIZED_API_STRING.get_or_init(|| serialized);
-
-            // Return the serialized JSON string
-            returned_val.clone().into_response()
-        }
-        Err(e) => {
-            // Serialization failed - return detailed error information
-            let error_response = format!(
-                "Failed to serialize OpenAPI specification: {}\n\
-                Error type: {}\n\
-                This typically occurs when:\n\
-                - The OpenAPI struct contains non-serializable fields\n\
-                - There are circular references in the data structure\n\
-                - Custom types don't implement Serialize properly\n\
-                - There are invalid UTF-8 sequences in string fields
-                Debug Object:\n{:?}",
-                e,
-                std::any::type_name_of_val(&e),
-                &api
-            );
-
-            // Return error as plain text response with appropriate status
-            (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                [("content-type", "text/plain")],
-                error_response,
-            )
-                .into_response()
-        }
-    }
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -85,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
         .layer(OtelInResponseLayer)
         //start OpenTelemetry trace on incoming request
         .layer(OtelAxumLayer::default())
-        .route("/api.json", get(serve_api))
+        .route("/api.json", get(api_documentation::serve_api))
         .route("/swagger", Swagger::new("/api.json").axum_route())
         .layer(DefaultBodyLimit::disable());
 
@@ -108,27 +60,9 @@ async fn main() -> anyhow::Result<()> {
     // bind and serve
     let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 8000);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let app_description = "A component of the openscrapers library designed to efficently and cheaply process goverment docs at scale.";
+    api_documentation::generate_api_docs_and_serve(listener, app, app_description).await?;
     info!("Listening on http://{}", addr);
-    let mut api = OpenApi {
-        info: Info {
-            description: Some("A component of the openscrapers library designed to efficently and cheaply process goverment docs at scale.".to_string()),
-            ..Info::default()
-        },
-        ..OpenApi::default()
-    };
-    info!("Initialized OpenAPI");
-    axum::serve(
-        listener,
-        app
-            // Generate the documentation.
-            .finish_api(&mut api)
-            // Expose the documentation to the handlers.
-            .layer(Extension(api))
-            .into_make_service(),
-    )
-    .await
-    .unwrap();
-    // });
 
     Ok(())
 }

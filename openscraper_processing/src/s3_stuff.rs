@@ -1,7 +1,6 @@
 use std::path::Path;
-use std::time::Duration;
 
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::config::Credentials;
 use chrono::offset;

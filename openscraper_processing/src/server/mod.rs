@@ -2,7 +2,7 @@ use aide::{
     self,
     axum::{
         ApiRouter, IntoApiResponse,
-        routing::{get_with, post, post_with},
+        routing::{get_with, post_with},
     },
     transform::TransformOperation,
 };
