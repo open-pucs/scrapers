@@ -18,6 +18,16 @@ pub struct JurisdictionInfo {
     pub state: String,
     pub jurisdiction: String,
 }
+impl Default for JurisdictionInfo {
+    fn default() -> Self {
+        let unknown_static = "unknown";
+        JurisdictionInfo {
+            country: unknown_static.to_string(),
+            state: unknown_static.to_string(),
+            jurisdiction: unknown_static.to_string(),
+        }
+    }
+}
 
 impl JurisdictionInfo {
     pub fn new_usa(jurisdiction: &str, state: &str) -> Self {
@@ -95,4 +105,6 @@ pub struct RawAttachment {
     pub name: String,
     pub extension: FileExtension,
     pub text_objects: Vec<RawAttachmentText>,
+    pub date_added: chrono::DateTime<Utc>,
+    pub date_updated: chrono::DateTime<Utc>,
 }

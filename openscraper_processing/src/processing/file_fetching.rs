@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Debug, str::FromStr, time::Duration};
 
 use anyhow::bail;
+use base64::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -42,8 +43,9 @@ impl<T: AsRef<str> + Debug + ?Sized> InternetFileFetch for T {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
 enum RequestMethod {
+    #[default]
     Get,
     Post,
 }
@@ -54,6 +56,14 @@ pub struct AdvancedFetchData {
     request_type: RequestMethod,
     request_body: Option<Value>,
     headers: Option<HashMap<String, String>>,
+    decode_method: InternetDecodeMethod,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
+pub enum InternetDecodeMethod {
+    #[default]
+    None,
+    Base64Regular,
+    Base64UrlSafe,
 }
 
 impl InternetFileFetch for AdvancedFetchData {
@@ -89,7 +99,11 @@ impl InternetFileFetch for AdvancedFetchData {
         }
 
         let bytes = response.bytes().await?;
-        Ok(bytes.to_vec())
+        let decoded_bytes = match self.decode_method {
+            InternetDecodeMethod::None => bytes.to_vec(),
+            InternetDecodeMethod::Base64Regular => BASE64_STANDARD.decode(&bytes)?,
+            InternetDecodeMethod::Base64UrlSafe => BASE64_URL_SAFE.decode(&bytes)?,
+        };
+        Ok(decoded_bytes.to_vec())
     }
 }
-

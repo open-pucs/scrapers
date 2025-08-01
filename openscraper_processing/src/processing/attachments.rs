@@ -50,6 +50,8 @@ pub async fn process_attachment_in_regular_pipeline(
         name: attachment.name.clone(),
         extension: extension.clone(),
         text_objects: vec![],
+        date_added: Utc::now(),
+        date_updated: Utc::now(),
     };
     shipout_attachment_to_s3(file_contents, raw_attachment, true, s3_client).await
 }
@@ -116,6 +118,8 @@ pub async fn process_attachment_with_direct_request(
         name: direct_info.file_name.clone(),
         extension: direct_info.extension.clone(),
         text_objects: vec![],
+        date_added: Utc::now(),
+        date_updated: Utc::now(),
     };
     let server_return_attach = raw_attachment.clone();
     let should_process_text = direct_info.process_text_before_upload;
