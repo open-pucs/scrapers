@@ -9,14 +9,110 @@ use tracing::{error, info};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(20);
 
+#[derive(Debug, Clone)]
+pub struct FileDownloadResult {
+    pub data: Vec<u8>,
+    pub filename: Option<String>,
+}
+
 pub trait InternetFileFetch: Debug {
-    async fn download_file_with_timeout(&self, timeout: Duration) -> anyhow::Result<Vec<u8>>;
-    async fn download_file(&self) -> anyhow::Result<Vec<u8>> {
+    // New methods that return filename along with data
+    async fn download_file_with_timeout(
+        &self,
+        timeout: Duration,
+    ) -> anyhow::Result<FileDownloadResult>;
+    async fn download_file(&self) -> anyhow::Result<FileDownloadResult> {
         self.download_file_with_timeout(DEFAULT_TIMEOUT).await
     }
 }
+
+fn extract_filename_from_headers(headers: &reqwest::header::HeaderMap) -> Option<String> {
+    // Try to get filename from Content-Disposition header
+    if let Some(content_disposition) = headers.get(reqwest::header::CONTENT_DISPOSITION) {
+        if let Ok(header_str) = content_disposition.to_str() {
+            // Parse Content-Disposition header for filename
+            // Common formats:
+            // - attachment; filename="file.txt"
+            // - attachment; filename*=UTF-8''file.txt
+            // - inline; filename=file.txt
+
+            // First try the standard filename parameter
+            if let Some(filename_start) = header_str.find("filename=") {
+                let filename_part = &header_str[filename_start + 9..];
+                let filename = if filename_part.starts_with('"') {
+                    // Remove quotes
+                    filename_part
+                        .trim_start_matches('"')
+                        .split('"')
+                        .next()
+                        .unwrap_or("")
+                } else {
+                    // Take until semicolon or end
+                    filename_part.split(';').next().unwrap_or("").trim()
+                };
+
+                if !filename.is_empty() {
+                    return Some(filename.to_string());
+                }
+            }
+
+            // Try filename* parameter (RFC 5987)
+            if let Some(filename_start) = header_str.find("filename*=") {
+                let filename_part = &header_str[filename_start + 10..];
+                // Format is usually: UTF-8''filename or charset'lang'filename
+                if let Some(double_quote_pos) = filename_part.find("''") {
+                    let filename = &filename_part[double_quote_pos + 2..];
+                    let filename = filename.split(';').next().unwrap_or("").trim();
+                    if !filename.is_empty() {
+                        // URL decode if needed
+                        return Some(
+                            urlencoding::decode(filename)
+                                .unwrap_or_default()
+                                .to_string(),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn extract_filename_from_url(url: &str) -> Option<String> {
+    // Extract filename from URL as fallback
+    if let Ok(parsed_url) = url::Url::parse(url) {
+        let path = parsed_url.path();
+        if let Some(filename) = path.split('/').last() {
+            if !filename.is_empty() && filename != "/" {
+                // Check if there are query parameters that might indicate a filename
+                if let Some(query) = parsed_url.query() {
+                    if let Some(filename_param) = query
+                        .split('&')
+                        .find(|param| param.starts_with("fileName="))
+                    {
+                        let filename = &filename_param[9..]; // Remove "fileName="
+                        if !filename.is_empty() {
+                            return Some(
+                                urlencoding::decode(filename)
+                                    .unwrap_or_default()
+                                    .to_string(),
+                            );
+                        }
+                    }
+                }
+                return Some(filename.to_string());
+            }
+        }
+    }
+    None
+}
+
 impl<T: AsRef<str> + Debug + ?Sized> InternetFileFetch for T {
-    async fn download_file_with_timeout(&self, timeout: Duration) -> anyhow::Result<Vec<u8>> {
+    async fn download_file_with_timeout(
+        &self,
+        timeout: Duration,
+    ) -> anyhow::Result<FileDownloadResult> {
         let self_str = self.as_ref();
         info!(self_str, "Downloading file");
         let client = reqwest::Client::new();
@@ -37,9 +133,21 @@ impl<T: AsRef<str> + Debug + ?Sized> InternetFileFetch for T {
             bail!(error_msg);
         }
 
+        // Extract filename before consuming the response
+        let filename = extract_filename_from_headers(response.headers())
+            .or_else(|| extract_filename_from_url(self_str));
+
         let bytes = response.bytes().await?.to_vec();
         info!("Successfully downloaded {} bytes", bytes.len());
-        Ok(bytes)
+
+        if let Some(ref fname) = filename {
+            info!("Detected filename: {}", fname);
+        }
+
+        Ok(FileDownloadResult {
+            data: bytes,
+            filename,
+        })
     }
 }
 
@@ -58,6 +166,7 @@ pub struct AdvancedFetchData {
     headers: Option<HashMap<String, String>>,
     decode_method: InternetDecodeMethod,
 }
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
 pub enum InternetDecodeMethod {
     #[default]
@@ -67,7 +176,10 @@ pub enum InternetDecodeMethod {
 }
 
 impl InternetFileFetch for AdvancedFetchData {
-    async fn download_file_with_timeout(&self, timeout: Duration) -> anyhow::Result<Vec<u8>> {
+    async fn download_file_with_timeout(
+        &self,
+        timeout: Duration,
+    ) -> anyhow::Result<FileDownloadResult> {
         let client = reqwest::Client::new();
 
         let mut headers = reqwest::header::HeaderMap::new();
@@ -98,12 +210,24 @@ impl InternetFileFetch for AdvancedFetchData {
             ));
         }
 
+        // Extract filename before consuming the response
+        let filename = extract_filename_from_headers(response.headers())
+            .or_else(|| extract_filename_from_url(&self.url));
+
         let bytes = response.bytes().await?;
         let decoded_bytes = match self.decode_method {
             InternetDecodeMethod::None => bytes.to_vec(),
             InternetDecodeMethod::Base64Regular => BASE64_STANDARD.decode(&bytes)?,
             InternetDecodeMethod::Base64UrlSafe => BASE64_URL_SAFE.decode(&bytes)?,
         };
-        Ok(decoded_bytes.to_vec())
+
+        if let Some(ref fname) = filename {
+            info!("Detected filename: {}", fname);
+        }
+
+        Ok(FileDownloadResult {
+            data: decoded_bytes,
+            filename,
+        })
     }
 }

@@ -37,3 +37,6 @@ opentelemetry-otlp = { version = "0.29.0", features = ["grpc-tonic"] }
 opentelemetry-stdout = "0.29.0"
 axum-tracing-opentelemetry = "0.28.0"
 init-tracing-opentelemetry = { version = "0.28.1", features = ["tracing_subscriber_ext"] }
+url = "2.5.4"
+urlencoding = "2.1.3"
+serde_with = "3.14.0"

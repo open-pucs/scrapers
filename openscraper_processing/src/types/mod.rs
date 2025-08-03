@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use file_extension::FileExtension;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use std::collections::HashMap;
 
 use crate::types::hash::Blake2bHash;
@@ -45,6 +46,7 @@ pub struct CaseWithJurisdiction {
     pub jurisdiction: JurisdictionInfo,
 }
 
+#[skip_serializing_none]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct GenericAttachment {
     pub name: String,
@@ -54,6 +56,7 @@ pub struct GenericAttachment {
     pub hash: Option<Blake2bHash>,
 }
 
+#[skip_serializing_none]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Default)]
 pub struct GenericFiling {
     pub name: String,
@@ -65,6 +68,7 @@ pub struct GenericFiling {
     pub extra_metadata: HashMap<String, serde_json::Value>,
 }
 
+#[skip_serializing_none]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Default)]
 pub struct GenericCase {
     pub case_number: String,
@@ -98,6 +102,7 @@ pub struct RawAttachmentText {
     pub timestamp: DateTime<Utc>,
 }
 
+#[skip_serializing_none]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct RawAttachment {
     pub hash: Blake2bHash,
@@ -107,4 +112,5 @@ pub struct RawAttachment {
     pub text_objects: Vec<RawAttachmentText>,
     pub date_added: chrono::DateTime<Utc>,
     pub date_updated: chrono::DateTime<Utc>,
+    pub extra_metadata: Option<HashMap<String, String>>,
 }

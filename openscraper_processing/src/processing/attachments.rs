@@ -14,12 +14,13 @@ use aws_sdk_s3::Client as S3Client;
 use chrono::Utc;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::info;
 
-use super::file_fetching::{AdvancedFetchData, InternetFileFetch};
+use super::file_fetching::{AdvancedFetchData, FileDownloadResult, InternetFileFetch};
 
 const ATTACHMENT_DOWNLOAD_TRIES: usize = 2;
 const DOWNLOAD_RETRY_DELAY_SECONDS: u64 = 2;
@@ -39,10 +40,15 @@ pub async fn process_attachment_in_regular_pipeline(
 
     info!(url=%attachment.url,"Trying to download attachment file.");
 
-    let file_contents =
-        download_file_content_validated_with_retries(&*attachment.url, &extension).await?;
+    let FileDownloadResult {
+        data: file_contents,
+        filename: server_filename,
+    } = download_file_content_validated_with_retries(&attachment.url, &extension).await?;
     let hash = Blake2bHash::from_bytes(&file_contents);
     info!(%hash, url=%attachment.url,"Successfully downloaded file.");
+
+    let metadata = server_filename
+        .map(|exant_filename| HashMap::from([("server_filename".to_string(), exant_filename)]));
 
     let raw_attachment = RawAttachment {
         jurisdiction_info: jurisdiction_info.to_owned(),
@@ -52,6 +58,7 @@ pub async fn process_attachment_in_regular_pipeline(
         text_objects: vec![],
         date_added: Utc::now(),
         date_updated: Utc::now(),
+        extra_metadata: metadata,
     };
     shipout_attachment_to_s3(file_contents, raw_attachment, true, s3_client).await
 }
@@ -90,7 +97,7 @@ async fn shipout_attachment_to_s3(
     Ok(raw_attachment)
 }
 
-#[derive(Serialize, Deserialize, Clone, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, JsonSchema, Debug)]
 pub struct DirectAttachmentProcessInfo {
     file_name: String,
     extension: FileExtension,
@@ -100,17 +107,31 @@ pub struct DirectAttachmentProcessInfo {
     process_text_before_upload: bool,
 }
 
+#[derive(Serialize, Deserialize, Clone, JsonSchema, Debug)]
+pub struct DirectAttachmentReturnInfo {
+    pub attachment: RawAttachment,
+    pub hash: Blake2bHash,
+    pub server_file_name: Option<String>,
+}
+
 pub async fn process_attachment_with_direct_request(
     direct_info: &DirectAttachmentProcessInfo,
     s3_client_owned: S3Client,
-) -> anyhow::Result<RawAttachment> {
-    let file_contents = download_file_content_validated_with_retries(
+) -> anyhow::Result<DirectAttachmentReturnInfo> {
+    let FileDownloadResult {
+        data: file_contents,
+        filename: server_filename,
+    } = download_file_content_validated_with_retries(
         &direct_info.fetch_info,
         &direct_info.extension,
     )
     .await?;
     let hash = Blake2bHash::from_bytes(&file_contents);
     info!(%hash, fetch_info=?direct_info.fetch_info,"Successfully downloaded file.");
+
+    let metadata = server_filename
+        .clone()
+        .map(|exant_filename| HashMap::from([("server_filename".to_string(), exant_filename)]));
 
     let raw_attachment = RawAttachment {
         jurisdiction_info: direct_info.jurisdiction_info.clone(),
@@ -120,24 +141,32 @@ pub async fn process_attachment_with_direct_request(
         text_objects: vec![],
         date_added: Utc::now(),
         date_updated: Utc::now(),
+        extra_metadata: metadata,
     };
-    let server_return_attach = raw_attachment.clone();
+    let return_info = DirectAttachmentReturnInfo {
+        attachment: raw_attachment.clone(),
+        hash,
+        server_file_name: server_filename,
+    };
+    let mut return_info_clone = return_info.clone();
     let should_process_text = direct_info.process_text_before_upload;
-    let s3_process_future = async move || -> anyhow::Result<RawAttachment> {
+    let s3_process_future = async move || {
         let s3_client = &s3_client_owned;
-        shipout_attachment_to_s3(
+        let new_attach = shipout_attachment_to_s3(
             file_contents,
             raw_attachment,
             should_process_text,
             s3_client,
         )
-        .await
+        .await?;
+        return_info_clone.attachment = new_attach;
+        Ok(return_info_clone)
     };
     match direct_info.wait_for_s3_upload {
         true => s3_process_future().await,
         false => {
             tokio::spawn(s3_process_future());
-            Ok(server_return_attach)
+            Ok(return_info)
         }
     }
 }
@@ -145,7 +174,7 @@ pub async fn process_attachment_with_direct_request(
 async fn download_file_content_validated_with_retries<T: InternetFileFetch + ?Sized>(
     to_fetch: &T,
     extension: &FileExtension,
-) -> anyhow::Result<Vec<u8>> {
+) -> anyhow::Result<FileDownloadResult> {
     let mut last_error: Option<anyhow::Error> = None;
     for _ in 0..ATTACHMENT_DOWNLOAD_TRIES {
         match to_fetch
@@ -153,7 +182,7 @@ async fn download_file_content_validated_with_retries<T: InternetFileFetch + ?Si
             .await
         {
             Ok(file_contents) => {
-                if let Err(err) = extension.is_valid_file_contents(&file_contents) {
+                if let Err(err) = extension.is_valid_file_contents(&file_contents.data) {
                     tracing::error!(%extension,?to_fetch, %err,"Downloaded file did not match extension");
                     last_error = Some(anyhow::Error::from(err))
                 } else {
