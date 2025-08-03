@@ -58,8 +58,12 @@ async fn main() -> anyhow::Result<()> {
     let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 8000);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     let app_description = "A component of the openscrapers library designed to efficently and cheaply process goverment docs at scale.";
-    api_documentation::generate_api_docs_and_serve(listener, app, app_description).await?;
-    info!("Listening on http://{}", addr);
+    let Err(serve_error) =
+        api_documentation::generate_api_docs_and_serve(listener, app, app_description).await;
+    tracing::error!(
+        %serve_error,
+        "Encountered error while serving applicaiton, exiting immediately."
+    );
 
     Ok(())
 }

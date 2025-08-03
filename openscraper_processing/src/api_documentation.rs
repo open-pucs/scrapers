@@ -1,3 +1,4 @@
+use thiserror::Error;
 use tokio::net::TcpListener;
 use tracing::info;
 
@@ -7,7 +8,7 @@ use aide::{
 };
 use axum::response::IntoResponse;
 
-use std::sync::OnceLock;
+use std::{convert::Infallible, sync::OnceLock};
 
 use aide::{axum::routing::get, swagger::Swagger};
 static PRESERIALIZED_API_STRING: OnceLock<String> = OnceLock::new();
@@ -24,11 +25,21 @@ pub async fn serve_api() -> impl IntoApiResponse {
         .into_response()
 }
 
+#[derive(Debug, Error)]
+pub enum ApiServeError {
+    #[error("Could not serialize api: {0}")]
+    ApiSerializationFailure(#[from] serde_json::Error),
+    #[error("Encounterd IO error while serving: {0}")]
+    IOError(#[from] std::io::Error),
+    #[error("Server exited early with ok error code")]
+    ServerExitEarly,
+}
+
 pub async fn generate_api_docs_and_serve(
     listener: TcpListener,
     app: ApiRouter,
     app_description: &str,
-) -> Result<(), std::io::Error> {
+) -> Result<Infallible, ApiServeError> {
     let mut api = OpenApi {
         info: Info {
             description: Some(app_description.to_string()),
@@ -52,22 +63,21 @@ pub async fn generate_api_docs_and_serve(
         }
         Err(e) => {
             // Serialization failed - return detailed error information
-            let error_response = format!(
-                "Failed to serialize OpenAPI specification: {}\n\
-                Error type: {}\n\
-                This typically occurs when:\n\
+            tracing::error!(
+                json_error=%e,
+                error_type=%std::any::type_name_of_val(&e),
+                debug_value=?(&api),
+                "Failed to serialize OpenAPI specification: This typically occurs when:\n\
                 - The OpenAPI struct contains non-serializable fields\n\
                 - There are circular references in the data structure\n\
                 - Custom types don't implement Serialize properly\n\
-                - There are invalid UTF-8 sequences in string fields
-                Debug Object:\n{:?}",
-                e,
-                std::any::type_name_of_val(&e),
-                &api
+                - There are invalid UTF-8 sequences in string fields",
             );
-            tracing::error!("{error_response}");
-            panic!("{error_response}");
+            return Err(e.into());
         }
     }
-    axum::serve(listener, full_service).await
+    match axum::serve(listener, full_service).await {
+        Ok(()) => Err(ApiServeError::ServerExitEarly),
+        Err(err) => Err(err.into()),
+    }
 }
