@@ -19,7 +19,7 @@ class JsonS3File(BaseModel):
 
 def save_json_sync(path: str, data: Any, bucket: Optional[str] = None) -> None:
     try:
-        url = f"{OPENSCRAPERS_INTERNAL_API_URL}/admin/write_openscrapers_s3_json"
+        url = f"{OPENSCRAPERS_INTERNAL_API_URL}/admin/write_s3_json"
         json_str = create_json_string(data)
         json_obj = json.loads(json_str)
         payload = {"key": path, "contents": json_obj}

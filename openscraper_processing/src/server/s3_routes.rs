@@ -18,17 +18,15 @@ use crate::types::{
 };
 
 #[derive(Deserialize, Serialize, JsonSchema)]
-pub struct S3FileLocationParams {
-    bucket: Option<String>,
-    key: String,
+pub struct OpenscrapersS3Path {
+    pub path: String,
 }
-
-pub async fn read_s3_file(Json(payload): Json<S3FileLocationParams>) -> impl IntoApiResponse {
-    let bucket = (payload.bucket)
-        .as_deref()
-        .unwrap_or(&**OPENSCRAPERS_S3_OBJECT_BUCKET);
+pub async fn read_openscrapers_s3_file(
+    Path(OpenscrapersS3Path { path }): Path<OpenscrapersS3Path>,
+) -> impl IntoApiResponse {
+    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
     let s3_client = crate::s3_stuff::make_s3_client().await;
-    let result = crate::s3_stuff::download_s3_bytes(&s3_client, bucket, &payload.key).await;
+    let result = crate::s3_stuff::download_s3_bytes(&s3_client, bucket, &path).await;
     match result {
         Ok(contents) => (axum::http::StatusCode::OK, Bytes::from(contents)).into_response(),
         Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
