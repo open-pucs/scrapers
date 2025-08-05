@@ -83,7 +83,7 @@ fn extract_filename_from_url(url: &str) -> Option<String> {
     // Extract filename from URL as fallback
     if let Ok(parsed_url) = url::Url::parse(url) {
         let path = parsed_url.path();
-        if let Some(filename) = path.split('/').last() {
+        if let Some(filename) = path.split('/').next_back() {
             if !filename.is_empty() && filename != "/" {
                 // Check if there are query parameters that might indicate a filename
                 if let Some(query) = parsed_url.query() {

@@ -58,16 +58,10 @@ pub async fn start_workers() -> anyhow::Result<Infallible> {
             );
         } else {
             cases_without_ingest += 1;
-            if is_root_of_power(cases_without_ingest, 3) {
+            if cases_without_ingest.is_power_of_two() {
                 tracing::info!(availible_permits = %case_sem_ref.available_permits(),"Checked {cases_without_ingest} times for cases and found nothing.");
             }
             sleep(Duration::from_secs(2)).await;
         }
     }
-}
-
-fn is_root_of_power(input: usize, pow: u32) -> bool {
-    let root = (input as f64).powf(1.0 / (pow as f64));
-    let iroot = root.floor() as usize;
-    iroot.pow(pow) == input
 }
