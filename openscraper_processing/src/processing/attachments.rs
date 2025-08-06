@@ -1,11 +1,11 @@
+use crate::common::file_extension::FileExtension;
+use crate::common::hash::Blake2bHash;
 use crate::processing::{CrimsonInitialResponse, CrimsonPDFIngestParamsS3, CrimsonStatusResponse};
 use crate::s3_stuff::{
     generate_s3_object_uri_from_key, get_raw_attach_file_key, push_raw_attach_file_to_s3,
     push_raw_attach_object_to_s3,
 };
 use crate::types::env_vars::CRIMSON_URL;
-use crate::types::file_extension::FileExtension;
-use crate::types::hash::Blake2bHash;
 use crate::types::{
     AttachmentTextQuality, GenericAttachment, JurisdictionInfo, RawAttachment, RawAttachmentText,
 };

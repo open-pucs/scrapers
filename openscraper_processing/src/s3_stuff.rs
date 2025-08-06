@@ -6,6 +6,7 @@ use aws_sdk_s3::config::Credentials;
 use chrono::offset;
 use tracing::{debug, error, info};
 
+use crate::common::hash::Blake2bHash;
 use crate::types::JurisdictionInfo;
 use crate::types::s3_uri::S3Location;
 use crate::types::{
@@ -14,7 +15,6 @@ use crate::types::{
         OPENSCRAPERS_S3_ACCESS_KEY, OPENSCRAPERS_S3_CLOUD_REGION, OPENSCRAPERS_S3_ENDPOINT,
         OPENSCRAPERS_S3_OBJECT_BUCKET, OPENSCRAPERS_S3_SECRET_KEY,
     },
-    hash::Blake2bHash,
 };
 use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
 

@@ -10,11 +10,13 @@ use serde_json::Value;
 use std::str::FromStr;
 use tracing::{error, info, warn};
 
-use crate::types::{
-    GenericCase, JurisdictionInfo, RawAttachment,
-    env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
-    hash::Blake2bHash,
-    pagination::{PaginationData, make_paginated_subslice},
+use crate::{
+    common::hash::Blake2bHash,
+    types::{
+        GenericCase, JurisdictionInfo, RawAttachment,
+        env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
+        pagination::{PaginationData, make_paginated_subslice},
+    },
 };
 
 #[derive(Deserialize, Serialize, JsonSchema)]

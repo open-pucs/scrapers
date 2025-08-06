@@ -1,15 +1,12 @@
 use chrono::{DateTime, Utc};
-use file_extension::FileExtension;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::collections::HashMap;
 
-use crate::types::hash::Blake2bHash;
+use crate::common::{file_extension::FileExtension, hash::Blake2bHash};
 
 pub mod env_vars;
-pub mod file_extension;
-pub mod hash;
 pub mod pagination;
 pub mod s3_uri;
 
