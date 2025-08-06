@@ -9,7 +9,7 @@ use axum::extract::DefaultBodyLimit;
 
 use std::net::{Ipv4Addr, SocketAddr};
 
-mod api_documentation;
+mod common
 mod misc;
 mod processing;
 mod s3_stuff;
@@ -55,11 +55,12 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // bind and serve
-    let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 8000);
+    let port = 33399;
+    let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     let app_description = "A component of the openscrapers library designed to efficently and cheaply process goverment docs at scale.";
     let Err(serve_error) =
-        api_documentation::generate_api_docs_and_serve(listener, app, app_description).await;
+        generate_api_docs_and_serve(listener, app, app_description).await;
     tracing::error!(
         %serve_error,
         "Encountered error while serving applicaiton, exiting immediately."

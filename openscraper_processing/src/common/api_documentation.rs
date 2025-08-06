@@ -6,7 +6,7 @@ use aide::{
     axum::{ApiRouter, IntoApiResponse},
     openapi::{Info, OpenApi},
 };
-use axum::response::IntoResponse;
+use axum::{response::IntoResponse, serve::Listener};
 
 use std::{convert::Infallible, sync::OnceLock};
 
@@ -47,7 +47,9 @@ pub async fn generate_api_docs_and_serve(
         },
         ..OpenApi::default()
     };
+    let socket = listener.local_addr().unwrap();
     info!("Initialized OpenAPI");
+    info!(?socket, "Listening on socket");
     let full_service = app
         .route("/api.json", get(serve_api))
         .route("/swagger", Swagger::new("/api.json").axum_route())
