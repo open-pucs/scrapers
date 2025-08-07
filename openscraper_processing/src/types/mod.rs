@@ -111,4 +111,5 @@ pub struct RawAttachment {
     pub date_added: chrono::DateTime<Utc>,
     pub date_updated: chrono::DateTime<Utc>,
     pub extra_metadata: Option<HashMap<String, String>>,
+    pub file_size_bytes: Option<u64>,
 }

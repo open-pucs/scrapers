@@ -1,7 +1,8 @@
 wireguard-configs
 **/*.db
 js_scrapers/raw_data
-
+openscraper_processing/backup
+openscraper_processing/results.csv
 
 **/node_modules
 # Project Specific Stuff 

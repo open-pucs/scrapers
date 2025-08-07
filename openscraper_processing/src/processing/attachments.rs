@@ -55,6 +55,7 @@ pub async fn process_attachment_in_regular_pipeline(
         jurisdiction_info: jurisdiction_info.to_owned(),
         url: Some(attachment.url.clone()),
         hash,
+        file_size_bytes: Some(file_contents.len() as u64),
         name: attachment.name.clone(),
         extension: extension.clone(),
         text_objects: vec![],
@@ -153,6 +154,7 @@ pub async fn process_attachment_with_direct_request(
     let raw_attachment = RawAttachment {
         jurisdiction_info: direct_info.jurisdiction_info.clone(),
         hash,
+        file_size_bytes: Some(file_contents.len() as u64),
         url: url_value,
         name: actual_filename.clone(),
         extension: direct_info.extension.clone(),
