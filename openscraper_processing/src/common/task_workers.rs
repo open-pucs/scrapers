@@ -88,8 +88,9 @@ static TASK_PRIORITY_QUEUE: Mutex<BinaryHeap<PriorityTaskObject>> =
 static TASK_STATUS_DATA: LazyLock<RwLock<HashMap<u64, TaskStatus>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-pub async fn add_task_to_queue(obj: Box<dyn ExecuteUserTask>, priority: i32) -> TaskStatus {
-    let task_object = PriorityTaskObject::new(obj, priority);
+pub async fn add_task_to_queue(obj: impl ExecuteUserTask, priority: i32) -> TaskStatus {
+    let boxed_obj = Box::new(obj);
+    let task_object = PriorityTaskObject::new(boxed_obj, priority);
     let task_id = task_object.task_id;
     let task_status = TaskStatus::new(task_id, &*(task_object.task_object));
     let mut task_status_writelock = (*TASK_STATUS_DATA).write().await;

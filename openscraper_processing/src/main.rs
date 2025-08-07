@@ -1,22 +1,25 @@
 #![allow(dead_code)]
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-use common::api_documentation::generate_api_docs_and_serve;
-use misc::{internet_check::do_i_have_internet, otel_setup::init_subscribers_and_loglevel};
+use common::{
+    api_documentation::generate_api_docs_and_serve,
+    misc::internet_check::do_i_have_internet,
+    otel_tracing::initialize_tracing_and_wrap_router,
+    task_workers::{define_generic_task_routes, spawn_worker_loop},
+};
 use tracing::{Instrument, info};
 
-use crate::{server::define_routes, worker::start_workers};
+use crate::server::define_routes;
 
 use axum::extract::DefaultBodyLimit;
 
 use std::net::{Ipv4Addr, SocketAddr};
 
+mod case_worker;
 mod common;
-mod misc;
 mod processing;
 mod s3_stuff;
 mod server;
 mod types;
-mod worker;
 // use opentelemetry::global::{self, BoxedTracer, ObjectSafeTracerProvider, tracer};
 
 // Note that this clones the document on each request.
@@ -25,35 +28,24 @@ mod worker;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let _ =
-        init_subscribers_and_loglevel().expect("Failed to initialize opentelemetry tracing stuff");
     if let Err(e) = do_i_have_internet() {
         tracing::error!(err = %e,"NO INTERNET DETECTED");
         panic!("NO INTERNET DETECTED");
     }
     // initialise our subscriber
-    let routes = define_routes();
-    let app = routes
-        .layer(OtelInResponseLayer)
-        //start OpenTelemetry trace on incoming request
-        .layer(OtelAxumLayer::default())
-        .layer(DefaultBodyLimit::disable());
+    let make_api = || {
+        let routes = define_routes();
+        let app = define_generic_task_routes(routes);
+        app.layer(DefaultBodyLimit::disable())
+    };
+    let app = initialize_tracing_and_wrap_router(make_api)?;
 
     // Spawn background worker to process PDF tasks
     // This worker runs indefinitely
     info!("App Created, spawning background process:");
-    tokio::spawn(
-        async move {
-            info!("Attempting to diagnose trace inside a tokio spawn?");
 
-            let result = start_workers().await;
-            let Err(err) = result;
-            tracing::error!(%err,"Encountered error while running the workers. The worker has stopped.");
-            println!("Encountered error while running the workers. The worker has stopped: {err}");
-            eprintln!("Encountered error while running the workers. The worker has stopped: {err}");
-        }
-        .in_current_span(),
-    );
+    // Spawns the background processing loop
+    spawn_worker_loop();
 
     // bind and serve
     let port = 33399;
