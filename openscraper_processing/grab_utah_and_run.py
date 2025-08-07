@@ -305,7 +305,7 @@ class PDFScraper:
             end_time = time.time()
             total_duration = end_time - start_time
 
-            print(f"\n=== Processing Complete ===")
+            print("\n=== Processing Complete ===")
             print(f"Total time: {total_duration:.2f} seconds")
             print(f"Successfully processed: {total_successful}/{total_indices} indices")
             print(
@@ -317,13 +317,13 @@ def main():
     """
     Main function to run the async PDF scraper.
     """
-    start_index = 1113
+    start_index = 1180
     end_index = 40000
     # These would need to be defined or passed as parameters
     openscrapers_endpoint = (
         "http://localhost:33399/admin/direct_file_attachment_process"
     )
-    batch_size = 20  # Process 20 at a time
+    batch_size = 5  # 20 was waaay to agressive
 
     scraper = PDFScraper(openscrapers_endpoint, start_index, end_index, batch_size)
 
