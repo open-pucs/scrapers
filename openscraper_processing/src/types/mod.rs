@@ -105,6 +105,7 @@ pub struct RawAttachment {
     pub hash: Blake2bHash,
     pub jurisdiction_info: JurisdictionInfo,
     pub name: String,
+    pub url: Option<String>,
     pub extension: FileExtension,
     pub text_objects: Vec<RawAttachmentText>,
     pub date_added: chrono::DateTime<Utc>,

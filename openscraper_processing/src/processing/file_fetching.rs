@@ -152,7 +152,7 @@ impl<T: AsRef<str> + Debug + ?Sized> InternetFileFetch for T {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
-enum RequestMethod {
+pub enum RequestMethod {
     #[default]
     Get,
     Post,
@@ -160,11 +160,11 @@ enum RequestMethod {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct AdvancedFetchData {
-    url: String,
-    request_type: RequestMethod,
-    request_body: Option<Value>,
-    headers: Option<HashMap<String, String>>,
-    decode_method: InternetDecodeMethod,
+    pub url: String,
+    pub request_type: RequestMethod,
+    pub request_body: Option<Value>,
+    pub headers: Option<HashMap<String, String>>,
+    pub decode_method: InternetDecodeMethod,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]

@@ -1,9 +1,10 @@
 use crate::common::file_extension::FileExtension;
 use crate::common::hash::Blake2bHash;
+use crate::processing::file_fetching::RequestMethod;
 use crate::processing::{CrimsonInitialResponse, CrimsonPDFIngestParamsS3, CrimsonStatusResponse};
 use crate::s3_stuff::{
-    generate_s3_object_uri_from_key, get_raw_attach_file_key, push_raw_attach_file_to_s3,
-    push_raw_attach_object_to_s3,
+    generate_s3_object_uri_from_key, get_raw_attach_file_key, get_raw_attach_obj_key,
+    push_raw_attach_file_to_s3, push_raw_attach_object_to_s3,
 };
 use crate::types::env_vars::CRIMSON_URL;
 use crate::types::{
@@ -52,6 +53,7 @@ pub async fn process_attachment_in_regular_pipeline(
 
     let raw_attachment = RawAttachment {
         jurisdiction_info: jurisdiction_info.to_owned(),
+        url: Some(attachment.url.clone()),
         hash,
         name: attachment.name.clone(),
         extension: extension.clone(),
@@ -99,12 +101,12 @@ async fn shipout_attachment_to_s3(
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, Debug)]
 pub struct DirectAttachmentProcessInfo {
-    file_name: String,
-    extension: FileExtension,
-    fetch_info: AdvancedFetchData,
-    jurisdiction_info: JurisdictionInfo,
-    wait_for_s3_upload: bool,
-    process_text_before_upload: bool,
+    pub file_name: Option<String>,
+    pub extension: FileExtension,
+    pub fetch_info: AdvancedFetchData,
+    pub jurisdiction_info: JurisdictionInfo,
+    pub wait_for_s3_upload: bool,
+    pub process_text_before_upload: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, Debug)]
@@ -112,6 +114,8 @@ pub struct DirectAttachmentReturnInfo {
     pub attachment: RawAttachment,
     pub hash: Blake2bHash,
     pub server_file_name: Option<String>,
+    pub file_s3_uri: String,
+    pub object_s3_uri: String,
 }
 
 pub async fn process_attachment_with_direct_request(
@@ -132,11 +136,25 @@ pub async fn process_attachment_with_direct_request(
     let metadata = server_filename
         .clone()
         .map(|exant_filename| HashMap::from([("server_filename".to_string(), exant_filename)]));
+    let actual_filename = direct_info
+        .file_name
+        .clone()
+        .or(server_filename.clone())
+        .unwrap_or("".to_string());
+
+    let is_normal_url_request = direct_info.fetch_info.request_type == RequestMethod::Get
+        && direct_info.fetch_info.request_body.is_none()
+        && direct_info.fetch_info.headers.is_none();
+    let url_value = match is_normal_url_request {
+        true => Some(direct_info.fetch_info.url.clone()),
+        false => None,
+    };
 
     let raw_attachment = RawAttachment {
         jurisdiction_info: direct_info.jurisdiction_info.clone(),
         hash,
-        name: direct_info.file_name.clone(),
+        url: url_value,
+        name: actual_filename.clone(),
         extension: direct_info.extension.clone(),
         text_objects: vec![],
         date_added: Utc::now(),
@@ -147,6 +165,8 @@ pub async fn process_attachment_with_direct_request(
         attachment: raw_attachment.clone(),
         hash,
         server_file_name: server_filename,
+        file_s3_uri: generate_s3_object_uri_from_key(&get_raw_attach_file_key(hash)),
+        object_s3_uri: generate_s3_object_uri_from_key(&get_raw_attach_obj_key(hash)),
     };
     let mut return_info_clone = return_info.clone();
     let should_process_text = direct_info.process_text_before_upload;

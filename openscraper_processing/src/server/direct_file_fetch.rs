@@ -3,7 +3,8 @@ use axum::{Json, response::IntoResponse};
 
 use crate::{
     processing::attachments::{
-        DirectAttachmentProcessInfo, process_attachment_with_direct_request,
+        DirectAttachmentProcessInfo, DirectAttachmentReturnInfo,
+        process_attachment_with_direct_request,
     },
     types::RawAttachment,
 };
@@ -25,7 +26,7 @@ pub async fn handle_directly_process_file_request(
 
 pub fn handle_directly_process_file_request_docs(op: TransformOperation) -> TransformOperation {
     op.description("Fetch attachment data from S3.")
-        .response::<200, Json<RawAttachment>>()
+        .response::<200, Json<DirectAttachmentReturnInfo>>()
         .response_with::<400, String, _>(|res| res.description("Invalid format"))
         .response_with::<500, String, _>(|res| res.description("Error processing attachment data"))
 }
