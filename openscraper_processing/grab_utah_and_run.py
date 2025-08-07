@@ -69,9 +69,93 @@ def generate_utah_url(number: int) -> str:
     return f"https://dataexplorer.ogm.utah.gov/api/Files?fileName=wellfile|{number}"
 
 
-for i in range(start_index, end_endex):
-    # In this code go ahead and hit the openscrapers endpoint with the utah url subsituted in
-    utah_url = generate_utah_url(i)
-    # then if the transfer was successful go ahead and save the response json under backup/{i}.json
-    # then keep a running list of csv results, in the following schema.
-    # file_index, hash, url, server_filename, API number guess, file_s3_uri
+import requests
+import json
+import os
+import csv
+from pathlib import Path
+import time
+
+
+def main():
+    """
+    Main function to iterate through a range of file indices, fetch them from a URL,
+    and process them through the openscrapers service.
+    """
+    # Create backup directory if it doesn't exist
+    backup_dir = Path("backup")
+    backup_dir.mkdir(exist_ok=True)
+
+    # Setup CSV file
+    csv_filename = "results.csv"
+    csv_file_exists = Path(csv_filename).exists()
+    csv_header = [
+        "file_index",
+        "hash",
+        "url",
+        "server_filename",
+        "api_number_guess",
+        "file_s3_uri",
+    ]
+
+    with open(csv_filename, "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        if not csv_file_exists:
+            writer.writerow(csv_header)
+
+        for i in range(start_index, end_endex):
+            utah_url = generate_utah_url(i)
+            payload = {
+                "extension": "pdf",
+                "fetch_info": {
+                    "decode_method": "None",
+                    "request_type": "Get",
+                    "url": utah_url,
+                },
+                "jurisdiction_info": {
+                    "country": "usa",
+                    "jurisdiction": "ut_dogm",
+                    "state": "ut",
+                },
+                "process_text_before_upload": False,
+                "wait_for_s3_upload": True,
+            }
+
+            try:
+                print(f"Processing index {i} with URL {utah_url}")
+                response = requests.post(
+                    openscrapers_endpoint, json=payload, timeout=60
+                )
+                response.raise_for_status()  # Raise an exception for bad status codes
+
+                response_data = response.json()
+
+                # Save response JSON
+                with open(backup_dir / f"{i}.json", "w") as f:
+                    json.dump(response_data, f, indent=2)
+
+                # Append to CSV
+                server_filename = response_data.get("server_file_name", "unknown")
+                api_guess = transform_filename_to_api_number(server_filename)
+                csv_row = [
+                    i,
+                    response_data.get("hash", ""),
+                    utah_url,
+                    server_filename,
+                    api_guess,
+                    response_data.get("file_s3_uri", ""),
+                ]
+                writer.writerow(csv_row)
+                csvfile.flush()  # Make sure it's written to disk
+                print(f"Successfully processed index {i}")
+
+            except requests.exceptions.RequestException as e:
+                print(f"Error processing index {i}: {e}")
+                # Optional: add a small delay before retrying or moving to the next
+                time.sleep(5)
+            except json.JSONDecodeError:
+                print(f"Error decoding JSON for index {i}, response: {response.text}")
+
+
+if __name__ == "__main__":
+    main()
