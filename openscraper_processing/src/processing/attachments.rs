@@ -1,6 +1,6 @@
 use crate::common::file_extension::FileExtension;
 use crate::common::hash::Blake2bHash;
-use crate::processing::file_fetching::RequestMethod;
+use crate::processing::file_fetching::{FileDownloadError, RequestMethod};
 use crate::processing::{CrimsonInitialResponse, CrimsonPDFIngestParamsS3, CrimsonStatusResponse};
 use crate::s3_stuff::{
     generate_s3_object_uri_from_key, get_raw_attach_file_key, get_raw_attach_obj_key,
@@ -196,8 +196,8 @@ pub async fn process_attachment_with_direct_request(
 async fn download_file_content_validated_with_retries<T: InternetFileFetch + ?Sized>(
     to_fetch: &T,
     extension: &FileExtension,
-) -> anyhow::Result<FileDownloadResult> {
-    let mut last_error: Option<anyhow::Error> = None;
+) -> Result<FileDownloadResult, FileDownloadError> {
+    let mut last_error: Option<FileDownloadError> = None;
     for _ in 0..ATTACHMENT_DOWNLOAD_TRIES {
         match to_fetch
             .download_file_with_timeout(Duration::from_secs(20))
@@ -206,7 +206,7 @@ async fn download_file_content_validated_with_retries<T: InternetFileFetch + ?Si
             Ok(file_contents) => {
                 if let Err(err) = extension.is_valid_file_contents(&file_contents.data) {
                     tracing::error!(%extension,?to_fetch, %err,"Downloaded file did not match extension");
-                    last_error = Some(anyhow::Error::from(err))
+                    last_error = Some(FileDownloadError::InvalidReturnData(err))
                 } else {
                     return Ok(file_contents);
                 }
@@ -214,6 +214,9 @@ async fn download_file_content_validated_with_retries<T: InternetFileFetch + ?Si
             Err(err) => {
                 tracing::error!(?to_fetch, %err,"Encountered error downloading file");
                 last_error = Some(err);
+                if !err.is_retryable() {
+                    return Err(err);
+                };
             }
         };
         sleep(Duration::from_secs(DOWNLOAD_RETRY_DELAY_SECONDS)).await;
@@ -221,9 +224,7 @@ async fn download_file_content_validated_with_retries<T: InternetFileFetch + ?Si
 
     tracing::error!(%extension,?to_fetch,"Could not download file from url dispite a bunch of retries.");
 
-    Err(last_error.unwrap_or(anyhow!(
-        "UNREACHABLE CODE: Should have not gotten to last step without error being set"
-    )))
+    Err(last_error.unwrap())
 }
 
 async fn process_pdf_text_using_crimson(

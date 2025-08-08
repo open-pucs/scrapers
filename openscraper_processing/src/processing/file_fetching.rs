@@ -5,7 +5,10 @@ use base64::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use thiserror::Error;
 use tracing::{error, info};
+
+use crate::common::file_extension::FileValidationError;
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(20);
 
@@ -15,13 +18,36 @@ pub struct FileDownloadResult {
     pub filename: Option<String>,
 }
 
+// Add more data for all of these errors including passing along any internal error values.
+#[derive(Debug, Error)]
+pub enum FileDownloadError {
+    BadRequest(()),
+    Unauthorized(()),
+    RateLimited(()),
+    InvalidReturnData(FileValidationError),
+    Unknwon(anyhow::Error),
+}
+
+impl FileDownloadError {
+    pub fn is_retryable(&self) -> bool {
+        // return true if the error might be solved by retying the request:
+        match self {
+            Self::BadRequest(_) => false,
+            Self::Unauthorized(_) => false,
+            Self::RateLimited(_) => true,
+            Self::InvalidReturnData(_) => true,
+            Self::Unknwon(_) => false,
+        }
+    }
+}
+
 pub trait InternetFileFetch: Debug {
     // New methods that return filename along with data
     async fn download_file_with_timeout(
         &self,
         timeout: Duration,
-    ) -> anyhow::Result<FileDownloadResult>;
-    async fn download_file(&self) -> anyhow::Result<FileDownloadResult> {
+    ) -> Result<FileDownloadResult, FileDownloadError>;
+    async fn download_file(&self) -> Result<FileDownloadResult, FileDownloadError> {
         self.download_file_with_timeout(DEFAULT_TIMEOUT).await
     }
 }
