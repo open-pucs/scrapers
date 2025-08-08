@@ -40,7 +40,7 @@ cur.execute("""
 """)
 cur.execute("""
     CREATE TABLE IF NOT EXISTS wells (
-        api_well_number TEXT UNIQUE,
+        api_well_number TEXT PRIMARY KEY,
         operator TEXT,
         well_name TEXT,
         well_status TEXT,
@@ -90,7 +90,7 @@ cur.execute("""
         county TEXT,
         operator TEXT,
         well_name TEXT,
-        api_number TEXT UNIQUE,
+        api_number TEXT PRIMARY KEY,
         work_type TEXT,
         well_type TEXT,
         current_status TEXT,
@@ -114,7 +114,7 @@ cur.execute("""
 """)
 cur.execute("""
     CREATE TABLE IF NOT EXISTS historical_well_metadata (
-        api_well_number TEXT UNIQUE,
+        api_well_number TEXT PRIMARY KEY,
         event_work_type TEXT,
         apd_approval DATE,
         spud_date_dry DATE,
@@ -150,7 +150,7 @@ cur.execute("""
 cur.execute("""
     CREATE TABLE IF NOT EXISTS apd_permit_expiry (
         operator TEXT,
-        api_number TEXT UNIQUE,
+        api_number UNIQUE PRIMARY KEY,
         well_name TEXT,
         work_type TEXT,
         date_approved DATE,
@@ -500,73 +500,6 @@ def load_apd_permit_expiry(cur, conn):
 load_application_for_permit_drilling_granted(cur, conn)
 load_historical_well_metadata(cur, conn)
 load_apd_permit_expiry(cur, conn)
-
-# Create the computed view
-
-cur.execute("DROP VIEW IF EXISTS wells_with_permit_extras;")
-cur.execute("""
-CREATE VIEW wells_with_permit_extras AS
-SELECT
-  w.*,
-  COUNT(p.permit_id) AS permit_file_submission_count,
-  MIN(p.date_posted) AS earliest_permit_file_submission_date,
-  MAX(p.date_posted) AS latest_permit_file_submission_date,
-  MAX(apd.date_approved) AS apd_approval_date,
-  MAX(expiry.date_permit_will_expire) AS apd_expiry_date_if_availible
-FROM wells w
-INNER JOIN api_well_number_repository apir ON w.api_well_number = apir.api_well_number
-INNER JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
-LEFT JOIN application_for_permit_drilling_granted apd ON apir.api_well_number = apd.api_number
-LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
-GROUP BY w.api_well_number;
-""")
-conn.commit()
-
-
-cur.execute("DROP VIEW IF EXISTS wells_with_permit_extras_all_inclusive;")
-cur.execute("""
-CREATE VIEW wells_with_permit_extras_all_inclusive AS
-SELECT
-  w.*,
-  COUNT(p.permit_id) AS permit_file_submission_count,
-  MIN(p.date_posted) AS earliest_permit_file_submission_date,
-  MAX(p.date_posted) AS latest_permit_file_submission_date,
-  MAX(apd.date_approved) AS apd_approval_date,
-  MAX(expiry.date_permit_will_expire) AS apd_expiry_date_if_availible
-FROM wells w
-INNER JOIN api_well_number_repository apir ON w.api_well_number = apir.api_well_number
-LEFT JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
-LEFT JOIN application_for_permit_drilling_granted apd ON apir.api_well_number = apd.api_number
-LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
-GROUP BY w.api_well_number;
-""")
-conn.commit()
-
-
-cur.execute("DROP VIEW IF EXISTS historical_wells_with_permit_extras_all_inclusive;")
-cur.execute("""
-CREATE VIEW historical_wells_with_permit_extras_all_inclusive AS
-SELECT
-  w.*,
-  COUNT(p.permit_id) AS permit_file_submission_count,
-  MIN(p.date_posted) AS earliest_permit_file_submission_date,
-  MAX(p.date_posted) AS latest_permit_file_submission_date,
-  MAX(apd.date_approved) AS apd_approval_date_from_other_data,
-  MAX(expiry.date_permit_will_expire) AS apd_expiry_date_if_availible
-FROM historical_well_metadata w
-INNER JOIN api_well_number_repository apir ON w.api_well_number = apir.api_well_number
-LEFT JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
-LEFT JOIN application_for_permit_drilling_granted apd ON apir.api_well_number = apd.api_number
-LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
-GROUP BY w.api_well_number;
-""")
-conn.commit()
-
-# Create GiST index for spatial queries on wells_rtree
-cur.execute(
-    "CREATE INDEX IF NOT EXISTS wells_rtree_geom_idx ON wells_rtree USING gist (box(point(min_lon, min_lat), point(max_lon, max_lat)));"
-)
-conn.commit()
 
 cur.close()
 conn.close()

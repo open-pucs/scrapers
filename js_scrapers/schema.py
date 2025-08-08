@@ -38,7 +38,7 @@ cur.execute("""
 """)
 cur.execute("""
     CREATE TABLE IF NOT EXISTS wells (
-        api_well_number TEXT UNIQUE,
+        api_well_number TEXT PRIMARY KEY,
         operator TEXT,
         well_name TEXT,
         well_status TEXT,
