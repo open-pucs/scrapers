@@ -35,7 +35,7 @@ INNER JOIN api_well_number_repository apir ON w.api_well_number = apir.api_well_
 INNER JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
 LEFT JOIN application_for_permit_drilling_granted apd ON apir.api_well_number = apd.api_number
 LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
-GROUP BY w.*;
+GROUP BY w.api_well_number;
 """)
 conn.commit()
 
@@ -55,7 +55,7 @@ INNER JOIN api_well_number_repository apir ON w.api_well_number = apir.api_well_
 LEFT JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
 LEFT JOIN application_for_permit_drilling_granted apd ON apir.api_well_number = apd.api_number
 LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
-GROUP BY w.*;
+GROUP BY w.api_well_number;
 """)
 conn.commit()
 
@@ -75,6 +75,6 @@ INNER JOIN api_well_number_repository apir ON w.api_well_number = apir.api_well_
 LEFT JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
 LEFT JOIN application_for_permit_drilling_granted apd ON apir.api_well_number = apd.api_number
 LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
-GROUP BY w.*;
+GROUP BY w.api_well_number;
 """)
 conn.commit()
