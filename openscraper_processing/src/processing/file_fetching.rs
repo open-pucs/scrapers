@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug, str::FromStr, time::Duration};
 
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use base64::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -21,11 +21,20 @@ pub struct FileDownloadResult {
 // Add more data for all of these errors including passing along any internal error values.
 #[derive(Debug, Error)]
 pub enum FileDownloadError {
-    BadRequest(()),
-    Unauthorized(()),
-    RateLimited(()),
-    InvalidReturnData(FileValidationError),
-    Unknwon(anyhow::Error),
+    #[error("File download failed with a bad request: {0}")]
+    BadRequest(anyhow::Error),
+    #[error("File download failed with a rate limit response code")]
+    RateLimited,
+    #[error("File download failed with a bad request response code: {0}")]
+    BadResponseCode(u16),
+    #[error("File download returned invalid data: {0}")]
+    InvalidReturnData(#[from] FileValidationError),
+    #[error("File download failed with a network error: {0}")]
+    Network(anyhow::Error),
+    #[error("File download timed out: {0}")]
+    Timeout(anyhow::Error),
+    #[error("File download failed with an unknown error: {0}")]
+    Unknown(#[from] anyhow::Error),
 }
 
 impl FileDownloadError {
@@ -33,10 +42,12 @@ impl FileDownloadError {
         // return true if the error might be solved by retying the request:
         match self {
             Self::BadRequest(_) => false,
-            Self::Unauthorized(_) => false,
-            Self::RateLimited(_) => true,
+            Self::BadResponseCode(_) => false,
+            Self::RateLimited => true,
             Self::InvalidReturnData(_) => true,
-            Self::Unknwon(_) => false,
+            Self::Network(_) => true,
+            Self::Timeout(_) => true,
+            Self::Unknown(_) => false,
         }
     }
 }
@@ -138,42 +149,14 @@ impl<T: AsRef<str> + Debug + ?Sized> InternetFileFetch for T {
     async fn download_file_with_timeout(
         &self,
         timeout: Duration,
-    ) -> anyhow::Result<FileDownloadResult> {
-        let self_str = self.as_ref();
-        info!(self_str, "Downloading file");
-        let client = reqwest::Client::new();
-        let response_result = client.get(self_str).timeout(timeout).send().await;
-
-        let response = match response_result {
-            Ok(res) => res,
-            Err(err) => {
-                tracing::error!(%err,"Encountered network error getting file.");
-                return Err(anyhow::Error::from(err));
-            }
+    ) -> Result<FileDownloadResult, FileDownloadError> {
+        let advanced_data = AdvancedFetchData {
+            url: self.as_ref().to_owned(),
+            headers: None,
+            request_body: None,
+            request_type: RequestMethod::Get,
         };
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_msg = format!("HTTP request failed with status code: {status}");
-            error!(url=self_str, %status, "Download failed");
-            bail!(error_msg);
-        }
-
-        // Extract filename before consuming the response
-        let filename = extract_filename_from_headers(response.headers())
-            .or_else(|| extract_filename_from_url(self_str));
-
-        let bytes = response.bytes().await?.to_vec();
-        info!("Successfully downloaded {} bytes", bytes.len());
-
-        if let Some(ref fname) = filename {
-            info!("Detected filename: {}", fname);
-        }
-
-        Ok(FileDownloadResult {
-            data: bytes,
-            filename,
-        })
+        advanced_data.download_file_with_timeout(timeout).await
     }
 }
 
@@ -190,29 +173,22 @@ pub struct AdvancedFetchData {
     pub request_type: RequestMethod,
     pub request_body: Option<Value>,
     pub headers: Option<HashMap<String, String>>,
-    pub decode_method: InternetDecodeMethod,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
-pub enum InternetDecodeMethod {
-    #[default]
-    None,
-    Base64Regular,
-    Base64UrlSafe,
 }
 
 impl InternetFileFetch for AdvancedFetchData {
     async fn download_file_with_timeout(
         &self,
         timeout: Duration,
-    ) -> anyhow::Result<FileDownloadResult> {
+    ) -> Result<FileDownloadResult, FileDownloadError> {
         let client = reqwest::Client::new();
 
         let mut headers = reqwest::header::HeaderMap::new();
         if let Some(header_hashmap) = &self.headers {
             for (key, value) in header_hashmap {
-                let header_name = reqwest::header::HeaderName::from_str(key)?;
-                let header_value = reqwest::header::HeaderValue::from_str(value)?;
+                let header_name = reqwest::header::HeaderName::from_str(key)
+                    .map_err(|_| FileDownloadError::BadRequest(anyhow!("Bad header name")))?;
+                let header_value = reqwest::header::HeaderValue::from_str(value)
+                    .map_err(|_| FileDownloadError::BadRequest(anyhow!("Bad header value")))?;
                 headers.insert(header_name, header_value);
             }
         }
@@ -222,37 +198,53 @@ impl InternetFileFetch for AdvancedFetchData {
             RequestMethod::Post => client.post(&self.url).json(&self.request_body),
         };
 
-        let response = request_builder
+        let response_result = request_builder
             .headers(headers)
             .timeout(timeout)
             .send()
-            .await?;
+            .await;
 
-        if !response.status().is_success() {
-            return Err(anyhow::anyhow!(
+        let response = match response_result {
+            Ok(res) => res,
+            Err(err) => {
+                tracing::error!(%err,"Encountered network error getting file.");
+                if err.is_timeout() {
+                    return Err(FileDownloadError::Timeout(anyhow::Error::from(err)));
+                }
+                return Err(FileDownloadError::Network(anyhow::Error::from(err)));
+            }
+        };
+
+        let status = response.status();
+        if !status.is_success() {
+            let err = anyhow::anyhow!(
                 "Failed to download file from {}: status code {}",
                 self.url,
                 response.status()
-            ));
+            );
+            return match status.as_u16() {
+                400 => Err(FileDownloadError::BadRequest(err)),
+                429 => Err(FileDownloadError::RateLimited),
+                _ => Err(FileDownloadError::BadResponseCode(status.as_u16())),
+            };
         }
 
         // Extract filename before consuming the response
         let filename = extract_filename_from_headers(response.headers())
             .or_else(|| extract_filename_from_url(&self.url));
 
-        let bytes = response.bytes().await?;
-        let decoded_bytes = match self.decode_method {
-            InternetDecodeMethod::None => bytes.to_vec(),
-            InternetDecodeMethod::Base64Regular => BASE64_STANDARD.decode(&bytes)?,
-            InternetDecodeMethod::Base64UrlSafe => BASE64_URL_SAFE.decode(&bytes)?,
-        };
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|err| FileDownloadError::Unknown(err.into()))?
+            .to_vec();
 
         if let Some(ref fname) = filename {
             info!("Detected filename: {}", fname);
         }
 
         Ok(FileDownloadResult {
-            data: decoded_bytes,
+            data: bytes,
             filename,
         })
     }
