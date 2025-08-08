@@ -1,6 +1,6 @@
 use super::*;
 use crate::s3_stuff::make_s3_client;
-use crate::types::{GenericAttachment, GenericCase, GenericFiling, JurisdictionInfo};
+use crate::types::{GenericAttachment, GenericCaseLegacy, GenericFilingLegacy, JurisdictionInfo};
 use chrono::Utc;
 
 #[tokio::test]
@@ -21,9 +21,9 @@ async fn test_process_case() {
         .init();
     let s3_client = make_s3_client().await;
 
-    let case = GenericCase {
+    let case = GenericCaseLegacy {
         case_number: "TEST-CASE-123".to_string(),
-        filings: vec![GenericFiling {
+        filings: vec![GenericFilingLegacy {
             filed_date: Utc::now(),
             attachments: vec![GenericAttachment {
                 name: "Test Attachment".to_string(),

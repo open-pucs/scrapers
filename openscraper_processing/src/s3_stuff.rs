@@ -10,7 +10,7 @@ use crate::common::hash::Blake2bHash;
 use crate::types::JurisdictionInfo;
 use crate::types::s3_uri::S3Location;
 use crate::types::{
-    GenericCase, RawAttachment,
+    GenericCaseLegacy, RawAttachment,
     env_vars::{
         OPENSCRAPERS_S3_ACCESS_KEY, OPENSCRAPERS_S3_CLOUD_REGION, OPENSCRAPERS_S3_ENDPOINT,
         OPENSCRAPERS_S3_OBJECT_BUCKET, OPENSCRAPERS_S3_SECRET_KEY,
@@ -120,7 +120,7 @@ pub async fn fetch_case_filing_from_s3(
     s3_client: &S3Client,
     case_name: &str,
     jurisdiction: &JurisdictionInfo,
-) -> anyhow::Result<GenericCase> {
+) -> anyhow::Result<GenericCaseLegacy> {
     info!(case_name, jurisdiction_name=%jurisdiction.jurisdiction, "Fetching case filing from S3");
     let key = get_case_s3_key(case_name, jurisdiction);
     let bytes = download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await?;
@@ -201,7 +201,7 @@ pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blak
 
 pub async fn push_case_to_s3_and_db(
     s3_client: &S3Client,
-    case: &mut GenericCase,
+    case: &mut GenericCaseLegacy,
     jurisdiction: &JurisdictionInfo,
 ) -> anyhow::Result<()> {
     info!(case_number = %case.case_number, "Pushing case to S3 and DB");

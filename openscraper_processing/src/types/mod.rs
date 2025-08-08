@@ -39,7 +39,7 @@ impl JurisdictionInfo {
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct CaseWithJurisdiction {
-    pub case: GenericCase,
+    pub case: GenericCaseLegacy,
     pub jurisdiction: JurisdictionInfo,
 }
 
@@ -55,7 +55,7 @@ pub struct GenericAttachment {
 
 #[skip_serializing_none]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Default)]
-pub struct GenericFiling {
+pub struct GenericFilingLegacy {
     pub name: String,
     pub filed_date: DateTime<Utc>,
     pub party_name: String,
@@ -67,7 +67,7 @@ pub struct GenericFiling {
 
 #[skip_serializing_none]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Default)]
-pub struct GenericCase {
+pub struct GenericCaseLegacy {
     pub case_number: String,
     pub case_name: String,
     pub case_url: String,
@@ -78,7 +78,7 @@ pub struct GenericCase {
     pub hearing_officer: Option<String>,
     pub opened_date: Option<DateTime<Utc>>,
     pub closed_date: Option<DateTime<Utc>>,
-    pub filings: Vec<GenericFiling>,
+    pub filings: Vec<GenericFilingLegacy>,
     pub extra_metadata: HashMap<String, serde_json::Value>,
     pub indexed_at: DateTime<Utc>,
 }

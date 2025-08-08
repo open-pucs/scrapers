@@ -317,7 +317,7 @@ def main():
     """
     Main function to run the async PDF scraper.
     """
-    start_index = 1180
+    start_index = 6300
     end_index = 40000
     # These would need to be defined or passed as parameters
     openscrapers_endpoint = (

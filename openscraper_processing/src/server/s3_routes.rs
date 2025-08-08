@@ -13,7 +13,7 @@ use tracing::{error, info, warn};
 use crate::{
     common::hash::Blake2bHash,
     types::{
-        GenericCase, JurisdictionInfo, RawAttachment,
+        GenericCaseLegacy, JurisdictionInfo, RawAttachment,
         env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
         pagination::{PaginationData, make_paginated_subslice},
     },
@@ -129,7 +129,7 @@ pub async fn handle_case_filing_from_s3(
 
 pub fn handle_case_filing_from_s3_docs(op: TransformOperation) -> TransformOperation {
     op.description("Fetch a case filing from S3.")
-        .response::<200, Json<GenericCase>>()
+        .response::<200, Json<GenericCaseLegacy>>()
         .response_with::<500, String, _>(|res| res.description("Error fetching case filing."))
 }
 
