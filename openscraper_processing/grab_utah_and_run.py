@@ -190,7 +190,7 @@ class PDFScraper:
 
     async def save_backup_json(self, index: int, response_data: Dict):
         """Save response JSON to backup directory."""
-        backup_file = self.backup_dir / f"{index:05d}.json"
+        Hbackup_file = self.backup_dir / f"{index:05d}.json"
         with open(backup_file, "w") as f:
             json.dump(response_data, f, indent=2)
 
@@ -317,7 +317,7 @@ def main():
     """
     Main function to run the async PDF scraper.
     """
-    start_index = 6300
+    start_index = 19475
     end_index = 40000
     # These would need to be defined or passed as parameters
     openscrapers_endpoint = (

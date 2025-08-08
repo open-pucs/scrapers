@@ -9,8 +9,6 @@ use tracing::{error, info};
 
 use crate::common::file_extension::FileValidationError;
 
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(20);
-
 #[derive(Debug, Clone)]
 pub struct FileDownloadResult {
     pub data: Vec<u8>,
@@ -51,6 +49,7 @@ impl FileDownloadError {
     }
 }
 
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(40);
 pub trait InternetFileFetch: Debug {
     // New methods that return filename along with data
     async fn download_file_with_timeout(
