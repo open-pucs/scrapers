@@ -30,9 +30,9 @@ pub enum FileDownloadError {
     #[error("File download returned invalid data: {0}")]
     InvalidReturnData(#[from] FileValidationError),
     #[error("File download failed with a network error: {0}")]
-    Network(anyhow::Error),
+    Network(reqwest::Error),
     #[error("File download timed out: {0}")]
-    Timeout(anyhow::Error),
+    Timeout(reqwest::Error),
     #[error("File download failed with an unknown error: {0}")]
     Unknown(#[from] anyhow::Error),
 }
@@ -209,9 +209,9 @@ impl InternetFileFetch for AdvancedFetchData {
             Err(err) => {
                 tracing::error!(%err,"Encountered network error getting file.");
                 if err.is_timeout() {
-                    return Err(FileDownloadError::Timeout(anyhow::Error::from(err)));
+                    return Err(FileDownloadError::Timeout(err));
                 }
-                return Err(FileDownloadError::Network(anyhow::Error::from(err)));
+                return Err(FileDownloadError::Network(err));
             }
         };
 

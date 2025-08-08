@@ -213,10 +213,10 @@ async fn download_file_content_validated_with_retries<T: InternetFileFetch + ?Si
             }
             Err(err) => {
                 tracing::error!(?to_fetch, %err,"Encountered error downloading file");
-                last_error = Some(err);
                 if !err.is_retryable() {
                     return Err(err);
                 };
+                last_error = Some(err);
             }
         };
         sleep(Duration::from_secs(DOWNLOAD_RETRY_DELAY_SECONDS)).await;
