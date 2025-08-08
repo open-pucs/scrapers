@@ -25,6 +25,8 @@ cur.execute("""
 CREATE VIEW wells_with_permit_extras AS
 SELECT
   w.*,
+  COUNT(raw.hash) AS downloaded_file_count,
+  (array_agg(raw.hash))[1] AS first_hash,
   COUNT(p.permit_id) AS permit_file_submission_count,
   MIN(p.date_posted) AS earliest_permit_file_submission_date,
   MAX(p.date_posted) AS latest_permit_file_submission_date,
@@ -32,7 +34,8 @@ SELECT
   MAX(expiry.date_permit_will_expire) AS apd_expiry_date_if_availible
 FROM wells w
 INNER JOIN api_well_number_repository apir ON w.api_well_number = apir.api_well_number
-INNER JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
+INNER JOIN raw_well_attachment_storage raw ON apir.api_well_number = raw.api_number_guess
+LEFT JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
 LEFT JOIN application_for_permit_drilling_granted apd ON apir.api_well_number = apd.api_number
 LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
 GROUP BY w.api_well_number;
@@ -45,6 +48,8 @@ cur.execute("""
 CREATE VIEW wells_with_permit_extras_all_inclusive AS
 SELECT
   w.*,
+  COUNT(raw.hash) AS downloaded_file_count,
+  (array_agg(raw.hash))[1] AS first_hash,
   COUNT(p.permit_id) AS permit_file_submission_count,
   MIN(p.date_posted) AS earliest_permit_file_submission_date,
   MAX(p.date_posted) AS latest_permit_file_submission_date,
@@ -52,6 +57,7 @@ SELECT
   MAX(expiry.date_permit_will_expire) AS apd_expiry_date_if_availible
 FROM wells w
 INNER JOIN api_well_number_repository apir ON w.api_well_number = apir.api_well_number
+LEFT JOIN raw_well_attachment_storage raw ON apir.api_well_number = raw.api_number_guess
 LEFT JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
 LEFT JOIN application_for_permit_drilling_granted apd ON apir.api_well_number = apd.api_number
 LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
@@ -65,6 +71,8 @@ cur.execute("""
 CREATE VIEW historical_wells_with_permit_extras_all_inclusive AS
 SELECT
   w.*,
+  COUNT(raw.hash) AS downloaded_file_count,
+  (array_agg(raw.hash))[1] AS first_hash,
   COUNT(p.permit_id) AS permit_file_submission_count,
   MIN(p.date_posted) AS earliest_permit_file_submission_date,
   MAX(p.date_posted) AS latest_permit_file_submission_date,
@@ -75,7 +83,7 @@ INNER JOIN api_well_number_repository apir ON w.api_well_number = apir.api_well_
 LEFT JOIN permit_file_data p ON apir.api_well_number = p.api_well_number
 LEFT JOIN application_for_permit_drilling_granted apd ON apir.api_well_number = apd.api_number
 LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
+LEFT JOIN raw_well_attachment_storage raw ON apir.api_well_number = raw.api_number_guess
 GROUP BY w.api_well_number;
 """)
 conn.commit()
-
