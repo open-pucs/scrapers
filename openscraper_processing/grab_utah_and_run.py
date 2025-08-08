@@ -190,7 +190,7 @@ class PDFScraper:
 
     async def save_backup_json(self, index: int, response_data: Dict):
         """Save response JSON to backup directory."""
-        Hbackup_file = self.backup_dir / f"{index:05d}.json"
+        backup_file = self.backup_dir / f"{index:05d}.json"
         with open(backup_file, "w") as f:
             json.dump(response_data, f, indent=2)
 
