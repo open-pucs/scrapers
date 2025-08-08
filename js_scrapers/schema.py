@@ -33,12 +33,12 @@ conn.commit()
 # Create tables
 cur.execute("""
     CREATE TABLE IF NOT EXISTS api_well_number_repository (
-        api_well_number TEXT PRIMARY KEY
+        api_well_number TEXT UNIQUE PRIMARY KEY
     );
 """)
 cur.execute("""
     CREATE TABLE IF NOT EXISTS wells (
-        api_well_number TEXT PRIMARY KEY,
+        api_well_number TEXT UNIQUE PRIMARY KEY,
         operator TEXT,
         well_name TEXT,
         well_status TEXT,
@@ -69,7 +69,7 @@ cur.execute("""
 """)
 cur.execute("""
     CREATE TABLE IF NOT EXISTS permit_file_data (
-        permit_id SERIAL PRIMARY KEY,
+        permit_id SERIAL UNIQUE PRIMARY KEY,
         api_well_number TEXT,
         log_category TEXT,
         log_type TEXT,
@@ -88,7 +88,7 @@ cur.execute("""
         county TEXT,
         operator TEXT,
         well_name TEXT,
-        api_number TEXT UNIQUE,
+        api_number TEXT UNIQUE PRIMARY KEY,
         work_type TEXT,
         well_type TEXT,
         current_status TEXT,
@@ -112,7 +112,7 @@ cur.execute("""
 """)
 cur.execute("""
     CREATE TABLE IF NOT EXISTS historical_well_metadata (
-        api_well_number TEXT UNIQUE,
+        api_well_number TEXT UNIQUE PRIMARY KEY,
         event_work_type TEXT,
         apd_approval DATE,
         spud_date_dry DATE,
@@ -148,7 +148,7 @@ cur.execute("""
 cur.execute("""
     CREATE TABLE IF NOT EXISTS apd_permit_expiry (
         operator TEXT,
-        api_number TEXT UNIQUE,
+        api_number TEXT UNIQUE PRIMARY KEY,
         well_name TEXT,
         work_type TEXT,
         date_approved DATE,

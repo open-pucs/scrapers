@@ -78,3 +78,4 @@ LEFT JOIN apd_permit_expiry expiry ON apir.api_well_number = expiry.api_number
 GROUP BY w.api_well_number;
 """)
 conn.commit()
+
