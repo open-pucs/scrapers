@@ -1,13 +1,10 @@
 use aide::{axum::IntoApiResponse, transform::TransformOperation};
 use axum::{Json, response::IntoResponse};
 
-use crate::{
-    processing::attachments::{
+use crate::processing::attachments::{
         DirectAttachmentProcessInfo, DirectAttachmentReturnInfo,
         process_attachment_with_direct_request,
-    },
-    types::RawAttachment,
-};
+    };
 
 pub async fn handle_directly_process_file_request(
     Json(direct_info): Json<DirectAttachmentProcessInfo>,

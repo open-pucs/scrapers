@@ -1,7 +1,6 @@
 use std::{collections::HashMap, fmt::Debug, str::FromStr, time::Duration};
 
-use anyhow::{anyhow, bail};
-use base64::prelude::*;
+use anyhow::anyhow;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

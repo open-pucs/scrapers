@@ -10,7 +10,7 @@ use crate::types::env_vars::CRIMSON_URL;
 use crate::types::{
     AttachmentTextQuality, GenericAttachment, JurisdictionInfo, RawAttachment, RawAttachmentText,
 };
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use aws_sdk_s3::Client as S3Client;
 use chrono::Utc;
 use schemars::JsonSchema;

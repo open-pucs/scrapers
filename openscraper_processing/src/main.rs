@@ -1,12 +1,11 @@
 #![allow(dead_code)]
-use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use common::{
     api_documentation::generate_api_docs_and_serve,
     misc::internet_check::do_i_have_internet,
     otel_tracing::initialize_tracing_and_wrap_router,
     task_workers::{define_generic_task_routes, spawn_worker_loop},
 };
-use tracing::{Instrument, info};
+use tracing::info;
 
 use crate::server::define_routes;
 
