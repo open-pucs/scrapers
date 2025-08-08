@@ -1,21 +1,20 @@
 use std::path::Path;
-use std::time::Duration;
 
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::config::Credentials;
 use chrono::offset;
 use tracing::{debug, error, info};
 
+use crate::common::hash::Blake2bHash;
 use crate::types::JurisdictionInfo;
 use crate::types::s3_uri::S3Location;
 use crate::types::{
-    GenericCase, RawAttachment,
+    GenericCaseLegacy, RawAttachment,
     env_vars::{
         OPENSCRAPERS_S3_ACCESS_KEY, OPENSCRAPERS_S3_CLOUD_REGION, OPENSCRAPERS_S3_ENDPOINT,
         OPENSCRAPERS_S3_OBJECT_BUCKET, OPENSCRAPERS_S3_SECRET_KEY,
     },
-    hash::Blake2bHash,
 };
 use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
 
@@ -117,36 +116,11 @@ pub async fn upload_s3_bytes(
     Ok(())
 }
 
-pub async fn download_file(url: &str, timeout: Duration) -> anyhow::Result<Vec<u8>> {
-    info!(url, "Downloading file");
-    let client = reqwest::Client::new();
-    let response_result = client.get(url).timeout(timeout).send().await;
-
-    let response = match response_result {
-        Ok(res) => res,
-        Err(err) => {
-            tracing::error!(%err,"Encountered network error getting file.");
-            return Err(anyhow::Error::from(err));
-        }
-    };
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let error_msg = format!("HTTP request failed with status code: {status}");
-        error!(url, %status, "Download failed");
-        bail!(error_msg);
-    }
-
-    let bytes = response.bytes().await?.to_vec();
-    info!("Successfully downloaded {} bytes", bytes.len());
-    Ok(bytes)
-}
-
 pub async fn fetch_case_filing_from_s3(
     s3_client: &S3Client,
     case_name: &str,
     jurisdiction: &JurisdictionInfo,
-) -> anyhow::Result<GenericCase> {
+) -> anyhow::Result<GenericCaseLegacy> {
     info!(case_name, jurisdiction_name=%jurisdiction.jurisdiction, "Fetching case filing from S3");
     let key = get_case_s3_key(case_name, jurisdiction);
     let bytes = download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await?;
@@ -227,7 +201,7 @@ pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blak
 
 pub async fn push_case_to_s3_and_db(
     s3_client: &S3Client,
-    case: &mut GenericCase,
+    case: &mut GenericCaseLegacy,
     jurisdiction: &JurisdictionInfo,
 ) -> anyhow::Result<()> {
     info!(case_number = %case.case_number, "Pushing case to S3 and DB");

@@ -1,39 +1,3 @@
-x-airflow-common: &airflow-common
-  build:
-    context: .
-    dockerfile: Dockerfile.airflow-standalone
-
-  environment: &airflow-common-env
-    AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD}
-    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
-    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
-    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
-    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
-    AIRFLOW__CORE__MAX_MAP_LENGTH: 1048576 # 2^20 instead of 2^10
-
-    OPENSCRAPERS_SQL_DB_CONNECTION: postgresql+asyncpg://postgres:${OPENSCRAPERS_SQL_PASSWORD}@openscrapers-postgres:5432/public
-    OPENSCRAPERS_S3_OBJECT_BUCKET: ${OPENSCRAPERS_S3_OBJECT_BUCKET}
-    OPENSCRAPERS_S3_ACCESS_KEY: ${OPENSCRAPERS_S3_ACCESS_KEY}
-    OPENSCRAPERS_S3_SECRET_KEY: ${OPENSCRAPERS_S3_SECRET_KEY}
-    OPENSCRAPERS_REDIS_DOMAIN: "redis"
-    DEEPINFRA_API_KEY: ${DEEPINFRA_API_KEY}
-    CRIMSON_URL: ${CRIMSON_URL}
-    OPENSCRAPERS_INTERNAL_API_URL: "http://openscrapers-api:8000"
-  volumes:
-    - ./airflow_dags:/opt/airflow/dags
-    - ./openpuc_scrapers:/app/openpuc_scrapers
-    # - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
-    # - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
-    # - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
-  # user: "${AIRFLOW_UID:-50000}:0"
-  user: "50000:0"
-  depends_on: &airflow-common-depends-on
-    redis:
-      condition: service_healthy
-    airflow-postgres:
-      condition: service_healthy
-
 x-openscraper-env-variables:
   &openscraper-env-variables # - OPENSCRAPERS_SQL_DB_CONNECTION: postgresql://postgres:dolphins@openscrapers-postgres:5432/postgres
 
@@ -46,59 +10,52 @@ x-openscraper-env-variables:
   DEEPINFRA_API_KEY: "${DEEPINFRA_API_KEY}"
 
 services:
+  gluetun:
+    image: qmcgaw/gluetun
+    # container_name: gluetun
+    # line above must be uncommented to allow external containers to connect.
+    # See https://github.com/qdm12/gluetun-wiki/blob/main/setup/connect-a-container-to-gluetun.md#external-container-to-gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - 8888:8888/tcp # HTTP proxy
+      - 8388:8388/tcp # Shadowsocks
+      - 8388:8388/udp # Shadowsocks
+      # - "35859:35859"
+      #
+      - 33399:33399/tcp
+    volumes:
+      - ./wireguard-configs:/gluetun/wireguard
+      - ./gluetun/busybox:/usr/local/bin/busybox
+      - ./wireguard-configs/us-chi-wg-303.conf:/gluetun/wireguard/wg0.conf
+    environment:
+      # See https://github.com/qdm12/gluetun-wiki/tree/main/setup#setup
+      - VPN_SERVICE_PROVIDER=custom
+      - VPN_TYPE=wireguard
+      - VPN_ENDPOINT_PORT=58277
+      # Timezone for accurate log times
+      - TZ=
+
+      # Server list updater
+      # See https://github.com/qdm12/gluetun-wiki/blob/main/setup/servers.md#update-the-vpn-servers-list
+      - UPDATER_PERIOD=
+    healthcheck:
+      test: ["CMD-SHELL", "/gluetun-entrypoint healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 2
   openscrapers-api:
-    networks:
-      - default
+    network_mode: service:gluetun
+    # ports:
     build:
       context: ./openscraper_processing/
       dockerfile: Dockerfile
     volumes:
       - ./openpuc_scrapers:/app/openpuc_scrapers
-    expose:
-      - 8000
-    ports:
-      - 8002:8000
     environment:
       <<: *openscraper-env-variables
-  # # Airflow Services
-  airflow-postgres:
-    # image: postgres:13
-    # Original image used postgres 13, if anything appears wrong, I think its a good idea to revert to the old image
-    image: postgres:17.4-alpine
-    environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
-    volumes:
-      - ./volumes/airflow-postgres:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
-      interval: 10s
-      retries: 5
-      start_period: 5s
-    restart: always
-
-  redis:
-    image: valkey/valkey:alpine
-    expose:
-      - 6379
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 30s
-      retries: 50
-      start_period: 30s
-    restart: always
-
-  airflow-standalone:
-    <<: *airflow-common
-    ports:
-      - "3030:8081"
-    expose:
-      - 8081
-    networks:
-      - default
-
-networks:
-  default:
-    driver: bridge
+    depends_on:
+      gluetun:
+        condition: service_healthy
