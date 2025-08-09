@@ -28,22 +28,28 @@ impl<T> IsEmpty for Vec<T> {
         self.is_empty()
     }
 }
-fn map_empty<T: IsEmpty>(val: &T) -> Option<&T> {
-    match val.is_empty() {
-        true => None,
-        false => Some(val),
-    }
-}
-fn map_empty_mut<T: IsEmpty>(val: &mut T) -> Option<&mut T> {
+pub fn map_empty<T: IsEmpty + ?Sized>(val: &T) -> Option<&T> {
     match val.is_empty() {
         true => None,
         false => Some(val),
     }
 }
 
-fn into_map_empty<T: IsEmpty>(val: T) -> Option<T> {
-    match val.is_empty() {
-        true => None,
-        false => Some(val),
+pub fn fmap_empty<T: IsEmpty + ?Sized>(val: Option<&T>) -> Option<&T> {
+    match val {
+        None => None,
+        Some(val) => match val.is_empty() {
+            true => None,
+            false => Some(val),
+        },
+    }
+}
+pub fn into_fmap_empty<T: IsEmpty>(val: Option<T>) -> Option<T> {
+    match val {
+        None => None,
+        Some(val) => match val.is_empty() {
+            true => None,
+            false => Some(val),
+        },
     }
 }

@@ -6,7 +6,7 @@ use aide::{
     axum::{ApiRouter, IntoApiResponse},
     openapi::{Info, OpenApi},
 };
-use axum::{response::IntoResponse, serve::Listener};
+use axum::response::IntoResponse;
 
 use std::{convert::Infallible, sync::OnceLock};
 
