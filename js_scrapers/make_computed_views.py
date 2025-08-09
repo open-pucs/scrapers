@@ -25,7 +25,6 @@ cur.execute("""
 CREATE VIEW wells_with_permit_extras AS
 SELECT
   w.*,
-  COUNT(raw.hash) AS downloaded_file_count,
   (array_agg(raw.hash))[1] AS first_hash,
   COUNT(p.permit_id) AS permit_file_submission_count,
   MIN(p.date_posted) AS earliest_permit_file_submission_date,
@@ -48,7 +47,6 @@ cur.execute("""
 CREATE VIEW wells_with_permit_extras_all_inclusive AS
 SELECT
   w.*,
-  COUNT(raw.hash) AS downloaded_file_count,
   (array_agg(raw.hash))[1] AS first_hash,
   COUNT(p.permit_id) AS permit_file_submission_count,
   MIN(p.date_posted) AS earliest_permit_file_submission_date,
@@ -71,7 +69,6 @@ cur.execute("""
 CREATE VIEW historical_wells_with_permit_extras_all_inclusive AS
 SELECT
   w.*,
-  COUNT(raw.hash) AS downloaded_file_count,
   (array_agg(raw.hash))[1] AS first_hash,
   COUNT(p.permit_id) AS permit_file_submission_count,
   MIN(p.date_posted) AS earliest_permit_file_submission_date,
