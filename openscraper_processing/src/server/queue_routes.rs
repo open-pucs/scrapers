@@ -3,7 +3,7 @@ use axum::response::{IntoResponse, Json};
 use tracing::info;
 
 use crate::{
-    common::task_workers::{TaskStatusDisplay, add_task_to_queue},
+    common::tasks::{TaskStatusDisplay, workers::add_task_to_queue},
     types::CaseWithJurisdiction,
 };
 

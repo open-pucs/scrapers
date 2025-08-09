@@ -1,4 +1,4 @@
-use crate::common::task_workers::ExecuteUserTask;
+use crate::common::tasks::ExecuteUserTask;
 use crate::processing::process_case;
 use crate::s3_stuff::make_s3_client;
 use crate::types::CaseWithJurisdiction;
@@ -15,6 +15,12 @@ impl ExecuteUserTask for CaseWithJurisdiction {
         }
     }
     fn get_task_label(&self) -> &'static str {
+        "ingest_case_with_jurisdiction"
+    }
+    fn get_task_label_static() -> &'static str
+    where
+        Self: Sized,
+    {
         "ingest_case_with_jurisdiction"
     }
 }

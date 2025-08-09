@@ -3,7 +3,7 @@ use common::{
     api_documentation::generate_api_docs_and_serve,
     misc::internet_check::do_i_have_internet,
     otel_tracing::initialize_tracing_and_wrap_router,
-    task_workers::{define_generic_task_routes, spawn_worker_loop},
+    tasks::{routing::define_generic_task_routes, workers::spawn_worker_loop},
 };
 use tracing::info;
 

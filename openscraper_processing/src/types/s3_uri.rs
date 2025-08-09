@@ -4,9 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::env_vars::{
-    OPENSCRAPERS_S3_CLOUD_REGION, OPENSCRAPERS_S3_ENDPOINT, OPENSCRAPERS_S3_OBJECT_BUCKET,
-};
+use super::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET};
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct S3Location {
@@ -21,8 +19,8 @@ impl S3Location {
         S3Location {
             key: key.to_owned(),
             bucket: (*OPENSCRAPERS_S3_OBJECT_BUCKET).clone(),
-            endpoint: (*OPENSCRAPERS_S3_ENDPOINT).clone(),
-            region: (*OPENSCRAPERS_S3_CLOUD_REGION).clone(),
+            endpoint: OPENSCRAPERS_S3.endpoint.clone(),
+            region: OPENSCRAPERS_S3.cloud_region.clone(),
         }
     }
 }

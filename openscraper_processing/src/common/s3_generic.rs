@@ -5,10 +5,10 @@ use aws_sdk_s3::{Client, config::Credentials};
 use tracing::info;
 
 pub struct S3Credentials {
-    cloud_region: String,
-    endpoint: String,
-    access_key: String,
-    secret_key: String,
+    pub cloud_region: String,
+    pub endpoint: String,
+    pub access_key: String,
+    pub secret_key: String,
 }
 
 impl S3Credentials {
@@ -65,6 +65,6 @@ fn init_from_env_vars<T: S3EnvNames>() -> S3Credentials {
         secret_key,
     }
 }
-pub const fn s3_locked<T: S3EnvNames>() -> LazyLock<S3Credentials> {
+pub const fn make_s3_lazylock<T: S3EnvNames>() -> LazyLock<S3Credentials> {
     LazyLock::new(init_from_env_vars::<T>)
 }

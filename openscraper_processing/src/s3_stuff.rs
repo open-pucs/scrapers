@@ -1,21 +1,14 @@
 use std::path::Path;
 
 use anyhow::anyhow;
-use aws_config::{BehaviorVersion, Region};
-use aws_sdk_s3::config::Credentials;
 use chrono::offset;
 use tracing::{debug, error, info};
 
 use crate::common::hash::Blake2bHash;
 use crate::types::JurisdictionInfo;
+use crate::types::env_vars::OPENSCRAPERS_S3;
 use crate::types::s3_uri::S3Location;
-use crate::types::{
-    GenericCaseLegacy, RawAttachment,
-    env_vars::{
-        OPENSCRAPERS_S3_ACCESS_KEY, OPENSCRAPERS_S3_CLOUD_REGION, OPENSCRAPERS_S3_ENDPOINT,
-        OPENSCRAPERS_S3_OBJECT_BUCKET, OPENSCRAPERS_S3_SECRET_KEY,
-    },
-};
+use crate::types::{GenericCaseLegacy, RawAttachment, env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET};
 use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
 
 pub fn get_raw_attach_obj_key(hash: Blake2bHash) -> String {
@@ -37,23 +30,7 @@ pub fn generate_s3_object_uri_from_key(key: &str) -> String {
 }
 pub async fn make_s3_client() -> S3Client {
     info!("Creating S3 client");
-    let region = Region::new(&**OPENSCRAPERS_S3_CLOUD_REGION);
-    let creds = Credentials::new(
-        &**OPENSCRAPERS_S3_ACCESS_KEY,
-        &**OPENSCRAPERS_S3_SECRET_KEY,
-        None, // no session token
-        None, // no expiration
-        "manual",
-    );
-
-    // Start from the env-loader so we still pick up other settings (timeouts, retry, etc)
-    let cfg_loader = aws_config::defaults(BehaviorVersion::latest())
-        .region(region)
-        .credentials_provider(creds)
-        .endpoint_url(&**OPENSCRAPERS_S3_ENDPOINT);
-
-    let sdk_config = cfg_loader.load().await;
-    S3Client::new(&sdk_config)
+    OPENSCRAPERS_S3.make_s3_client().await
 }
 
 // Core function to download bytes from S3
