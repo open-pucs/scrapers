@@ -7,7 +7,10 @@ use common::{
 };
 use tracing::info;
 
-use crate::server::define_routes;
+use crate::{
+    server::define_routes,
+    types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET},
+};
 
 use axum::extract::DefaultBodyLimit;
 
@@ -38,6 +41,8 @@ static PORT: LazyLock<u16> = LazyLock::new(|| {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let _ = *OPENSCRAPERS_S3;
+    let _ = *OPENSCRAPERS_S3_OBJECT_BUCKET;
     if let Err(e) = do_i_have_internet() {
         tracing::error!(err = %e,"NO INTERNET DETECTED");
         panic!("NO INTERNET DETECTED");

@@ -16,12 +16,12 @@ impl S3EnvNames for S3Envs {
 
 pub static OPENSCRAPERS_S3: LazyLock<S3Credentials> = make_s3_lazylock::<S3Envs>();
 
-pub static OPENSCRAPERS_REDIS_DOMAIN: LazyLock<String> = LazyLock::new(|| {
-    env::var("OPENSCRAPERS_REDIS_DOMAIN").unwrap_or_else(|_| "localhost:6379".to_string())
-});
-
-pub static OPENSCRAPERS_REDIS_STRING: LazyLock<String> =
-    LazyLock::new(|| format!("redis://{}", *OPENSCRAPERS_REDIS_DOMAIN));
+// pub static OPENSCRAPERS_REDIS_DOMAIN: LazyLock<String> = LazyLock::new(|| {
+//     env::var("OPENSCRAPERS_REDIS_DOMAIN").unwrap_or_else(|_| "localhost:6379".to_string())
+// });
+//
+// pub static OPENSCRAPERS_REDIS_STRING: LazyLock<String> =
+//     LazyLock::new(|| format!("redis://{}", *OPENSCRAPERS_REDIS_DOMAIN));
 
 pub static CRIMSON_URL: LazyLock<String> = LazyLock::new(|| {
     env::var("CRIMSON_URL").unwrap_or_else(|_| "http://localhost:14423".to_string())
