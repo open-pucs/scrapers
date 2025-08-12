@@ -2,6 +2,7 @@ use std::path::Path;
 
 use anyhow::anyhow;
 use chrono::offset;
+use futures_util::join;
 use tracing::{debug, error, info};
 
 use crate::common::hash::Blake2bHash;
@@ -134,6 +135,25 @@ pub async fn fetch_attachment_file_from_s3(
     info!(%hash, "Fetching attachment file from S3");
     let key = get_raw_attach_file_key(hash);
     download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await
+}
+
+pub async fn fetch_attachment_file_from_s3_with_filename(
+    s3_client: &S3Client,
+    hash: Blake2bHash,
+) -> anyhow::Result<(String, Vec<u8>)> {
+    info!(%hash, "Fetching attachment file from S3");
+    let key = get_raw_attach_file_key(hash);
+    let bytes_future = download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key);
+    let metadata_future = fetch_attachment_data_from_s3(s3_client, hash);
+    let (Ok(bytes), metadata) = join!(bytes_future, metadata_future) else {
+        return Err(anyhow!("fetching bytes failed."));
+    };
+
+    let filename = metadata
+        .ok()
+        .map(|v| v.name + "." + &v.extension.to_string())
+        .unwrap_or_else(|| "unknown_filename.pdf".to_string());
+    Ok((filename, bytes))
 }
 pub fn get_case_s3_key(case_name: &str, jurisdiction: &JurisdictionInfo) -> String {
     let country = &*jurisdiction.country;

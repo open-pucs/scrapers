@@ -1,9 +1,10 @@
 use aide::{self, axum::IntoApiResponse, transform::TransformOperation};
 use axum::{
     extract::{Path, Query},
+    http::HeaderValue,
     response::{IntoResponse, Json},
 };
-use hyper::body::Bytes;
+use hyper::{StatusCode, body::Bytes, header};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -231,10 +232,45 @@ pub async fn handle_attachment_file_from_s3(
             return (axum::http::StatusCode::BAD_REQUEST, e.to_string()).into_response();
         }
     };
-    let result = crate::s3_stuff::fetch_attachment_file_from_s3(&s3_client, hash).await;
-
+    let result =
+        crate::s3_stuff::fetch_attachment_file_from_s3_with_filename(&s3_client, hash).await;
     match result {
-        Ok(contents) => (axum::http::StatusCode::OK, Bytes::from(contents)).into_response(),
+        Ok((filename, contents)) => {
+            // Content‑Type – generic binary stream
+            let ct = HeaderValue::from_static("application/octet-stream");
+
+            // Content‑Disposition – attachment; filename="<sanitized>"
+            let escaped_name = urlencoding::encode(&filename);
+            let cd = format!(
+                "attachment; filename=\"{}\"; filename*=UTF-8''{}",
+                // Legacy (ASCII‑only) fallback – we keep the original name but
+                // escape any double‑quotes or backslashes.
+                filename.replace('\\', "\\\\").replace('\"', "\\\""),
+                escaped_name
+            );
+            let cd = HeaderValue::from_str(&cd).expect("valid header value");
+
+            // Optional: Content‑Length – helps the client know the exact size
+            let cl = HeaderValue::from_str(&contents.len().to_string())
+                .expect("content length is a valid integer");
+
+            // ---------------------------------------------------------------
+            //   3b️⃣ Return the tuple that Axum knows how to turn into a response
+            // ---------------------------------------------------------------
+            (
+                StatusCode::OK,
+                // An array of header‑name / header‑value pairs.
+                // You can add more if you need (Cache‑Control, ETag, …)
+                [
+                    (header::CONTENT_TYPE, ct),
+                    (header::CONTENT_DISPOSITION, cd),
+                    (header::CONTENT_LENGTH, cl),
+                ],
+                // The body – we turn the Vec<u8> (or whatever `contents` is) into Bytes.
+                Bytes::from(contents),
+            )
+                .into_response()
+        }
         Err(e) => {
             error!(hash = %blake2b_hash,error = %e, "Error reading attachment file from disk");
             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()

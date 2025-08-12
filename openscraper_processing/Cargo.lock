@@ -2073,6 +2073,7 @@ dependencies = [
  "serde_with",
  "thiserror",
  "tokio",
+ "tower-http",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",

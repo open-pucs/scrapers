@@ -11,8 +11,8 @@ use crate::{
     server::define_routes,
     types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET},
 };
-
 use axum::extract::DefaultBodyLimit;
+use tower_http::cors::{Any, CorsLayer};
 
 use std::{
     net::{Ipv4Addr, SocketAddr},
@@ -51,7 +51,12 @@ async fn main() -> anyhow::Result<()> {
     let make_api = || {
         let routes = define_routes();
         let app = define_generic_task_routes(routes);
-        app.layer(DefaultBodyLimit::disable())
+        app.layer(DefaultBodyLimit::disable()).layer(
+            CorsLayer::new()
+                .allow_origin(Any) // Allow requests from any origin
+                .allow_methods(Any) // Allow any HTTP method (GET, POST, PUT, DELETE, etc.)
+                .allow_headers(Any), // Allow any request headers
+        )
     };
     let app = initialize_tracing_and_wrap_router(make_api)?;
 
