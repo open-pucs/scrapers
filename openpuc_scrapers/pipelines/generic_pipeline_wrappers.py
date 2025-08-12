@@ -3,12 +3,10 @@ import traceback
 import time
 import random
 from typing import Any, List, Optional, Tuple
-import redis
 import json
 
 from openpuc_scrapers.models.constants import (
     OPENSCRAPERS_INTERNAL_API_URL,
-    OPENSCRAPERS_REDIS_DOMAIN,
 )
 from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.case import GenericCase
