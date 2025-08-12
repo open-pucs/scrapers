@@ -22,7 +22,7 @@ pub fn prettyprint_duration(dur: Duration) -> String {
 
 pub fn is_env_var_true(var_name: &str) -> bool {
     let Ok(var) = std::env::var(var_name) else {
-        false
+        return false;
     };
     if var == "0" {
         return false;

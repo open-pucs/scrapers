@@ -59,7 +59,7 @@ pub fn define_routes() -> ApiRouter {
             ),
         );
 
-    if !PUBLIC_SAFE_MODE {
+    if !*PUBLIC_SAFE_MODE {
         app = app
             .api_route(
                 "/admin/cases/submit",
