@@ -2,7 +2,7 @@ use aide::{
     self,
     axum::{
         ApiRouter,
-        routing::{get_with, post_with},
+        routing::{get, get_with, post_with},
     },
 };
 use direct_file_fetch::{
@@ -19,10 +19,16 @@ pub mod s3_routes;
 
 static PUBLIC_SAFE_MODE: LazyLock<bool> = LazyLock::new(|| is_env_var_true("PUBLIC_SAFE_MODE"));
 
+async fn return_healthy() -> &'static str {
+    "service is healthy"
+}
+
 pub fn define_routes() -> ApiRouter {
     println!("Defining API Routes but without tracing.");
     info!("Defining API Routes");
     let mut app = ApiRouter::new()
+        .api_route("/", get(return_healthy))
+        .api_route("/health", get(return_healthy))
         .api_route(
             "/public/cases/{state}/{jurisdiction_name}/{case_name}",
             get_with(

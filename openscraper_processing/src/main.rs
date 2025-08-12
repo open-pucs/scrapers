@@ -11,7 +11,10 @@ use crate::server::define_routes;
 
 use axum::extract::DefaultBodyLimit;
 
-use std::net::{Ipv4Addr, SocketAddr};
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    sync::LazyLock,
+};
 
 mod case_worker;
 mod common;
@@ -24,6 +27,14 @@ mod types;
 // Note that this clones the document on each request.
 // To be more efficient, we could wrap it into an Arc,
 // or even store it as a serialized string.
+
+const DEFAULT_PORT: u16 = 33399;
+static PORT: LazyLock<u16> = LazyLock::new(|| {
+    std::env::var("PORT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_PORT)
+});
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -47,8 +58,7 @@ async fn main() -> anyhow::Result<()> {
     spawn_worker_loop();
 
     // bind and serve
-    let port = 33399;
-    let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port);
+    let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *PORT);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     let app_description = "A component of the openscrapers library designed to efficently and cheaply process goverment docs at scale.";
     let Err(serve_error) = generate_api_docs_and_serve(listener, app, app_description).await;
