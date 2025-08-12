@@ -59,6 +59,7 @@ async fn main() -> anyhow::Result<()> {
 
     // bind and serve
     let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *PORT);
+    info!(?addr, "Starting application on adress");
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     let app_description = "A component of the openscrapers library designed to efficently and cheaply process goverment docs at scale.";
     let Err(serve_error) = generate_api_docs_and_serve(listener, app, app_description).await;
