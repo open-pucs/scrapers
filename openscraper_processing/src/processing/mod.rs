@@ -74,12 +74,12 @@ pub async fn process_case(
             attachment_tasks.push(tmp_closure(attachment));
         }
     }
-    tracing::info!(case_num=%case.case_number,"Created all attachment processing futures.");
+    tracing::info!(case_num=%case.case_govid,"Created all attachment processing futures.");
     join_all(attachment_tasks).await;
 
     let jur_info =&jurisdiction_case.jurisdiction;
     tracing::info!(
-        case_num=%case.case_number,
+        case_num=%case.case_govid,
         state=%jur_info.state,
         jurisdiction=%jur_info.jurisdiction,
         "Finished all attachments, pushing case to db."
@@ -92,7 +92,7 @@ pub async fn process_case(
     .await;
     if let Err(err) = s3_result {
         tracing::error!(
-            case_num=%case.case_number, 
+            case_num=%case.case_govid, 
             %err, 
             state=%jur_info.state,
             jurisdiction=%jur_info.jurisdiction,
@@ -101,7 +101,7 @@ pub async fn process_case(
     }
 
     tracing::info!(
-        case_num=%case.case_number,
+        case_num=%case.case_govid,
 
         state=%jur_info.state,
         jurisdiction=%jur_info.jurisdiction,

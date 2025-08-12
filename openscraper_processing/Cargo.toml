@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+non-empty-string = {git = "https://github.com/mycorrhiza-inc/non-empty-string.git", branch="add-schemars-support", features = ["serde", "schemars", "macros"]}
+
 reqwest = { version = "0.12.5", features = ["json"] }
 blake2 = "0.10.6"
 base64 = "0.22.1"

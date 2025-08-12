@@ -50,13 +50,14 @@ async fn main() -> anyhow::Result<()> {
     // initialise our subscriber
     let make_api = || {
         let routes = define_routes();
-        let app = define_generic_task_routes(routes);
-        app.layer(DefaultBodyLimit::disable()).layer(
-            CorsLayer::new()
-                .allow_origin(Any) // Allow requests from any origin
-                .allow_methods(Any) // Allow any HTTP method (GET, POST, PUT, DELETE, etc.)
-                .allow_headers(Any), // Allow any request headers
-        )
+        define_generic_task_routes(routes)
+            .layer(DefaultBodyLimit::disable())
+            .layer(
+                CorsLayer::new()
+                    .allow_origin(Any)
+                    .allow_methods(Any)
+                    .allow_headers(Any),
+            )
     };
     let app = initialize_tracing_and_wrap_router(make_api)?;
 
