@@ -62,7 +62,7 @@ async fn test_process_case() {
 
     // First filing – contains one attachment and some authors.
     let filing_1 = GenericFiling {
-        name: non_empty_string!("Initial Complaint"),
+        name: non_empty_string!("Initial Complaint").into(),
         filed_date: filing_date_1,
         attachments: vec![attachment_1],
         description: "The plaintiff filed the initial complaint.".to_string(),
@@ -74,7 +74,7 @@ async fn test_process_case() {
 
     // Second filing – different date, different attachment.
     let filing_2 = GenericFiling {
-        name: non_empty_string!("Supplemental Exhibit"),
+        name: non_empty_string!("Supplemental Exhibit").into(),
         filed_date: filing_date_2,
         attachments: vec![attachment_2],
         description: "An additional exhibit submitted by the defence.".to_string(),

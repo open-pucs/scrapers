@@ -11,6 +11,10 @@ pub mod env_vars;
 pub mod pagination;
 pub mod s3_uri;
 
+trait Revalidate {
+    fn revalidate(&mut self);
+}
+
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct JurisdictionInfo {
     pub country: String,
@@ -112,10 +116,10 @@ pub struct GenericCase {
     #[serde(default = "Utc::now")]
     pub indexed_at: DateTime<Utc>,
 }
-impl GenericCase {
-    fn set_opened_date(mut self) -> Self {
+impl Revalidate for GenericCase {
+    fn revalidate(&mut self) {
         if self.opened_date.is_some() {
-            return self;
+            return;
         }
         let mut opened_date = NaiveDate::MAX;
         for filling in &self.filings {
@@ -124,7 +128,20 @@ impl GenericCase {
             }
         }
         self.opened_date = Some(opened_date);
-        return self;
+        for filling in &mut self.filings {
+            filling.revalidate();
+        }
+    }
+}
+
+impl Revalidate for GenericFiling {
+    fn revalidate(&mut self) {
+        if !self.name.is_empty() {
+            return;
+        }
+        if let Some(attach) = self.attachments.first() {
+            self.name = attach.name.clone().into();
+        }
     }
 }
 
