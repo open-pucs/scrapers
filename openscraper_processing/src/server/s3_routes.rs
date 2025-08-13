@@ -13,6 +13,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     common::hash::Blake2bHash,
+    s3_stuff::{delete_all_with_prefix, delete_s3_file, get_case_s3_key, get_jurisdiction_prefix},
     types::{
         GenericCaseLegacy, JurisdictionInfo, RawAttachment,
         env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
@@ -123,6 +124,54 @@ pub async fn handle_case_filing_from_s3(
         }
         Err(e) => {
             error!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, error = %e, "Error fetching case filing");
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
+    }
+}
+
+pub async fn delete_case_filing_from_s3(
+    Path(CasePath {
+        state,
+        jurisdiction_name,
+        case_name,
+    }): Path<CasePath>,
+) -> impl IntoApiResponse {
+    info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Request received to delete case filing");
+    let s3_client = crate::s3_stuff::make_s3_client().await;
+    let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
+    let case_key = get_case_s3_key(&case_name, &jurisdiction_info);
+    let result = delete_s3_file(&s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &case_key).await;
+    match result {
+        Ok(_) => {
+            info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Successfully deleted case filing");
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Err(e) => {
+            error!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, error = %e, "Error deleting case filing");
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
+    }
+}
+
+pub async fn recursive_delete_all_jurisdiction_data(
+    Path(JurisdictionPath {
+        state,
+        jurisdiction_name,
+    }): Path<JurisdictionPath>,
+) -> impl IntoApiResponse {
+    info!(state = %state, jurisdiction = %jurisdiction_name, "Deleting all data for jurisdiction");
+    let s3_client = crate::s3_stuff::make_s3_client().await;
+    let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
+    let prefix = get_jurisdiction_prefix(&jurisdiction_info);
+    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
+    let result = delete_all_with_prefix(&s3_client, bucket, &prefix).await;
+    match result {
+        Ok(_) => {
+            info!(state = %state, jurisdiction = %jurisdiction_name, "Successfully deleted all jurisdiction data");
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Err(e) => {
+            error!(state = %state, jurisdiction = %jurisdiction_name, error = %e, "Error deleting all jurisdiction data");
             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
         }
     }
@@ -273,7 +322,7 @@ pub async fn handle_attachment_file_from_s3(
         }
         Err(e) => {
             error!(hash = %blake2b_hash,error = %e, "Error reading attachment file from disk");
-            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+            (axum::http::StatusCode::NOT_FOUND, e.to_string()).into_response()
         }
     }
 }

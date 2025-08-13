@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::anyhow;
 use chrono::offset;
 use futures_util::join;
-use non_empty_string::{NonEmptyString, non_empty_string};
+use non_empty_string::non_empty_string;
 use tracing::{debug, error, info};
 
 use crate::common::hash::Blake2bHash;
@@ -95,6 +95,51 @@ pub async fn upload_s3_bytes(
     Ok(())
 }
 
+pub async fn delete_s3_file(s3_client: &S3Client, bucket: &str, key: &str) -> anyhow::Result<()> {
+    debug!( %bucket, %key,"Deleting file from S3");
+    s3_client
+        .delete_object()
+        .bucket(bucket)
+        .key(key)
+        .send()
+        .await
+        .map_err(|err| {
+            error!(%err,%bucket, %key,"Failed to delete s3 file");
+            anyhow!(err)
+        })?;
+    debug!( %bucket, %key,"Successfully uploaded s3 object");
+    Ok(())
+}
+
+pub async fn delete_all_with_prefix(
+    s3_client: &S3Client,
+    bucket: &str,
+    prefix: &str,
+) -> anyhow::Result<()> {
+    let mut continuation_token: Option<String> = None;
+
+    loop {
+        let mut list_request = s3_client.list_objects_v2().bucket(bucket).prefix(prefix);
+        if let Some(token) = continuation_token {
+            list_request = list_request.continuation_token(token);
+        }
+        let response = list_request.send().await?;
+        if let Some(objects) = response.contents {
+            for object in objects {
+                if let Some(key) = object.key {
+                    delete_s3_file(s3_client, bucket, &key).await?;
+                }
+            }
+        }
+        match response.is_truncated {
+            Some(true) => continuation_token = response.next_continuation_token,
+            _ => break,
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn fetch_case_filing_from_s3(
     s3_client: &S3Client,
     case_name: &str,
@@ -166,6 +211,13 @@ pub fn get_case_s3_key(case_name: &str, jurisdiction: &JurisdictionInfo) -> Stri
         jurisdiction_name, state, country, "Generated case S3 key: {}", key
     );
     key
+}
+pub fn get_jurisdiction_prefix(jurisdiction: &JurisdictionInfo) -> String {
+    let country = &*jurisdiction.country;
+    let state = &*jurisdiction.state;
+    let jurisdiction_name = &*jurisdiction.jurisdiction;
+    let key = format!("objects/{country}/{state}/{jurisdiction_name}");
+    return key;
 }
 
 pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blake2bHash) -> bool {

@@ -17,15 +17,6 @@
           };
         };
 
-        # Python version and packages
-        python = pkgs.python312;
-
-        # Selenium drivers
-        chromedriver = pkgs.chromedriver;
-        geckodriver = pkgs.geckodriver;
-
-        # UV for Python package management
-        uv = pkgs.uv;
 
         # Project dependencies from pyproject.toml
         projectDependencies = with pkgs.python312Packages; [
@@ -38,7 +29,7 @@
           jinja2
           langchain-community
           langchain-core
-          libsql-client
+          # libsql-client # this might be a problem
           psycopg2
           pydantic
           pymupdf
@@ -52,16 +43,15 @@
           uvicorn
         ];
 
-        # Development environment
+
         devPackages = with pkgs; [
-          python
+          python312
           uv
           chromedriver
           geckodriver
-          google-chrome
+          chromium
           firefox
         ];
-
         # Python environment with dependencies
         pythonEnv = python.withPackages (ps: projectDependencies);
       in
