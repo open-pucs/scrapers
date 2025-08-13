@@ -111,6 +111,11 @@ def time_is_in_year(year: int, rfctime: RFC3339Time) -> bool:
     return time_is_in_yearlist(years=[year], rfctime=rfctime)
 
 
+def rfctime_from_date(input_date: date) -> RFC3339Time:
+    midnight_datetime = datetime.combine(input_date, datetime.min.time())
+    return midnight_datetime.replace(tzinfo=timezone.utc)
+
+
 def rfc_time_from_string(input: str) -> RFC3339Time:
     return to_rfc339_time(input)
 

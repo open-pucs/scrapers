@@ -15,6 +15,7 @@ from openpuc_scrapers.models.timestamp import (
     RFC3339Time,
     is_after,
     rfc_time_now,
+    rfctime_from_date,
     rfctime_serializer,
     time_is_in_yearlist,
 )
@@ -213,12 +214,14 @@ def filter_off_filings_in_yearlist(
 
         if not opened_date:
             default_logger.warning(
-                f"Case {generic_case.case_number} missing opened_date, excluding from results"
+                f"Case {generic_case.case_govid} missing opened_date, excluding from results"
             )
             continue
         if len(filtered_cases) == 0:
             filtered_cases.append(case)
-        elif time_is_in_yearlist(rfctime=opened_date, years=yearlist):
+        elif time_is_in_yearlist(
+            rfctime=rfctime_from_date(opened_date), years=yearlist
+        ):
             filtered_cases.append(case)
         else:
             pass
