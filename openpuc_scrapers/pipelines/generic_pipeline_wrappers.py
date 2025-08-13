@@ -78,23 +78,23 @@ def process_case(
     base_path: str,
 ) -> str:
     generic_case = scraper.into_generic_case_data(case)
-    case_num = generic_case.case_number
-    default_logger.info(f"Successfully made generic case object: {case_num} ")
+    case_govid = generic_case.case_govid
+    default_logger.info(f"Successfully made generic case object: {case_govid} ")
 
     # Save state-specific case data
-    case_path = f"{base_path}/initial_cases/case_{case_num}.json"
+    case_path = f"{base_path}/initial_cases/case_{case_govid}.json"
     save_json_sync(path=case_path, data=case)
 
     # Process filings
     filings_intermediate = scraper.filing_data_intermediate(case)
-    filings_path = f"{base_path}/intermediate_caseinfo/case_{case_num}.json"
+    filings_path = f"{base_path}/intermediate_caseinfo/case_{case_govid}.json"
     save_json_sync(
         path=filings_path,
         data=filings_intermediate,
     )
 
     filings = scraper.filing_data_from_intermediate(filings_intermediate)
-    filings_json_path = f"{base_path}/filings/case_{case_num}.json"
+    filings_json_path = f"{base_path}/filings/case_{case_govid}.json"
     save_json_sync(
         path=filings_json_path,
         data=filings,
@@ -123,7 +123,7 @@ def process_case(
     default_logger.info(f"successfully got case json for {generic_case.case_name}")
 
     # NOW THAT THE CASE IS FULLY GENERIC IT SHOULD PUSH ALL THIS STUFF OVER TO RUST
-    url = f"{OPENSCRAPERS_INTERNAL_API_URL}/api/cases/submit"
+    url = f"{OPENSCRAPERS_INTERNAL_API_URL}/admin/cases/submit"
     response = requests.post(url, json=case_json_pythonable)
     response.raise_for_status()
 

@@ -14,7 +14,10 @@ from openpuc_scrapers.models.generic import (
     GenericAttachment,
 )
 from openpuc_scrapers.models.timestamp import RFC3339Time, date_to_rfctime
-from openpuc_scrapers.pipelines.misc_testing import test_selenium_connection
+from openpuc_scrapers.pipelines.misc_testing import (
+    test_selenium_connection_fallible,
+    test_selenium_connection_no_exception,
+)
 from openpuc_scrapers.scrapers.base import GenericScraper
 
 fake = Faker()
@@ -83,8 +86,8 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
 
     def universal_caselist_intermediate(self) -> Dict[str, Any]:
         """Include Selenium connectivity test results with dummy data"""
-        # selenium_works = test_selenium_connection()
-        selenium_works = False
+        selenium_works = test_selenium_connection_fallible()
+        # selenium_works = False
         return {
             "cases": [self._generate_dummy_case().model_dump() for _ in range(10)],
             "selenium_test": {
