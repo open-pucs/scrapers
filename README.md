@@ -42,4 +42,26 @@ We welcome anyone interested in contributing an interface for a new PUC! Please 
 
 ## Getting started
 
+### Using Nix (Recommended)
+
+This project includes a Nix flake for reproducible development environments:
+
+1. Install [Nix](https://nixos.org/download.html) if you haven't already
+2. Enable flakes by adding to your `~/.config/nix/nix.conf`:
+   ```
+   experimental-features = nix-command flakes
+   ```
+3. Enter the development environment:
+   ```bash
+   nix develop
+   ```
+   
+This will provide all necessary dependencies including:
+- Python 3.12
+- UV for package management
+- Selenium with ChromeDriver and GeckoDriver
+- All project dependencies
+
+### Using pip
+
 TODO easy peasy installation using pip

@@ -9,7 +9,13 @@
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        # Configure nixpkgs to allow unfree packages (like Google Chrome)
+        pkgs = import nixpkgs {
+          inherit system;
+          config = {
+            allowUnfree = true;
+          };
+        };
 
         # Python version and packages
         python = pkgs.python312;
