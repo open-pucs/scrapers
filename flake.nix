@@ -43,9 +43,15 @@
           uvicorn
         ];
 
+        python = pkgs.python312;
 
+        # Selenium drivers
+        chromedriver = pkgs.chromedriver;
+        geckodriver = pkgs.geckodriver;
+
+        # UV for Python package management
+        uv = pkgs.uv;
         devPackages = with pkgs; [
-          python312
           uv
           chromedriver
           geckodriver
