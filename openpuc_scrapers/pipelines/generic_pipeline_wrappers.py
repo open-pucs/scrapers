@@ -8,10 +8,8 @@ import json
 from openpuc_scrapers.models.constants import (
     OPENSCRAPERS_INTERNAL_API_URL,
 )
-from openpuc_scrapers.models.filing import GenericFiling
-from openpuc_scrapers.models.case import GenericCase
 
-
+from openpuc_scrapers.models.generic import GenericCase
 from openpuc_scrapers.models.jurisdictions import CaseWithJurisdiction, JurisdictionInfo
 from openpuc_scrapers.models.timestamp import (
     RFC3339Time,
@@ -78,7 +76,7 @@ def process_case(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     case: StateCaseData,
     base_path: str,
-) -> GenericCase:
+) -> str:
     generic_case = scraper.into_generic_case_data(case)
     case_num = generic_case.case_number
     default_logger.info(f"Successfully made generic case object: {case_num} ")
@@ -130,12 +128,7 @@ def process_case(
     response.raise_for_status()
 
     # INSTEAD OF RETURNING THE CASE REFACTOR THE CODE TO RETURN A SUCCESSFUL SIGNAL
-    return GenericCase(
-        case_number="Success",
-        case_name="Success",
-        filings=[],
-        opened_date=rfc_time_now(),
-    )
+    return "successfully processed case"
 
 
 def process_case_jsonified_bulk(
@@ -172,7 +165,7 @@ def process_case_jsonified(
     default_logger.info("Successfully deserialized case from json.")
 
     processed_case = process_case(scraper=scraper, case=case_data, base_path=base_path)
-    return processed_case.model_dump_json()
+    return processed_case
 
 
 def filter_off_filings_after_date(

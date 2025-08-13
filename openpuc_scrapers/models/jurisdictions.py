@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from openpuc_scrapers.models.case import GenericCase
+from openpuc_scrapers.models.generic import GenericCase
 
 
 class JurisdictionInfo(BaseModel):

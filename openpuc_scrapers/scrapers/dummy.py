@@ -8,9 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from openpuc_scrapers.models.attachment import GenericAttachment
-from openpuc_scrapers.models.case import GenericCase
-from openpuc_scrapers.models.filing import GenericFiling
+from openpuc_scrapers.models.generic import GenericCase, GenericFiling
 from openpuc_scrapers.models.timestamp import RFC3339Time, date_to_rfctime
 from openpuc_scrapers.pipelines.misc_testing import test_selenium_connection
 from openpuc_scrapers.scrapers.base import GenericScraper

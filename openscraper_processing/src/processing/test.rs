@@ -30,8 +30,8 @@ async fn test_process_case() {
         .init();
     let s3_client = make_s3_client().await;
 
-    let filing_date_1 = NaiveDate::from_ymd_opt(2021, 03, 15).unwrap();
-    let filing_date_2 = NaiveDate::from_ymd_opt(2022, 07, 22).unwrap();
+    let filing_date_1 = NaiveDate::from_ymd_opt(2021, 3, 15).unwrap();
+    let filing_date_2 = NaiveDate::from_ymd_opt(2022, 7, 22).unwrap();
 
     // Some extra metadata that will be encoded as JSON values.
     let mut filing_meta = HashMap::new();
@@ -102,6 +102,7 @@ async fn test_process_case() {
             m.insert("source_system".to_string(), json!("internal‑scraper"));
             m
         },
+        case_parties: vec![],
         indexed_at: Utc::now(),
     };
     let jurisdiction = JurisdictionInfo::new_usa("test", "test");
