@@ -1,9 +1,10 @@
 use aide::{self, axum::IntoApiResponse, transform::TransformOperation};
 use axum::{
     extract::{Path, Query},
+    http::HeaderValue,
     response::{IntoResponse, Json},
 };
-use hyper::body::Bytes;
+use hyper::{StatusCode, body::Bytes, header};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -12,6 +13,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     common::hash::Blake2bHash,
+    s3_stuff::{delete_all_with_prefix, delete_s3_file, get_case_s3_key, get_jurisdiction_prefix},
     types::{
         GenericCaseLegacy, JurisdictionInfo, RawAttachment,
         env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
@@ -127,6 +129,54 @@ pub async fn handle_case_filing_from_s3(
     }
 }
 
+pub async fn delete_case_filing_from_s3(
+    Path(CasePath {
+        state,
+        jurisdiction_name,
+        case_name,
+    }): Path<CasePath>,
+) -> impl IntoApiResponse {
+    info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Request received to delete case filing");
+    let s3_client = crate::s3_stuff::make_s3_client().await;
+    let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
+    let case_key = get_case_s3_key(&case_name, &jurisdiction_info);
+    let result = delete_s3_file(&s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &case_key).await;
+    match result {
+        Ok(_) => {
+            info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Successfully deleted case filing");
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Err(e) => {
+            error!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, error = %e, "Error deleting case filing");
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
+    }
+}
+
+pub async fn recursive_delete_all_jurisdiction_data(
+    Path(JurisdictionPath {
+        state,
+        jurisdiction_name,
+    }): Path<JurisdictionPath>,
+) -> impl IntoApiResponse {
+    info!(state = %state, jurisdiction = %jurisdiction_name, "Deleting all data for jurisdiction");
+    let s3_client = crate::s3_stuff::make_s3_client().await;
+    let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
+    let prefix = get_jurisdiction_prefix(&jurisdiction_info);
+    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
+    let result = delete_all_with_prefix(&s3_client, bucket, &prefix).await;
+    match result {
+        Ok(_) => {
+            info!(state = %state, jurisdiction = %jurisdiction_name, "Successfully deleted all jurisdiction data");
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Err(e) => {
+            error!(state = %state, jurisdiction = %jurisdiction_name, error = %e, "Error deleting all jurisdiction data");
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
+    }
+}
+
 pub fn handle_case_filing_from_s3_docs(op: TransformOperation) -> TransformOperation {
     op.description("Fetch a case filing from S3.")
         .response::<200, Json<GenericCaseLegacy>>()
@@ -231,13 +281,48 @@ pub async fn handle_attachment_file_from_s3(
             return (axum::http::StatusCode::BAD_REQUEST, e.to_string()).into_response();
         }
     };
-    let result = crate::s3_stuff::fetch_attachment_file_from_s3(&s3_client, hash).await;
-
+    let result =
+        crate::s3_stuff::fetch_attachment_file_from_s3_with_filename(&s3_client, hash).await;
     match result {
-        Ok(contents) => (axum::http::StatusCode::OK, Bytes::from(contents)).into_response(),
+        Ok((filename, contents)) => {
+            // Content‑Type – generic binary stream
+            let ct = HeaderValue::from_static("application/octet-stream");
+
+            // Content‑Disposition – attachment; filename="<sanitized>"
+            let escaped_name = urlencoding::encode(&filename);
+            let cd = format!(
+                "attachment; filename=\"{}\"; filename*=UTF-8''{}",
+                // Legacy (ASCII‑only) fallback – we keep the original name but
+                // escape any double‑quotes or backslashes.
+                filename.replace('\\', "\\\\").replace('\"', "\\\""),
+                escaped_name
+            );
+            let cd = HeaderValue::from_str(&cd).expect("valid header value");
+
+            // Optional: Content‑Length – helps the client know the exact size
+            let cl = HeaderValue::from_str(&contents.len().to_string())
+                .expect("content length is a valid integer");
+
+            // ---------------------------------------------------------------
+            //   3b️⃣ Return the tuple that Axum knows how to turn into a response
+            // ---------------------------------------------------------------
+            (
+                StatusCode::OK,
+                // An array of header‑name / header‑value pairs.
+                // You can add more if you need (Cache‑Control, ETag, …)
+                [
+                    (header::CONTENT_TYPE, ct),
+                    (header::CONTENT_DISPOSITION, cd),
+                    (header::CONTENT_LENGTH, cl),
+                ],
+                // The body – we turn the Vec<u8> (or whatever `contents` is) into Bytes.
+                Bytes::from(contents),
+            )
+                .into_response()
+        }
         Err(e) => {
             error!(hash = %blake2b_hash,error = %e, "Error reading attachment file from disk");
-            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+            (axum::http::StatusCode::NOT_FOUND, e.to_string()).into_response()
         }
     }
 }

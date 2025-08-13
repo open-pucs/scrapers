@@ -39,3 +39,7 @@ server = [
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
+
+[tool.setuptools.packages.find]
+include = ["openpuc_scrapers*"]
+namespaces = false

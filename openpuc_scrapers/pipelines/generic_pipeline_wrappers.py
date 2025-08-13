@@ -3,17 +3,13 @@ import traceback
 import time
 import random
 from typing import Any, List, Optional, Tuple
-import redis
 import json
 
 from openpuc_scrapers.models.constants import (
     OPENSCRAPERS_INTERNAL_API_URL,
-    OPENSCRAPERS_REDIS_DOMAIN,
 )
-from openpuc_scrapers.models.filing import GenericFiling
-from openpuc_scrapers.models.case import GenericCase
 
-
+from openpuc_scrapers.models.generic import GenericCase
 from openpuc_scrapers.models.jurisdictions import CaseWithJurisdiction, JurisdictionInfo
 from openpuc_scrapers.models.timestamp import (
     RFC3339Time,
@@ -80,25 +76,25 @@ def process_case(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     case: StateCaseData,
     base_path: str,
-) -> GenericCase:
+) -> str:
     generic_case = scraper.into_generic_case_data(case)
-    case_num = generic_case.case_number
-    default_logger.info(f"Successfully made generic case object: {case_num} ")
+    case_govid = generic_case.case_govid
+    default_logger.info(f"Successfully made generic case object: {case_govid} ")
 
     # Save state-specific case data
-    case_path = f"{base_path}/initial_cases/case_{case_num}.json"
+    case_path = f"{base_path}/initial_cases/case_{case_govid}.json"
     save_json_sync(path=case_path, data=case)
 
     # Process filings
     filings_intermediate = scraper.filing_data_intermediate(case)
-    filings_path = f"{base_path}/intermediate_caseinfo/case_{case_num}.json"
+    filings_path = f"{base_path}/intermediate_caseinfo/case_{case_govid}.json"
     save_json_sync(
         path=filings_path,
         data=filings_intermediate,
     )
 
     filings = scraper.filing_data_from_intermediate(filings_intermediate)
-    filings_json_path = f"{base_path}/filings/case_{case_num}.json"
+    filings_json_path = f"{base_path}/filings/case_{case_govid}.json"
     save_json_sync(
         path=filings_json_path,
         data=filings,
@@ -127,17 +123,13 @@ def process_case(
     default_logger.info(f"successfully got case json for {generic_case.case_name}")
 
     # NOW THAT THE CASE IS FULLY GENERIC IT SHOULD PUSH ALL THIS STUFF OVER TO RUST
-    url = f"{OPENSCRAPERS_INTERNAL_API_URL}/api/cases/submit"
+    url = f"{OPENSCRAPERS_INTERNAL_API_URL}/admin/cases/submit"
+    default_logger.info(f"Sending this string to openscrapers api: {case_json}")
     response = requests.post(url, json=case_json_pythonable)
     response.raise_for_status()
 
     # INSTEAD OF RETURNING THE CASE REFACTOR THE CODE TO RETURN A SUCCESSFUL SIGNAL
-    return GenericCase(
-        case_number="Success",
-        case_name="Success",
-        filings=[],
-        opened_date=rfc_time_now(),
-    )
+    return "successfully processed case"
 
 
 def process_case_jsonified_bulk(
@@ -174,7 +166,7 @@ def process_case_jsonified(
     default_logger.info("Successfully deserialized case from json.")
 
     processed_case = process_case(scraper=scraper, case=case_data, base_path=base_path)
-    return processed_case.model_dump_json()
+    return processed_case
 
 
 def filter_off_filings_after_date(

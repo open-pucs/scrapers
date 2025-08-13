@@ -8,7 +8,7 @@ def test_selenium_connection_exec() -> None:
     )
 
 
-def test_selenium_connection() -> bool:
+def test_selenium_connection_no_exception() -> bool:
     # If this works I am going to <REDACTED>
     from selenium import webdriver
     from selenium.webdriver.support.wait import WebDriverWait
@@ -32,3 +32,18 @@ def test_selenium_connection() -> bool:
         except Exception:
             pass
         return False
+
+
+def test_selenium_connection_fallible():
+    from selenium import webdriver
+    from selenium.webdriver.support.wait import WebDriverWait
+
+    options = webdriver.FirefoxOptions()
+    options.add_argument("--headless")
+    # Firefox generally needs fewer special flags
+    options.add_argument("--disable-dev-shm-usage")
+
+    driver = webdriver.Firefox(options=options)
+    driver.get("https://www.google.com")
+    # WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "q")))
+    driver.quit()

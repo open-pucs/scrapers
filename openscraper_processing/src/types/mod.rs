@@ -1,4 +1,5 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
+use non_empty_string::NonEmptyString;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -9,6 +10,10 @@ use crate::common::{file_extension::FileExtension, hash::Blake2bHash};
 pub mod env_vars;
 pub mod pagination;
 pub mod s3_uri;
+
+trait Revalidate {
+    fn revalidate(&mut self);
+}
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct JurisdictionInfo {
@@ -39,18 +44,112 @@ impl JurisdictionInfo {
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct CaseWithJurisdiction {
-    pub case: GenericCaseLegacy,
+    pub case: GenericCase,
     pub jurisdiction: JurisdictionInfo,
 }
 
-#[skip_serializing_none]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct GenericAttachment {
-    pub name: String,
+    pub name: NonEmptyString,
+    pub document_extension: FileExtension,
+    #[serde(default)]
     pub url: String,
-    pub document_extension: Option<String>,
+    #[serde(default)]
+    pub attachment_type: String,
+    #[serde(default)]
+    pub attachment_subtype: String,
+    #[serde(default)]
     pub extra_metadata: HashMap<String, serde_json::Value>,
+    #[serde(default)]
     pub hash: Option<Blake2bHash>,
+}
+
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+pub struct GenericFiling {
+    pub filed_date: NaiveDate,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub organization_authors: Vec<NonEmptyString>,
+    #[serde(default)]
+    pub individual_authors: Vec<NonEmptyString>,
+    #[serde(default)]
+    pub filing_type: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub attachments: Vec<GenericAttachment>,
+    #[serde(default)]
+    pub extra_metadata: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+pub struct GenericCase {
+    pub case_govid: NonEmptyString,
+    // This shouldnt be an optional field in the final submission, since it can be calculated from
+    // the minimum of the fillings, and the scraper should calculate it.
+    #[serde(default)]
+    pub opened_date: Option<NaiveDate>,
+
+    #[serde(default)]
+    pub case_name: String,
+    #[serde(default)]
+    pub case_url: String,
+    #[serde(default)]
+    pub case_type: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub industry: String,
+    #[serde(default)]
+    pub petitioner: String,
+    #[serde(default)]
+    pub hearing_officer: String,
+    #[serde(default)]
+    pub closed_date: Option<NaiveDate>,
+    #[serde(default)]
+    pub filings: Vec<GenericFiling>,
+    #[serde(default)]
+    pub case_parties: Vec<GenericParty>,
+    #[serde(default)]
+    pub extra_metadata: HashMap<String, serde_json::Value>,
+    #[serde(default = "Utc::now")]
+    pub indexed_at: DateTime<Utc>,
+}
+impl Revalidate for GenericCase {
+    fn revalidate(&mut self) {
+        if self.opened_date.is_some() {
+            return;
+        }
+        let mut opened_date = NaiveDate::MAX;
+        for filling in &self.filings {
+            if filling.filed_date < opened_date {
+                opened_date = filling.filed_date
+            }
+        }
+        self.opened_date = Some(opened_date);
+        for filling in &mut self.filings {
+            filling.revalidate();
+        }
+    }
+}
+
+impl Revalidate for GenericFiling {
+    fn revalidate(&mut self) {
+        if !self.name.is_empty() {
+            return;
+        }
+        if let Some(attach) = self.attachments.first() {
+            self.name = attach.name.clone().into();
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+pub struct GenericParty {
+    name: NonEmptyString,
+    is_corperate_entity: bool,
+    is_human: bool,
 }
 
 #[skip_serializing_none]
@@ -94,22 +193,24 @@ pub enum AttachmentTextQuality {
 #[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
 pub struct RawAttachmentText {
     pub quality: AttachmentTextQuality,
-    pub language: String,
+    pub language: NonEmptyString,
     pub text: String,
     pub timestamp: DateTime<Utc>,
 }
 
-#[skip_serializing_none]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct RawAttachment {
     pub hash: Blake2bHash,
     pub jurisdiction_info: JurisdictionInfo,
-    pub name: String,
-    pub url: Option<String>,
+    pub name: NonEmptyString,
     pub extension: FileExtension,
     pub text_objects: Vec<RawAttachmentText>,
     pub date_added: chrono::DateTime<Utc>,
     pub date_updated: chrono::DateTime<Utc>,
-    pub extra_metadata: Option<HashMap<String, String>>,
-    pub file_size_bytes: Option<u64>,
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub extra_metadata: HashMap<String, String>,
+    #[serde(default)]
+    pub file_size_bytes: u64,
 }

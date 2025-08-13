@@ -7,11 +7,17 @@ use common::{
 };
 use tracing::info;
 
-use crate::server::define_routes;
-
+use crate::{
+    server::define_routes,
+    types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET},
+};
 use axum::extract::DefaultBodyLimit;
+use tower_http::cors::{Any, CorsLayer};
 
-use std::net::{Ipv4Addr, SocketAddr};
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    sync::LazyLock,
+};
 
 mod case_worker;
 mod common;
@@ -25,8 +31,18 @@ mod types;
 // To be more efficient, we could wrap it into an Arc,
 // or even store it as a serialized string.
 
+const DEFAULT_PORT: u16 = 33399;
+static PORT: LazyLock<u16> = LazyLock::new(|| {
+    std::env::var("PORT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_PORT)
+});
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let _ = *OPENSCRAPERS_S3;
+    let _ = *OPENSCRAPERS_S3_OBJECT_BUCKET;
     if let Err(e) = do_i_have_internet() {
         tracing::error!(err = %e,"NO INTERNET DETECTED");
         panic!("NO INTERNET DETECTED");
@@ -34,8 +50,14 @@ async fn main() -> anyhow::Result<()> {
     // initialise our subscriber
     let make_api = || {
         let routes = define_routes();
-        let app = define_generic_task_routes(routes);
-        app.layer(DefaultBodyLimit::disable())
+        define_generic_task_routes(routes)
+            .layer(DefaultBodyLimit::disable())
+            .layer(
+                CorsLayer::new()
+                    .allow_origin(Any)
+                    .allow_methods(Any)
+                    .allow_headers(Any),
+            )
     };
     let app = initialize_tracing_and_wrap_router(make_api)?;
 
@@ -47,8 +69,8 @@ async fn main() -> anyhow::Result<()> {
     spawn_worker_loop();
 
     // bind and serve
-    let port = 33399;
-    let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port);
+    let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *PORT);
+    info!(?addr, "Starting application on adress");
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     let app_description = "A component of the openscrapers library designed to efficently and cheaply process goverment docs at scale.";
     let Err(serve_error) = generate_api_docs_and_serve(listener, app, app_description).await;

@@ -2,12 +2,14 @@ use std::path::Path;
 
 use anyhow::anyhow;
 use chrono::offset;
+use futures_util::join;
+use non_empty_string::non_empty_string;
 use tracing::{debug, error, info};
 
 use crate::common::hash::Blake2bHash;
-use crate::types::JurisdictionInfo;
 use crate::types::env_vars::OPENSCRAPERS_S3;
 use crate::types::s3_uri::S3Location;
+use crate::types::{GenericCase, JurisdictionInfo};
 use crate::types::{GenericCaseLegacy, RawAttachment, env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET};
 use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
 
@@ -93,6 +95,51 @@ pub async fn upload_s3_bytes(
     Ok(())
 }
 
+pub async fn delete_s3_file(s3_client: &S3Client, bucket: &str, key: &str) -> anyhow::Result<()> {
+    debug!( %bucket, %key,"Deleting file from S3");
+    s3_client
+        .delete_object()
+        .bucket(bucket)
+        .key(key)
+        .send()
+        .await
+        .map_err(|err| {
+            error!(%err,%bucket, %key,"Failed to delete s3 file");
+            anyhow!(err)
+        })?;
+    debug!( %bucket, %key,"Successfully uploaded s3 object");
+    Ok(())
+}
+
+pub async fn delete_all_with_prefix(
+    s3_client: &S3Client,
+    bucket: &str,
+    prefix: &str,
+) -> anyhow::Result<()> {
+    let mut continuation_token: Option<String> = None;
+
+    loop {
+        let mut list_request = s3_client.list_objects_v2().bucket(bucket).prefix(prefix);
+        if let Some(token) = continuation_token {
+            list_request = list_request.continuation_token(token);
+        }
+        let response = list_request.send().await?;
+        if let Some(objects) = response.contents {
+            for object in objects {
+                if let Some(key) = object.key {
+                    delete_s3_file(s3_client, bucket, &key).await?;
+                }
+            }
+        }
+        match response.is_truncated {
+            Some(true) => continuation_token = response.next_continuation_token,
+            _ => break,
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn fetch_case_filing_from_s3(
     s3_client: &S3Client,
     case_name: &str,
@@ -135,6 +182,25 @@ pub async fn fetch_attachment_file_from_s3(
     let key = get_raw_attach_file_key(hash);
     download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await
 }
+
+pub async fn fetch_attachment_file_from_s3_with_filename(
+    s3_client: &S3Client,
+    hash: Blake2bHash,
+) -> anyhow::Result<(String, Vec<u8>)> {
+    info!(%hash, "Fetching attachment file from S3");
+    let key = get_raw_attach_file_key(hash);
+    let bytes_future = download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key);
+    let metadata_future = fetch_attachment_data_from_s3(s3_client, hash);
+    let (Ok(bytes), metadata) = join!(bytes_future, metadata_future) else {
+        return Err(anyhow!("fetching bytes failed."));
+    };
+
+    let filename = metadata
+        .ok()
+        .map(|v| v.name + "." + &v.extension.to_string())
+        .unwrap_or_else(|| non_empty_string!("unknown_filename.pdf"));
+    Ok((filename.to_string(), bytes))
+}
 pub fn get_case_s3_key(case_name: &str, jurisdiction: &JurisdictionInfo) -> String {
     let country = &*jurisdiction.country;
     let state = &*jurisdiction.state;
@@ -145,6 +211,13 @@ pub fn get_case_s3_key(case_name: &str, jurisdiction: &JurisdictionInfo) -> Stri
         jurisdiction_name, state, country, "Generated case S3 key: {}", key
     );
     key
+}
+pub fn get_jurisdiction_prefix(jurisdiction: &JurisdictionInfo) -> String {
+    let country = &*jurisdiction.country;
+    let state = &*jurisdiction.state;
+    let jurisdiction_name = &*jurisdiction.jurisdiction;
+    let key = format!("objects/{country}/{state}/{jurisdiction_name}");
+    return key;
 }
 
 pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blake2bHash) -> bool {
@@ -178,11 +251,11 @@ pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blak
 
 pub async fn push_case_to_s3_and_db(
     s3_client: &S3Client,
-    case: &mut GenericCaseLegacy,
+    case: &mut GenericCase,
     jurisdiction: &JurisdictionInfo,
 ) -> anyhow::Result<()> {
-    info!(case_number = %case.case_number, "Pushing case to S3 and DB");
-    let key = get_case_s3_key(&case.case_number, &jurisdiction);
+    info!(case_number = %case.case_govid, "Pushing case to S3 and DB");
+    let key = get_case_s3_key(case.case_govid.as_ref(), jurisdiction);
     debug!("Pushing case with key: {}", key);
     case.indexed_at = offset::Utc::now();
     let case_jsonified = serde_json::to_string(case)?;

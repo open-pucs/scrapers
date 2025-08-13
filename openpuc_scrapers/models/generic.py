@@ -1,30 +1,56 @@
-from datetime import date
-from typing import Dict, List, Optional, Union
-from pydantic import BaseModel, Field, HttpUrl
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
 
-class GenericCase(BaseModel):
-    """Generic case data model."""
-    case_number: str
-    case_title: Optional[str] = None
-    case_url: str
-    category: Optional[str] = None
-    service_type: Optional[str] = None
-    judge_name: Optional[List[str]] = None
-    filing_date: Optional[date] = None
-    case_status: Optional[str] = None
-    case_description: Optional[str] = None
-    applicant: Optional[str] = None
-    industry: Optional[str] = None
-    documents: List[str] = Field(default_factory=list)
-    service_list: List[Dict[str, Union[str, bool]]] = Field(default_factory=list)
-    schedule: List[Dict[str, Optional[str]]] = Field(default_factory=list)
+from pydantic import BaseModel, Field
+
+
+class GenericAttachment(BaseModel):
+    """Generic attachment data model."""
+
+    name: str
+    document_extension: str
+    url: str
+    attachment_type: str
+    attachment_subtype: str
+    extra_metadata: Dict[str, Any]
+    # Default value here since 99% of the time this should be set by the api.
+    hash: Optional[str] = None
+
 
 class GenericFiling(BaseModel):
     """Generic filing data model."""
-    case_number: str
-    filed_date: Optional[date] = None
-    party_name: Optional[str] = None
-    filing_type: Optional[str] = None
-    description: Optional[str] = None
-    attachments: List[Dict[str, str]] = Field(default_factory=list)
-    document_url: str 
+
+    name: str
+    filed_date: date
+    organization_authors: List[str]
+    individual_authors: List[str]
+    filing_type: str
+    description: str
+    attachments: List[GenericAttachment]
+    extra_metadata: Dict[str, Any]
+
+
+class GenericParty(BaseModel):
+    """Generic party data model."""
+
+    name: str
+    is_corperate_entity: bool
+    is_human: bool
+
+
+class GenericCase(BaseModel):
+    """Generic case data model."""
+
+    case_govid: str
+    opened_date: Optional[date] = None
+    case_name: str
+    case_url: str
+    case_type: str
+    description: str
+    industry: str
+    petitioner: str
+    hearing_officer: str
+    closed_date: Optional[date]
+    filings: List[GenericFiling]
+    case_parties: List[GenericParty]
+    extra_metadata: Dict[str, Any]
