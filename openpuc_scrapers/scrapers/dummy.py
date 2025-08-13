@@ -8,7 +8,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from openpuc_scrapers.models.generic import GenericCase, GenericFiling
+from openpuc_scrapers.models.generic import (
+    GenericCase,
+    GenericFiling,
+    GenericAttachment,
+)
 from openpuc_scrapers.models.timestamp import RFC3339Time, date_to_rfctime
 from openpuc_scrapers.pipelines.misc_testing import test_selenium_connection
 from openpuc_scrapers.scrapers.base import GenericScraper
@@ -136,18 +140,31 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
 
     def into_generic_case_data(self, state_data: DummyCaseData) -> GenericCase:
         return GenericCase(
-            case_number=state_data.case_number,
+            case_govid=state_data.case_number,
+            case_name=f"Dummy Case {state_data.case_number}",
+            case_url="",
             case_type="dummy_case",
             description=state_data.description,
             industry=state_data.industry,
-            opened_date=date_to_rfctime(state_data.opened_date),
+            petitioner="",
+            hearing_officer="",
+            opened_date=state_data.opened_date.date()
+            if hasattr(state_data.opened_date, "date")
+            else date.today(),
+            filings=[],
+            case_parties=[],
             extra_metadata={"status": state_data.status},
+            closed_date=None,
         )
 
     def into_generic_filing_data(self, state_data: DummyFilingData) -> GenericFiling:
         return GenericFiling(
-            party_name="",
-            filed_date=date_to_rfctime(state_data.date_filed),
+            name=f"Filing {state_data.filing_id}",
+            filed_date=state_data.date_filed.date()
+            if hasattr(state_data.date_filed, "date")
+            else date.today(),
+            organization_authors=[],
+            individual_authors=[],
             filing_type=state_data.filing_type,
             description=state_data.description,
             attachments=[
@@ -155,6 +172,10 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
                     name=a.document_title,
                     url=a.url,
                     document_extension=a.document_extension,
+                    attachment_type="document",
+                    attachment_subtype="filing",
+                    extra_metadata={},
+                    hash=None,
                 )
                 for a in state_data.attachments
             ],

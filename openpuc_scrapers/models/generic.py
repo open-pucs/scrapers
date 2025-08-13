@@ -13,7 +13,8 @@ class GenericAttachment(BaseModel):
     attachment_type: str
     attachment_subtype: str
     extra_metadata: Dict[str, Any]
-    hash: Optional[str]
+    # Default value here since 99% of the time this should be set by the api.
+    hash: Optional[str] = None
 
 
 class GenericFiling(BaseModel):
