@@ -13,6 +13,7 @@ use crate::types::{
 use anyhow::bail;
 use aws_sdk_s3::Client as S3Client;
 use chrono::Utc;
+use non_empty_string::{NonEmptyString, non_empty_string};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -30,16 +31,8 @@ pub async fn process_attachment_in_regular_pipeline(
     jurisdiction_info: &JurisdictionInfo,
     attachment: &GenericAttachment,
 ) -> anyhow::Result<RawAttachment> {
-    if attachment.document_extension.is_none() {
-        bail!("Extension does not exist!")
-    };
-    let invalid_ext = attachment.document_extension.as_ref().unwrap();
-    let extension = match FileExtension::from_str(invalid_ext) {
-        Ok(val) => val,
-        Err(err) => bail!(err),
-    };
-
     info!(url=%attachment.url,"Trying to download attachment file.");
+    let extension = &attachment.document_extension;
 
     let FileDownloadResult {
         data: file_contents,
@@ -49,13 +42,14 @@ pub async fn process_attachment_in_regular_pipeline(
     info!(%hash, url=%attachment.url,"Successfully downloaded file.");
 
     let metadata = server_filename
-        .map(|exant_filename| HashMap::from([("server_filename".to_string(), exant_filename)]));
+        .map(|exant_filename| HashMap::from([("server_filename".to_string(), exant_filename)]))
+        .unwrap_or_default();
 
     let raw_attachment = RawAttachment {
         jurisdiction_info: jurisdiction_info.to_owned(),
-        url: Some(attachment.url.clone()),
+        url: attachment.url.clone(),
         hash,
-        file_size_bytes: Some(file_contents.len() as u64),
+        file_size_bytes: file_contents.len() as u64,
         name: attachment.name.clone(),
         extension: extension.clone(),
         text_objects: vec![],
@@ -84,7 +78,7 @@ async fn shipout_attachment_to_s3(
                 info!(%hash,"Completed text processing.");
                 let text_obj = RawAttachmentText {
                     quality: AttachmentTextQuality::Low,
-                    language: "en".to_string(),
+                    language: non_empty_string!("en"),
                     text,
                     timestamp: Utc::now(),
                 };
@@ -134,14 +128,16 @@ pub async fn process_attachment_with_direct_request(
     let hash = Blake2bHash::from_bytes(&file_contents);
     info!(%hash, fetch_info=?direct_info.fetch_info,"Successfully downloaded file.");
 
-    let metadata = server_filename
-        .clone()
-        .map(|exant_filename| HashMap::from([("server_filename".to_string(), exant_filename)]));
+    let mut metadata = HashMap::new();
+    if let Some(exant_filename) = server_filename.clone() {
+        metadata.insert("server_file_name".to_string(), exant_filename);
+    }
     let actual_filename = direct_info
         .file_name
         .clone()
         .or(server_filename.clone())
-        .unwrap_or("".to_string());
+        .and_then(|x| NonEmptyString::new(x).ok())
+        .unwrap_or(non_empty_string!("unknown"));
 
     let is_normal_url_request = direct_info.fetch_info.request_type == RequestMethod::Get
         && direct_info.fetch_info.request_body.is_none()
@@ -154,8 +150,8 @@ pub async fn process_attachment_with_direct_request(
     let raw_attachment = RawAttachment {
         jurisdiction_info: direct_info.jurisdiction_info.clone(),
         hash,
-        file_size_bytes: Some(file_contents.len() as u64),
-        url: url_value,
+        file_size_bytes: file_contents.len() as u64,
+        url: url_value.unwrap_or_default(),
         name: actual_filename.clone(),
         extension: direct_info.extension.clone(),
         text_objects: vec![],

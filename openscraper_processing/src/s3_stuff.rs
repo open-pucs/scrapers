@@ -3,12 +3,13 @@ use std::path::Path;
 use anyhow::anyhow;
 use chrono::offset;
 use futures_util::join;
+use non_empty_string::{NonEmptyString, non_empty_string};
 use tracing::{debug, error, info};
 
 use crate::common::hash::Blake2bHash;
-use crate::types::JurisdictionInfo;
 use crate::types::env_vars::OPENSCRAPERS_S3;
 use crate::types::s3_uri::S3Location;
+use crate::types::{GenericCase, JurisdictionInfo};
 use crate::types::{GenericCaseLegacy, RawAttachment, env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET};
 use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
 
@@ -152,8 +153,8 @@ pub async fn fetch_attachment_file_from_s3_with_filename(
     let filename = metadata
         .ok()
         .map(|v| v.name + "." + &v.extension.to_string())
-        .unwrap_or_else(|| "unknown_filename.pdf".to_string());
-    Ok((filename, bytes))
+        .unwrap_or_else(|| non_empty_string!("unknown_filename.pdf"));
+    Ok((filename.to_string(), bytes))
 }
 pub fn get_case_s3_key(case_name: &str, jurisdiction: &JurisdictionInfo) -> String {
     let country = &*jurisdiction.country;
@@ -198,11 +199,11 @@ pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blak
 
 pub async fn push_case_to_s3_and_db(
     s3_client: &S3Client,
-    case: &mut GenericCaseLegacy,
+    case: &mut GenericCase,
     jurisdiction: &JurisdictionInfo,
 ) -> anyhow::Result<()> {
-    info!(case_number = %case.case_number, "Pushing case to S3 and DB");
-    let key = get_case_s3_key(&case.case_number, &jurisdiction);
+    info!(case_number = %case.case_govid, "Pushing case to S3 and DB");
+    let key = get_case_s3_key(case.case_govid.as_ref(), jurisdiction);
     debug!("Pushing case with key: {}", key);
     case.indexed_at = offset::Utc::now();
     let case_jsonified = serde_json::to_string(case)?;

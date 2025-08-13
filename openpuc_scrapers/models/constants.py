@@ -11,17 +11,6 @@ def Maybe(f: Callable) -> Callable:
 
 DEEPINFRA_API_KEY = os.environ["DEEPINFRA_API_KEY"]
 
-OPENSCRAPERS_S3_CLOUD_REGION = os.environ.get("OPENSCRAPERS_S3_CLOUD_REGION", "sfo3")
-OPENSCRAPERS_S3_ENDPOINT = os.environ.get(
-    "OPENSCRAPERS_S3_ENDPOINT", "https://sfo3.digitaloceanspaces.com"
-)
-# OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET = os.environ.get(
-#     "OPENSCRAPERS_S3_SCRAPER_INTERMEDIATE_BUCKET", "opescraper-intermediates"
-# )
-
-OPENSCRAPERS_S3_OBJECT_BUCKET = os.environ.get(
-    "OPENSCRAPERS_S3_OBJECT_BUCKET", "opescrapers"
-)
 DEFAULT_OPENSCRAPERS_SQL_CONNECTION = (
     "postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow"
 )
@@ -41,7 +30,6 @@ LOCAL_CACHE_DIR: Optional[Path] = (
     else Path(os.environ.get("LOCAL_CACHE_DIR"))
 )
 
-CRIMSON_URL = os.environ["CRIMSON_URL"]
 
 OPENSCRAPERS_S3_ACCESS_KEY = os.environ["OPENSCRAPERS_S3_ACCESS_KEY"]
 OPENSCRAPERS_S3_SECRET_KEY = os.environ["OPENSCRAPERS_S3_SECRET_KEY"]

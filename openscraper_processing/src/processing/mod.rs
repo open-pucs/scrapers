@@ -58,7 +58,6 @@ pub async fn process_case(
                     match result {
                         Ok(Ok(raw_attach)) => {
                             attach.hash = Some(raw_attach.hash);
-                            attach.document_extension = Some(raw_attach.extension.to_string());
                             Ok(raw_attach)
                         }
                         Ok(Err(err)) => {

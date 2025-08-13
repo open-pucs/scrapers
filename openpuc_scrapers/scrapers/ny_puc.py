@@ -1,8 +1,11 @@
 import logging
 from pathlib import Path
-from annotated_types import doc
+from openpuc_scrapers.models.generic import (
+    GenericAttachment,
+    GenericCase,
+    GenericFiling,
+)
 from openpuc_scrapers.models.utils import rand_string
-from openpuc_scrapers.models.attachment import GenericAttachment
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
@@ -13,8 +16,6 @@ import time
 from datetime import datetime
 from bs4 import BeautifulSoup
 
-from openpuc_scrapers.models.case import GenericCase
-from openpuc_scrapers.models.filing import GenericFiling
 from openpuc_scrapers.models.timestamp import RFC3339Time, date_to_rfctime
 from openpuc_scrapers.scrapers.base import GenericScraper
 
@@ -23,7 +24,7 @@ default_logger = logging.getLogger(__name__)
 
 
 class NYPUCAttachment(BaseModel):
-    document_title: str = ""
+    document_title: str
     url: str
     file_format: str = ""
     document_extension: str = ""
@@ -44,6 +45,7 @@ class NYPUCFiling(BaseModel):
 
 class NYPUCDocket(BaseModel):
     case_number: str  # 24-C-0663
+    case_url: str
     matter_type: str  # Complaint
     matter_subtype: str  # Appeal of an Informal Hearing Decision
     case_title: str  # In the Matter of the Rules and Regulations of the Public Service
@@ -93,6 +95,7 @@ def process_docket(docket: NYPUCDocket) -> str:
     driver = webdriver.Chrome(options=chrome_options)
     try:
         url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={docket.case_number}"
+        docket.case_url = url
         default_logger.debug(f"Navigating to docket URL: {url}")
         driver.get(url)
         default_logger.info(f"Loaded docket page for {docket.case_number}")
@@ -180,6 +183,7 @@ def extract_docket_info_from_caselisthtml(
 
             docket_info = NYPUCDocket(
                 case_number=cells[0].find("a").text.strip(),
+                case_url=f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={case_number}",
                 matter_type=cells[1].text.strip(),
                 matter_subtype=cells[2].text.strip(),
                 date_filed=cells[3].text.strip(),
@@ -422,9 +426,12 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
     def into_generic_case_data(self, state_data: NYPUCDocket) -> GenericCase:
         """Convert to generic case format"""
         return GenericCase(
-            case_number=state_data.case_number,
+            case_url=state_data.case_url,
+            case_govid=state_data.case_number,
             case_type=f"{state_data.matter_type} - {state_data.matter_subtype}",
             description=state_data.case_title,
+            case_name=state_data.case_title,
+            hearing_officer="",
             industry=state_data.industry_affected,
             petitioner=state_data.organization,
             opened_date=date_to_rfctime(
@@ -434,6 +441,9 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
                 "matter_type": state_data.matter_type,
                 "matter_subtype": state_data.matter_subtype,
             },
+            closed_date=None,
+            filings=[],
+            case_parties=[],
         )
 
     def into_generic_filing_data(self, state_data: NYPUCFiling) -> GenericFiling:
@@ -446,14 +456,20 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
                 name=att.document_title,
                 url=att.url,
                 document_extension=att.document_extension,
+                attachment_type="",
+                attachment_subtype="",
+                extra_metadata={},
+                hash=None,
             )
             for att in state_data.attachments
         ]
 
         return GenericFiling(
             # case_number=self.docket_id,
+            name="",
             filed_date=date_to_rfctime(filed_date_obj),
-            party_name=state_data.filing_on_behalf_of,
+            organization_authors=[state_data.filing_on_behalf_of],
+            individual_authors=[state_data.filed_by],
             filing_type=state_data.filing_type,
             description=state_data.description_of_filing,
             attachments=attachments,

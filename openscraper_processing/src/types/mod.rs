@@ -105,6 +105,8 @@ pub struct GenericCase {
     #[serde(default)]
     pub filings: Vec<GenericFiling>,
     #[serde(default)]
+    pub case_parties: Vec<GenericParty>,
+    #[serde(default)]
     pub extra_metadata: HashMap<String, serde_json::Value>,
     #[serde(default = "Utc::now")]
     pub indexed_at: DateTime<Utc>,
@@ -123,6 +125,13 @@ impl GenericCase {
         self.opened_date = Some(opened_date);
         return self;
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+pub struct GenericParty {
+    name: NonEmptyString,
+    is_corperate_entity: bool,
+    is_human: bool,
 }
 
 #[skip_serializing_none]
