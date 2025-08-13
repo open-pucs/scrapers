@@ -34,20 +34,14 @@ pub fn define_routes() -> ApiRouter {
             get_with(
                 s3_routes::handle_case_filing_from_s3,
                 s3_routes::handle_case_filing_from_s3_docs,
-            )
-            .delete(s3_routes::delete_case_filing_from_s3),
-        )
-        .api_route(
-            "/public/cases/{state}/{jurisdiction_name}/purge_all",
-            delete(s3_routes::recursive_delete_all_jurisdiction_data),
+            ),
         )
         .api_route(
             "/public/caselist/{state}/{jurisdiction_name}/all",
             get_with(
                 s3_routes::handle_caselist_jurisdiction_fetch_all,
                 s3_routes::handle_caselist_jurisdiction_fetch_all_docs,
-            )
-            .delete(s3_routes::delete_case_filing_from_s3),
+            ),
         )
         .api_route(
             "/public/raw_attachments/{blake2b_hash}/obj",
@@ -97,6 +91,14 @@ pub fn define_routes() -> ApiRouter {
                     handle_directly_process_file_request,
                     handle_directly_process_file_request_docs,
                 ),
+            )
+            .api_route(
+                "/public/cases/{state}/{jurisdiction_name}/{case_name}",
+                delete(s3_routes::delete_case_filing_from_s3),
+            )
+            .api_route(
+                "/admin/cases/{state}/{jurisdiction_name}/purge_all",
+                delete(s3_routes::recursive_delete_all_jurisdiction_data),
             );
     } else {
         info!("Public safe mode enabled, admin routes are disabled.");

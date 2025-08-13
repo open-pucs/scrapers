@@ -124,6 +124,7 @@ def process_case(
 
     # NOW THAT THE CASE IS FULLY GENERIC IT SHOULD PUSH ALL THIS STUFF OVER TO RUST
     url = f"{OPENSCRAPERS_INTERNAL_API_URL}/admin/cases/submit"
+    default_logger.info(f"Sending this string to openscrapers api: {case_json}")
     response = requests.post(url, json=case_json_pythonable)
     response.raise_for_status()
 

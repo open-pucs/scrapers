@@ -62,8 +62,9 @@ pub struct GenericAttachment {
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct GenericFiling {
-    pub name: NonEmptyString,
     pub filed_date: NaiveDate,
+    #[serde(default)]
+    pub name: String,
     #[serde(default)]
     pub organization_authors: Vec<NonEmptyString>,
     #[serde(default)]
