@@ -3,6 +3,7 @@ use std::{
     cmp::Ordering,
     collections::{BinaryHeap, HashMap},
     convert::Infallible,
+    env,
     sync::LazyLock,
     time::{Duration, Instant},
 };
@@ -110,8 +111,15 @@ async fn pop_task_from_queue() -> Option<PriorityTaskObject> {
     }
 }
 
-const SIMULTANEOUS_USER_TASKS: usize = 20;
-static USER_TASK_SEMAPHORE: Semaphore = Semaphore::const_new(SIMULTANEOUS_USER_TASKS);
+const DEFAULT_SIMULTANEOUS_TASKS: usize = 2;
+static SIMULTANEOUS_TASKS: LazyLock<usize> = LazyLock::new(|| {
+    env::var("SIMULTANEOUS_TASKS")
+        .ok()
+        .and_then(|val| str::parse(&val).ok())
+        .unwrap_or(DEFAULT_SIMULTANEOUS_TASKS)
+});
+static USER_TASK_SEMAPHORE: LazyLock<Semaphore> =
+    LazyLock::new(|| Semaphore::new(*SIMULTANEOUS_TASKS));
 
 pub async fn start_workers() -> Infallible {
     let mut trips_since_last_task: u64 = 0;
