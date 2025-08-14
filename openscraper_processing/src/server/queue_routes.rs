@@ -4,7 +4,7 @@ use tracing::info;
 
 use crate::{
     common::tasks::{TaskStatusDisplay, workers::add_task_to_queue},
-    types::CaseWithJurisdiction,
+    types::openscraper_types::CaseWithJurisdiction,
 };
 
 pub async fn submit_case_to_queue(Json(case): Json<CaseWithJurisdiction>) -> impl IntoApiResponse {

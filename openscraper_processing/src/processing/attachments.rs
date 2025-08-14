@@ -7,7 +7,7 @@ use crate::s3_stuff::{
     push_raw_attach_file_to_s3, push_raw_attach_object_to_s3,
 };
 use crate::types::env_vars::CRIMSON_URL;
-use crate::types::{
+use crate::types::openscraper_types::{
     AttachmentTextQuality, GenericAttachment, JurisdictionInfo, RawAttachment, RawAttachmentText,
 };
 use anyhow::bail;
@@ -36,7 +36,7 @@ pub async fn process_attachment_in_regular_pipeline(
     let FileDownloadResult {
         data: file_contents,
         filename: server_filename,
-    } = download_file_content_validated_with_retries(&attachment.url, &extension).await?;
+    } = download_file_content_validated_with_retries(&attachment.url, extension).await?;
     let hash = Blake2bHash::from_bytes(&file_contents);
     info!(%hash, url=%attachment.url,"Successfully downloaded file.");
 

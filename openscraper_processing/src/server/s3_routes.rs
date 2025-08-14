@@ -15,8 +15,8 @@ use crate::{
     common::hash::Blake2bHash,
     s3_stuff::{delete_all_with_prefix, delete_s3_file, get_case_s3_key, get_jurisdiction_prefix},
     types::{
-        GenericCaseLegacy, JurisdictionInfo, RawAttachment,
         env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
+        openscraper_types::{GenericCase, JurisdictionInfo, RawAttachment},
         pagination::{PaginationData, make_paginated_subslice},
     },
 };
@@ -179,7 +179,7 @@ pub async fn recursive_delete_all_jurisdiction_data(
 
 pub fn handle_case_filing_from_s3_docs(op: TransformOperation) -> TransformOperation {
     op.description("Fetch a case filing from S3.")
-        .response::<200, Json<GenericCaseLegacy>>()
+        .response::<200, Json<GenericCase>>()
         .response_with::<500, String, _>(|res| res.description("Error fetching case filing."))
 }
 

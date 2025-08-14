@@ -1,5 +1,5 @@
 use crate::s3_stuff::push_case_to_s3_and_db;
-use crate::types::{
+use crate::types::openscraper_types::{
     CaseWithJurisdiction, GenericAttachment, GenericCase, RawAttachment
 };
 use attachments::process_attachment_in_regular_pipeline;

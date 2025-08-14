@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use super::*;
 use crate::common::file_extension::FileExtension;
 use crate::s3_stuff::make_s3_client;
-use crate::types::{
-    GenericAttachment, GenericCase, GenericCaseLegacy, GenericFiling, GenericFilingLegacy,
-    JurisdictionInfo,
+use crate::types::openscraper_types::{
+    CaseWithJurisdiction, GenericAttachment, GenericCase, GenericFiling, JurisdictionInfo,
 };
 
 use chrono::{NaiveDate, Utc};

@@ -7,10 +7,9 @@ use non_empty_string::non_empty_string;
 use tracing::{debug, error, info};
 
 use crate::common::hash::Blake2bHash;
-use crate::types::env_vars::OPENSCRAPERS_S3;
+use crate::types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET};
+use crate::types::openscraper_types::{GenericCase, JurisdictionInfo, RawAttachment};
 use crate::types::s3_uri::S3Location;
-use crate::types::{GenericCase, JurisdictionInfo};
-use crate::types::{GenericCaseLegacy, RawAttachment, env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET};
 use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
 
 pub fn get_raw_attach_obj_key(hash: Blake2bHash) -> String {
@@ -144,7 +143,7 @@ pub async fn fetch_case_filing_from_s3(
     s3_client: &S3Client,
     case_name: &str,
     jurisdiction: &JurisdictionInfo,
-) -> anyhow::Result<GenericCaseLegacy> {
+) -> anyhow::Result<GenericCase> {
     info!(case_name, jurisdiction_name=%jurisdiction.jurisdiction, "Fetching case filing from S3");
     let key = get_case_s3_key(case_name, jurisdiction);
     let bytes = download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await?;
