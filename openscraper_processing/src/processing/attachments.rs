@@ -11,7 +11,7 @@ use crate::types::env_vars::CRIMSON_URL;
 use crate::types::openscraper_types::{
     AttachmentTextQuality, GenericAttachment, JurisdictionInfo, RawAttachment, RawAttachmentText,
 };
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use aws_sdk_s3::Client as S3Client;
 use chrono::Utc;
 use non_empty_string::{NonEmptyString, non_empty_string};
@@ -30,11 +30,14 @@ const DOWNLOAD_RETRY_DELAY_SECONDS: u64 = 2;
 pub type OpenscrapersExtraData = (S3Client, JurisdictionInfo);
 impl DownloadIncomplete for GenericAttachment {
     type ExtraData = OpenscrapersExtraData;
-    type SucessData = RawAttachment;
+    type SucessData = ();
     async fn download_incomplete(
         &mut self,
         (s3_client, jurisdiction_info): &Self::ExtraData,
     ) -> anyhow::Result<Self::SucessData> {
+        if self.hash.is_some() {
+            return Err(anyhow!("File already has hash"));
+        }
         info!(url=%self.url,"Trying to download attachment file.");
         let extension = &self.document_extension;
 
@@ -61,7 +64,9 @@ impl DownloadIncomplete for GenericAttachment {
             date_updated: Utc::now(),
             extra_metadata: metadata,
         };
-        shipout_attachment_to_s3(file_contents, raw_attachment, true, s3_client).await
+        shipout_attachment_to_s3(file_contents, raw_attachment, true, s3_client).await?;
+        self.hash = Some(hash);
+        Ok(())
     }
 }
 

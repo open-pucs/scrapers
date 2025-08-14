@@ -47,15 +47,59 @@ impl UpdateFromCache for GenericAttachment {
 
 impl UpdateFromCache for GenericFiling {
     fn update_from_cache(&mut self, cache: &Self) {
-        let url_map = cache
+        let cache_urls = cache
             .attachments
             .iter()
             .map(|att| (&*att.url, att))
             .collect::<HashMap<_, _>>();
         for attach in self.attachments.iter_mut() {
-            if let Some(attach_cache) = url_map.get(&*attach.url) {
-                attach.update_from_cache(attach_cache);
+            if !attach.url.is_empty()
+                && let Some(cache_attach) = cache_urls.get(&*attach.url)
+            {
+                attach.update_from_cache(cache_attach);
             }
         }
+    }
+}
+
+impl UpdateFromCache for GenericCase {
+    fn update_from_cache(&mut self, cache: &Self) {
+        let mut cache_urls = HashMap::new();
+        for filling in cache.filings.iter() {
+            for attach in filling.attachments.iter() {
+                cache_urls.insert(&*attach.url, attach);
+            }
+        }
+        for filling in self.filings.iter_mut() {
+            for attach in filling.attachments.iter_mut() {
+                if !attach.url.is_empty()
+                    && let Some(cache_attach) = cache_urls.get(&*attach.url)
+                {
+                    attach.update_from_cache(cache_attach);
+                }
+            }
+        }
+
+        // Old approach that compars on file name and other metadata instead of just using the urls for all attachments
+        // in a filling.
+        // type ToCompare<'a> = (&'a NaiveDate, usize, &'a str, &'a str); // Date filed,number of attachments, Name, Description,
+        // fn make_compare(filling: &GenericFiling) -> ToCompare<'_> {
+        //     (
+        //         &filling.filed_date,
+        //         filling.attachments.len(),
+        //         &filling.name,
+        //         &filling.description,
+        //     )
+        // }
+        // let filling_comparison = cache
+        //     .filings
+        //     .iter()
+        //     .map(|f| (make_compare(f), f))
+        //     .collect::<HashMap<_, _>>();
+        // for filling in self.filings.iter_mut() {
+        //     if let Some(cached_filling) = filling_comparison.get(&make_compare(filling)) {
+        //         filling.update_from_cache(cached_filling);
+        //     }
+        // }
     }
 }

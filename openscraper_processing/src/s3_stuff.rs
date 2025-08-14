@@ -141,11 +141,11 @@ pub async fn delete_all_with_prefix(
 
 pub async fn fetch_case_filing_from_s3(
     s3_client: &S3Client,
-    case_name: &str,
+    case_govid: &str,
     jurisdiction: &JurisdictionInfo,
 ) -> anyhow::Result<GenericCase> {
-    info!(case_name, jurisdiction_name=%jurisdiction.jurisdiction, "Fetching case filing from S3");
-    let key = get_case_s3_key(case_name, jurisdiction);
+    info!(case_govid, jurisdiction_name=%jurisdiction.jurisdiction, "Fetching case filing from S3");
+    let key = get_case_s3_key(case_govid, jurisdiction);
     let bytes = download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await?;
     let case = serde_json::from_slice(&bytes)?;
     info!("Successfully deserialized case filing");

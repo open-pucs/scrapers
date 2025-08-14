@@ -1,12 +1,11 @@
 use crate::processing::attachments::OpenscrapersExtraData;
-use crate::s3_stuff::push_case_to_s3_and_db;
-use crate::types::data_processing_traits::{DownloadIncomplete, Revalidate};
+use crate::s3_stuff::{fetch_case_filing_from_s3, push_case_to_s3_and_db};
+use crate::types::data_processing_traits::{DownloadIncomplete, Revalidate, UpdateFromCache};
 use crate::types::openscraper_types::{
-    GenericAttachment, GenericCase, RawAttachment
+    GenericAttachment, GenericCase
 };
 use futures_util::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 
 pub mod attachments;
 pub mod file_fetching;
@@ -49,30 +48,8 @@ impl DownloadIncomplete for GenericCase {
         ) -> anyhow::Result<Self::SucessData> {
 
         let attachment_refs = make_reflist_of_attachments(self);
-        let tmp_closure =
-            async |attach: &mut GenericAttachment| -> anyhow::Result<RawAttachment> {
-                // Acquire permit from semaphore (waits if none available)
-                let result = tokio::time::timeout(
-                    Duration::from_secs(120),
-                attach.download_incomplete(extra)
-                )
-                .await;
-                match result {
-                    Ok(Ok(raw_attach)) => {
-                        attach.hash = Some(raw_attach.hash);
-                        Ok(raw_attach)
-                    }
-                    Ok(Err(err)) => {
-                        tracing::error!(%err,"Failed to process attachment");
-                        Err(err)
-                    }
-                    Err(err) => {
-                        tracing::error!(%err, "Attachment processing timed out");
-                        Err(anyhow::Error::from(err))
-                    }
-                }
-            };
-        let futures_stream = stream::iter(attachment_refs.into_iter().map(tmp_closure));
+        let wraped_download = async |val: &mut GenericAttachment| {DownloadIncomplete::download_incomplete(val, extra).await};
+        let futures_stream = stream::iter(attachment_refs.into_iter().map(wraped_download));
         const CONCURRENT_ATTACHMENTS :usize = 2;
         let _ = futures_stream.buffer_unordered(CONCURRENT_ATTACHMENTS).count().await;
         Ok(())
@@ -88,6 +65,11 @@ pub async fn process_case(
     let (s3_client,jur_info) = extra_data;
     case.revalidate();
     // TODO: Fetch data from s3 and merge the cache results.
+    let govid = case.case_govid.as_str();
+    if let Ok(fetch_from_s3) = fetch_case_filing_from_s3(s3_client, govid, jur_info).await {
+        case.update_from_cache(&fetch_from_s3);
+    };
+    
     if download_files {
         let _ = case.download_incomplete(extra_data).await;
     }
