@@ -1,8 +1,9 @@
+use crate::processing::attachments::OpenscrapersExtraData;
 use crate::s3_stuff::push_case_to_s3_and_db;
+use crate::types::data_processing_traits::{DownloadIncomplete, Revalidate};
 use crate::types::openscraper_types::{
-    CaseWithJurisdiction, GenericAttachment, GenericCase, RawAttachment
+    CaseWithJurisdiction, GenericAttachment, GenericCase, JurisdictionInfo, RawAttachment
 };
-use attachments::process_attachment_in_regular_pipeline;
 use aws_sdk_s3::Client as S3Client;
 use futures_util::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -40,45 +41,58 @@ pub fn make_reflist_of_attachments(case: &mut GenericCase) -> Vec<&mut GenericAt
     case_refs
 }
 
-pub async fn process_case(
-    jurisdiction_case: &CaseWithJurisdiction,
-    s3_client: &S3Client,
-) -> anyhow::Result<()> {
-    let case = &jurisdiction_case.case;
-    let jurisdiction_info = &jurisdiction_case.jurisdiction;
-    let mut return_case = case.to_owned();
-    // let mut attachment_tasks = Vec::with_capacity(case.filings.len());
-    let attachment_refs = make_reflist_of_attachments(&mut return_case);
-    let tmp_closure =
-        async |attach: &mut GenericAttachment| -> anyhow::Result<RawAttachment> {
-            // Acquire permit from semaphore (waits if none available)
-            let result = tokio::time::timeout(
-                Duration::from_secs(120),
-                process_attachment_in_regular_pipeline(s3_client,jurisdiction_info, attach),
-            )
-            .await;
-            match result {
-                Ok(Ok(raw_attach)) => {
-                    attach.hash = Some(raw_attach.hash);
-                    Ok(raw_attach)
-                }
-                Ok(Err(err)) => {
-                    tracing::error!(%err,"Failed to process attachment");
-                    Err(err)
-                }
-                Err(err) => {
-                    tracing::error!(%err, "Attachment processing timed out");
-                    Err(anyhow::Error::from(err))
-                }
-            }
-        };
-    let futures_stream = stream::iter(attachment_refs.into_iter().map(tmp_closure));
-    const CONCURRENT_ATTACHMENTS :usize = 2;
-    let _ = futures_stream.buffer_unordered(CONCURRENT_ATTACHMENTS).count().await;
-    // Asychronously process all of these using the futures library
-    tracing::info!(case_num=%case.case_govid,"Created all attachment processing futures.");
+impl DownloadIncomplete for GenericCase {
+    type ExtraData = OpenscrapersExtraData;
+    type SucessData = ();
+    async fn download_incomplete(
+            &mut self,
+            extra: &Self::ExtraData,
+        ) -> anyhow::Result<Self::SucessData> {
 
-    let jur_info =&jurisdiction_case.jurisdiction;
+        let attachment_refs = make_reflist_of_attachments(self);
+        let tmp_closure =
+            async |attach: &mut GenericAttachment| -> anyhow::Result<RawAttachment> {
+                // Acquire permit from semaphore (waits if none available)
+                let result = tokio::time::timeout(
+                    Duration::from_secs(120),
+                attach.download_incomplete(extra)
+                )
+                .await;
+                match result {
+                    Ok(Ok(raw_attach)) => {
+                        attach.hash = Some(raw_attach.hash);
+                        Ok(raw_attach)
+                    }
+                    Ok(Err(err)) => {
+                        tracing::error!(%err,"Failed to process attachment");
+                        Err(err)
+                    }
+                    Err(err) => {
+                        tracing::error!(%err, "Attachment processing timed out");
+                        Err(anyhow::Error::from(err))
+                    }
+                }
+            };
+        let futures_stream = stream::iter(attachment_refs.into_iter().map(tmp_closure));
+        const CONCURRENT_ATTACHMENTS :usize = 2;
+        let _ = futures_stream.buffer_unordered(CONCURRENT_ATTACHMENTS).count().await;
+        return Ok(());
+    }
+}
+
+
+pub async fn process_case(
+    mut case: GenericCase,
+    extra_data: &OpenscrapersExtraData,
+    download_files: bool,
+) -> anyhow::Result<()> {
+    let (s3_client,jur_info) = extra_data;
+    case.revalidate();
+    // TODO: Fetch data from s3 and merge the cache results.
+    if download_files {
+        case.download_incomplete(extra_data).await;
+    }
+
     tracing::info!(
         case_num=%case.case_govid,
         state=%jur_info.state,
@@ -87,7 +101,7 @@ pub async fn process_case(
     );
     let s3_result = push_case_to_s3_and_db(
         s3_client,
-        &mut return_case,
+        &mut case,
         jur_info
     )
     .await;

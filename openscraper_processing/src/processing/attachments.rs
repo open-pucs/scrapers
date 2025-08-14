@@ -6,6 +6,7 @@ use crate::s3_stuff::{
     generate_s3_object_uri_from_key, get_raw_attach_file_key, get_raw_attach_obj_key,
     push_raw_attach_file_to_s3, push_raw_attach_object_to_s3,
 };
+use crate::types::data_processing_traits::DownloadIncomplete;
 use crate::types::env_vars::CRIMSON_URL;
 use crate::types::openscraper_types::{
     AttachmentTextQuality, GenericAttachment, JurisdictionInfo, RawAttachment, RawAttachmentText,
@@ -25,38 +26,43 @@ use super::file_fetching::{AdvancedFetchData, FileDownloadResult, InternetFileFe
 
 const ATTACHMENT_DOWNLOAD_TRIES: usize = 2;
 const DOWNLOAD_RETRY_DELAY_SECONDS: u64 = 2;
-pub async fn process_attachment_in_regular_pipeline(
-    s3_client: &S3Client,
-    jurisdiction_info: &JurisdictionInfo,
-    attachment: &GenericAttachment,
-) -> anyhow::Result<RawAttachment> {
-    info!(url=%attachment.url,"Trying to download attachment file.");
-    let extension = &attachment.document_extension;
 
-    let FileDownloadResult {
-        data: file_contents,
-        filename: server_filename,
-    } = download_file_content_validated_with_retries(&attachment.url, extension).await?;
-    let hash = Blake2bHash::from_bytes(&file_contents);
-    info!(%hash, url=%attachment.url,"Successfully downloaded file.");
+pub type OpenscrapersExtraData = (S3Client, JurisdictionInfo);
+impl DownloadIncomplete for GenericAttachment {
+    type ExtraData = OpenscrapersExtraData;
+    type SucessData = RawAttachment;
+    async fn download_incomplete(
+        &mut self,
+        (s3_client, jurisdiction_info): &Self::ExtraData,
+    ) -> anyhow::Result<Self::SucessData> {
+        info!(url=%self.url,"Trying to download attachment file.");
+        let extension = &self.document_extension;
 
-    let metadata = server_filename
-        .map(|exant_filename| HashMap::from([("server_filename".to_string(), exant_filename)]))
-        .unwrap_or_default();
+        let FileDownloadResult {
+            data: file_contents,
+            filename: server_filename,
+        } = download_file_content_validated_with_retries(&self.url, extension).await?;
+        let hash = Blake2bHash::from_bytes(&file_contents);
+        info!(%hash, url=%self.url,"Successfully downloaded file.");
 
-    let raw_attachment = RawAttachment {
-        jurisdiction_info: jurisdiction_info.to_owned(),
-        url: attachment.url.clone(),
-        hash,
-        file_size_bytes: file_contents.len() as u64,
-        name: attachment.name.clone(),
-        extension: extension.clone(),
-        text_objects: vec![],
-        date_added: Utc::now(),
-        date_updated: Utc::now(),
-        extra_metadata: metadata,
-    };
-    shipout_attachment_to_s3(file_contents, raw_attachment, true, s3_client).await
+        let metadata = server_filename
+            .map(|exant_filename| HashMap::from([("server_filename".to_string(), exant_filename)]))
+            .unwrap_or_default();
+
+        let raw_attachment = RawAttachment {
+            jurisdiction_info: jurisdiction_info.to_owned(),
+            url: self.url.clone(),
+            hash,
+            file_size_bytes: file_contents.len() as u64,
+            name: self.name.clone(),
+            extension: extension.clone(),
+            text_objects: vec![],
+            date_added: Utc::now(),
+            date_updated: Utc::now(),
+            extra_metadata: metadata,
+        };
+        shipout_attachment_to_s3(file_contents, raw_attachment, true, s3_client).await
+    }
 }
 
 async fn shipout_attachment_to_s3(

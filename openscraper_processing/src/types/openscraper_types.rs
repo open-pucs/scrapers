@@ -110,34 +110,6 @@ pub struct GenericCase {
     #[serde(default = "Utc::now")]
     pub indexed_at: DateTime<Utc>,
 }
-impl Revalidate for GenericCase {
-    fn revalidate(&mut self) {
-        if self.opened_date.is_some() {
-            return;
-        }
-        let mut opened_date = NaiveDate::MAX;
-        for filling in &self.filings {
-            if filling.filed_date < opened_date {
-                opened_date = filling.filed_date
-            }
-        }
-        self.opened_date = Some(opened_date);
-        for filling in &mut self.filings {
-            filling.revalidate();
-        }
-    }
-}
-
-impl Revalidate for GenericFiling {
-    fn revalidate(&mut self) {
-        if !self.name.is_empty() {
-            return;
-        }
-        if let Some(attach) = self.attachments.first() {
-            self.name = attach.name.clone().into();
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct GenericParty {

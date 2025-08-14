@@ -70,7 +70,14 @@ pub fn define_routes() -> ApiRouter {
             .api_route(
                 "/admin/cases/submit",
                 post_with(
-                    queue_routes::submit_case_to_queue,
+                    queue_routes::submit_case_to_queue_without_download,
+                    queue_routes::submit_case_to_queue_docs,
+                ),
+            )
+            .api_route(
+                "/admin/cases/submit_and_download",
+                post_with(
+                    queue_routes::submit_case_to_queue_without_download,
                     queue_routes::submit_case_to_queue_docs,
                 ),
             )
