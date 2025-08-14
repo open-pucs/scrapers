@@ -73,7 +73,7 @@ pub async fn process_case(
             }
         };
     let futures_stream = stream::iter(attachment_refs.into_iter().map(tmp_closure));
-    const CONCURRENT_ATTACHMENTS :usize = 3;
+    const CONCURRENT_ATTACHMENTS :usize = 2;
     let _ = futures_stream.buffer_unordered(CONCURRENT_ATTACHMENTS).count().await;
     // Asychronously process all of these using the futures library
     tracing::info!(case_num=%case.case_govid,"Created all attachment processing futures.");

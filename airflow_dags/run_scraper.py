@@ -32,7 +32,7 @@ def run_all_cases(scraper_info: ScraperInfoObject, years: list[int] | None):
         scraper=scraper, base_path=base_path, year_list=years
     )
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         futures = [
             executor.submit(process_case_jsonified, scraper, case, base_path)
             for case in cases

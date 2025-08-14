@@ -111,7 +111,7 @@ async fn pop_task_from_queue() -> Option<PriorityTaskObject> {
     }
 }
 
-const DEFAULT_SIMULTANEOUS_TASKS: usize = 2;
+const DEFAULT_SIMULTANEOUS_TASKS: usize = 1;
 static SIMULTANEOUS_TASKS: LazyLock<usize> = LazyLock::new(|| {
     env::var("SIMULTANEOUS_TASKS")
         .ok()
