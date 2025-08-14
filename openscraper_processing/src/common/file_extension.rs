@@ -1,8 +1,7 @@
 use std::convert::Infallible;
-use std::fmt::{self, Binary, Display};
+use std::fmt::{self, Display};
 use std::str::FromStr;
 use std::{fs, path::Path, str};
-use tracing::warn;
 
 macro_rules! static_extensions {
     ($($variant:ident => $ext_str:expr),* $(,)?) => {
@@ -163,7 +162,7 @@ impl FileEncoding {
 use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
-use crate::common::misc::{fmap_empty, into_fmap_empty};
+use crate::common::misc::into_fmap_empty;
 impl Serialize for FileExtension {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

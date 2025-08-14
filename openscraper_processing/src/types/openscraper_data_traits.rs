@@ -31,7 +31,7 @@ impl Revalidate for GenericFiling {
             return;
         }
         if let Some(attach) = self.attachments.first() {
-            self.name = attach.name.clone().into();
+            self.name = attach.name.clone();
         }
     }
 }
