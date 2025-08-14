@@ -41,7 +41,7 @@ pub struct CaseWithJurisdiction {
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct GenericAttachment {
-    pub name: NonEmptyString,
+    pub name: String,
     pub document_extension: FileExtension,
     #[serde(default)]
     pub url: String,

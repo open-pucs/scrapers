@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::*;
-use crate::common::file_extension::FileExtension;
+use crate::common::file_extension::{FileExtension, StaticExtension};
 use crate::s3_stuff::make_s3_client;
 use crate::types::openscraper_types::{
     CaseWithJurisdiction, GenericAttachment, GenericCase, GenericFiling, JurisdictionInfo,
@@ -39,9 +39,9 @@ async fn test_process_case() {
 
     // Attachments for the first filing.
     let attachment_1 = GenericAttachment {
-        name: non_empty_string!("Judgement PDF"),
+        name: non_empty_string!("Judgement PDF").into(),
         url: "https://example.com/judgement.pdf".to_string(),
-        document_extension: FileExtension::Pdf,
+        document_extension: FileExtension::Static(StaticExtension::Pdf),
         hash: None,
         extra_metadata: HashMap::new(),
         attachment_type: Default::default(),
@@ -50,9 +50,9 @@ async fn test_process_case() {
 
     // Attachments for the second filing (different extension, no hash).
     let attachment_2 = GenericAttachment {
-        name: non_empty_string!("Exhibit Image"),
+        name: non_empty_string!("Exhibit Image").into(),
         url: "https://example.com/exhibit.png".to_string(),
-        document_extension: FileExtension::Png,
+        document_extension: FileExtension::Static(StaticExtension::Png),
         hash: None,
         extra_metadata: HashMap::new(),
         attachment_type: Default::default(),

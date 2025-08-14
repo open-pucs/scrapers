@@ -1,4 +1,4 @@
-use crate::common::file_extension::FileExtension;
+use crate::common::file_extension::{FileExtension, StaticExtension};
 use crate::common::hash::Blake2bHash;
 use crate::processing::file_fetching::{FileDownloadError, RequestMethod};
 use crate::processing::{CrimsonInitialResponse, CrimsonPDFIngestParamsS3, CrimsonStatusResponse};
@@ -18,6 +18,7 @@ use non_empty_string::{NonEmptyString, non_empty_string};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::info;
@@ -35,6 +36,8 @@ impl DownloadIncomplete for GenericAttachment {
         &mut self,
         (s3_client, jurisdiction_info): &Self::ExtraData,
     ) -> anyhow::Result<Self::SucessData> {
+        let name = NonEmptyString::from_str(&self.name)
+            .unwrap_or_else(|_| non_empty_string!("unknown_filename"));
         if self.hash.is_some() {
             return Err(anyhow!("File already has hash"));
         }
@@ -57,7 +60,7 @@ impl DownloadIncomplete for GenericAttachment {
             url: self.url.clone(),
             hash,
             file_size_bytes: file_contents.len() as u64,
-            name: self.name.clone(),
+            name,
             extension: extension.clone(),
             text_objects: vec![],
             date_added: Utc::now(),
@@ -80,7 +83,12 @@ async fn shipout_attachment_to_s3(
     push_raw_attach_file_to_s3(s3_client, &raw_attachment, file_contents).await?;
     info!(%hash, "Pushed raw file to s3.");
 
-    if should_process_text && raw_attachment.extension == FileExtension::Pdf {
+    if should_process_text
+        && matches!(
+            raw_attachment.extension,
+            FileExtension::Static(StaticExtension::Pdf)
+        )
+    {
         info!(%hash,"Sending request to crimson to process pdf.");
         let text_result = process_pdf_text_using_crimson(raw_attachment.hash).await;
         match text_result {

@@ -1,62 +1,43 @@
-use std::fmt;
+use std::convert::Infallible;
+use std::fmt::{self, Binary, Display};
 use std::str::FromStr;
 use std::{fs, path::Path, str};
 use tracing::warn;
 
-#[derive(Debug, thiserror::Error)]
-#[error("File Extension was empty or contained only whitespace")]
-pub struct EmptyExtensionError {}
-macro_rules! define_file_extensions {
-    ($($variant:ident => ($ext_str:expr, $encoding:expr)),* $(,)?) => {
-        #[derive(Clone, Debug, PartialEq, Eq)]
-        pub enum FileExtension {
-            $($variant),*,
-            Unknown(String),
+macro_rules! static_extensions {
+    ($($variant:ident => $ext_str:expr),* $(,)?) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub enum StaticExtension {
+            $($variant),*
         }
 
-        impl FromStr for FileExtension {
-            type Err = EmptyExtensionError;
-
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
-                let ext = s.split_whitespace().next()
-                    .map(|s| s.to_lowercase())
-                    .ok_or(EmptyExtensionError{})?;
-
-                match ext.as_str() {
-                    $(
-                        $ext_str => Ok(FileExtension::$variant),
-                    )*
-                    _ => {
-                        warn!(extension=%ext,"Encountered unknown file extension, if not invalid, consider adding it.");
-                        Ok(FileExtension::Unknown(ext))},
+        impl StaticExtension {
+            /// Returns the extension string exactly as it was given.
+            pub const fn get_static_str(&self) -> &'static str {
+                match self {
+                    $(Self::$variant => $ext_str),*
                 }
             }
-        }
 
-        impl fmt::Display for FileExtension {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                match self {
-                    $(
-                        FileExtension::$variant => write!(f, $ext_str),
-                    )*
-                    FileExtension::Unknown(ext) => write!(f, "{}", ext),
-                }
-            }
-        }
-
-        impl FileExtension {
-            pub fn get_encoding(&self) -> FileEncoding {
-                match self {
-                    $(
-                        FileExtension::$variant => $encoding,
-                    )*
-                    FileExtension::Unknown(_) => FileEncoding::Unknown,
+            /// Case-sensitive comparison; returns `None` if no match.
+            pub fn from_str(s: &str) -> Option<Self> {
+                match s {
+                    $($ext_str => Some(Self::$variant),)*
+                    _ => None,
                 }
             }
         }
     };
 }
 
+// ---- Define the extensions you care about here ------------
+static_extensions! {
+    Pdf  => "pdf",
+    Xlsx => "xlsx",
+    Md   => "md",
+    Html => "html",
+    Png  => "png",
+}
 #[derive(Clone, Copy, Debug)]
 pub enum FileEncoding {
     Binary,
@@ -64,14 +45,55 @@ pub enum FileEncoding {
     Unknown,
 }
 
-// Define all supported file extensions. Second variable should be the encoding of the file.
-define_file_extensions! {
-    Pdf => ("pdf", FileEncoding::Binary),
-    Xlsx => ("xlsx", FileEncoding::Unknown),
-    Md => ("md", FileEncoding::Utf8),
-    Html => ("html", FileEncoding::Utf8),
-    Docx => ("docx", FileEncoding::Unknown),
-    Png => ("png", FileEncoding::Binary),
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub enum FileExtension {
+    Static(StaticExtension),
+    Unknown(String),
+    #[default]
+    Empty,
+}
+
+impl FileExtension {
+    fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+    fn get_encoding(&self) -> FileEncoding {
+        let Self::Static(static_ext) = self else {
+            return FileEncoding::Unknown;
+        };
+        match static_ext {
+            StaticExtension::Pdf => FileEncoding::Binary,
+            StaticExtension::Xlsx => FileEncoding::Binary,
+            StaticExtension::Html => FileEncoding::Utf8,
+            _ => FileEncoding::Unknown,
+        }
+    }
+    fn to_str(&self) -> &str {
+        match self {
+            Self::Static(val) => val.get_static_str(),
+            Self::Unknown(val) => val,
+            Self::Empty => "",
+        }
+    }
+}
+
+impl Display for FileExtension {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.to_str())
+    }
+}
+
+impl FromStr for FileExtension {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let intiial_fragment =
+            into_fmap_empty(s.split_whitespace().next().map(|val| val.to_lowercase()));
+        let Some(parsed) = intiial_fragment else {
+            return Ok(Self::Empty);
+        };
+        let static_opt = StaticExtension::from_str(&parsed).map(Self::Static);
+        Ok(static_opt.unwrap_or_else(|| Self::Unknown(s.to_owned())))
+    }
 }
 
 use thiserror::Error;
@@ -104,7 +126,7 @@ impl FileExtension {
         }
 
         match self {
-            FileExtension::Pdf => is_valid_pdf_contents(contents),
+            FileExtension::Static(StaticExtension::Pdf) => is_valid_pdf_contents(contents),
             _ => Ok(()),
         }
     }
@@ -140,6 +162,8 @@ impl FileEncoding {
 
 use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
+
+use crate::common::misc::{fmap_empty, into_fmap_empty};
 impl Serialize for FileExtension {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
