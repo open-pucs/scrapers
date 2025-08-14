@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::NaiveDate;
 
 use crate::types::{
-    data_processing_traits::{DownloadIncomplete, Revalidate, UpdateFromCache},
+    data_processing_traits::{Revalidate, UpdateFromCache},
     openscraper_types::{GenericAttachment, GenericCase, GenericFiling},
 };
 

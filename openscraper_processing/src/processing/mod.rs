@@ -2,9 +2,8 @@ use crate::processing::attachments::OpenscrapersExtraData;
 use crate::s3_stuff::push_case_to_s3_and_db;
 use crate::types::data_processing_traits::{DownloadIncomplete, Revalidate};
 use crate::types::openscraper_types::{
-    CaseWithJurisdiction, GenericAttachment, GenericCase, JurisdictionInfo, RawAttachment
+    GenericAttachment, GenericCase, RawAttachment
 };
-use aws_sdk_s3::Client as S3Client;
 use futures_util::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -76,7 +75,7 @@ impl DownloadIncomplete for GenericCase {
         let futures_stream = stream::iter(attachment_refs.into_iter().map(tmp_closure));
         const CONCURRENT_ATTACHMENTS :usize = 2;
         let _ = futures_stream.buffer_unordered(CONCURRENT_ATTACHMENTS).count().await;
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -90,7 +89,7 @@ pub async fn process_case(
     case.revalidate();
     // TODO: Fetch data from s3 and merge the cache results.
     if download_files {
-        case.download_incomplete(extra_data).await;
+        let _ = case.download_incomplete(extra_data).await;
     }
 
     tracing::info!(

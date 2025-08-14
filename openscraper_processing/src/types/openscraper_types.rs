@@ -5,10 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::collections::HashMap;
 
-use crate::{
-    common::{file_extension::FileExtension, hash::Blake2bHash},
-    types::data_processing_traits::Revalidate,
-};
+use crate::common::{file_extension::FileExtension, hash::Blake2bHash};
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct JurisdictionInfo {
     pub country: String,

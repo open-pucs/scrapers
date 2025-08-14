@@ -216,7 +216,7 @@ pub fn get_jurisdiction_prefix(jurisdiction: &JurisdictionInfo) -> String {
     let state = &*jurisdiction.state;
     let jurisdiction_name = &*jurisdiction.jurisdiction;
     let key = format!("objects/{country}/{state}/{jurisdiction_name}");
-    return key;
+    key
 }
 
 pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blake2bHash) -> bool {
@@ -295,12 +295,11 @@ pub async fn list_cases_for_jurisdiction(
         for object in result?.contents() {
             if let Some(key) = object.key() {
                 info!(%key, "Found list attachment object");
-                if key.ends_with(".json") {
-                    if let Some(filename) = Path::new(key).file_name() {
-                        if let Some(filestem) = filename.to_str().unwrap().strip_suffix(".json") {
-                            case_names.push(filestem.to_string());
-                        }
-                    }
+                if key.ends_with(".json")
+                    && let Some(filename) = Path::new(key).file_name()
+                    && let Some(filestem) = filename.to_str().unwrap().strip_suffix(".json")
+                {
+                    case_names.push(filestem.to_string());
                 }
             }
         }

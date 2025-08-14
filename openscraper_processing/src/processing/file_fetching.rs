@@ -63,49 +63,49 @@ pub trait InternetFileFetch: Debug {
 
 fn extract_filename_from_headers(headers: &reqwest::header::HeaderMap) -> Option<String> {
     // Try to get filename from Content-Disposition header
-    if let Some(content_disposition) = headers.get(reqwest::header::CONTENT_DISPOSITION) {
-        if let Ok(header_str) = content_disposition.to_str() {
-            // Parse Content-Disposition header for filename
-            // Common formats:
-            // - attachment; filename="file.txt"
-            // - attachment; filename*=UTF-8''file.txt
-            // - inline; filename=file.txt
+    if let Some(content_disposition) = headers.get(reqwest::header::CONTENT_DISPOSITION)
+        && let Ok(header_str) = content_disposition.to_str()
+    {
+        // Parse Content-Disposition header for filename
+        // Common formats:
+        // - attachment; filename="file.txt"
+        // - attachment; filename*=UTF-8''file.txt
+        // - inline; filename=file.txt
 
-            // First try the standard filename parameter
-            if let Some(filename_start) = header_str.find("filename=") {
-                let filename_part = &header_str[filename_start + 9..];
-                let filename = if filename_part.starts_with('"') {
-                    // Remove quotes
-                    filename_part
-                        .trim_start_matches('"')
-                        .split('"')
-                        .next()
-                        .unwrap_or("")
-                } else {
-                    // Take until semicolon or end
-                    filename_part.split(';').next().unwrap_or("").trim()
-                };
+        // First try the standard filename parameter
+        if let Some(filename_start) = header_str.find("filename=") {
+            let filename_part = &header_str[filename_start + 9..];
+            let filename = if filename_part.starts_with('"') {
+                // Remove quotes
+                filename_part
+                    .trim_start_matches('"')
+                    .split('"')
+                    .next()
+                    .unwrap_or("")
+            } else {
+                // Take until semicolon or end
+                filename_part.split(';').next().unwrap_or("").trim()
+            };
 
-                if !filename.is_empty() {
-                    return Some(filename.to_string());
-                }
+            if !filename.is_empty() {
+                return Some(filename.to_string());
             }
+        }
 
-            // Try filename* parameter (RFC 5987)
-            if let Some(filename_start) = header_str.find("filename*=") {
-                let filename_part = &header_str[filename_start + 10..];
-                // Format is usually: UTF-8''filename or charset'lang'filename
-                if let Some(double_quote_pos) = filename_part.find("''") {
-                    let filename = &filename_part[double_quote_pos + 2..];
-                    let filename = filename.split(';').next().unwrap_or("").trim();
-                    if !filename.is_empty() {
-                        // URL decode if needed
-                        return Some(
-                            urlencoding::decode(filename)
-                                .unwrap_or_default()
-                                .to_string(),
-                        );
-                    }
+        // Try filename* parameter (RFC 5987)
+        if let Some(filename_start) = header_str.find("filename*=") {
+            let filename_part = &header_str[filename_start + 10..];
+            // Format is usually: UTF-8''filename or charset'lang'filename
+            if let Some(double_quote_pos) = filename_part.find("''") {
+                let filename = &filename_part[double_quote_pos + 2..];
+                let filename = filename.split(';').next().unwrap_or("").trim();
+                if !filename.is_empty() {
+                    // URL decode if needed
+                    return Some(
+                        urlencoding::decode(filename)
+                            .unwrap_or_default()
+                            .to_string(),
+                    );
                 }
             }
         }
@@ -118,26 +118,26 @@ fn extract_filename_from_url(url: &str) -> Option<String> {
     // Extract filename from URL as fallback
     if let Ok(parsed_url) = url::Url::parse(url) {
         let path = parsed_url.path();
-        if let Some(filename) = path.split('/').next_back() {
-            if !filename.is_empty() && filename != "/" {
-                // Check if there are query parameters that might indicate a filename
-                if let Some(query) = parsed_url.query() {
-                    if let Some(filename_param) = query
-                        .split('&')
-                        .find(|param| param.starts_with("fileName="))
-                    {
-                        let filename = &filename_param[9..]; // Remove "fileName="
-                        if !filename.is_empty() {
-                            return Some(
-                                urlencoding::decode(filename)
-                                    .unwrap_or_default()
-                                    .to_string(),
-                            );
-                        }
-                    }
+        if let Some(filename) = path.split('/').next_back()
+            && !filename.is_empty()
+            && filename != "/"
+        {
+            // Check if there are query parameters that might indicate a filename
+            if let Some(query) = parsed_url.query()
+                && let Some(filename_param) = query
+                    .split('&')
+                    .find(|param| param.starts_with("fileName="))
+            {
+                let filename = &filename_param[9..]; // Remove "fileName="
+                if !filename.is_empty() {
+                    return Some(
+                        urlencoding::decode(filename)
+                            .unwrap_or_default()
+                            .to_string(),
+                    );
                 }
-                return Some(filename.to_string());
             }
+            return Some(filename.to_string());
         }
     }
     None

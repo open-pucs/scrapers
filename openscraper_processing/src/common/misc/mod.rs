@@ -33,7 +33,7 @@ pub fn is_env_var_true(var_name: &str) -> bool {
     if var == "false" {
         return false;
     }
-    return true;
+    true
 }
 
 pub trait IsEmpty {
