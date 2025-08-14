@@ -25,14 +25,14 @@ def run_all_cases(scraper_info: ScraperInfoObject, years: list[int] | None):
     logging.info(f"Running scraper for all cases for {scraper_info.id}")
 
     if not years:
-        years = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015]
+        years = [2025]
     logging.info(f"Filtering for years: {years}")
 
     cases = get_all_caselist_raw_jsonified(
         scraper=scraper, base_path=base_path, year_list=years
     )
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         futures = [
             executor.submit(process_case_jsonified, scraper, case, base_path)
             for case in cases

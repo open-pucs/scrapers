@@ -13,6 +13,7 @@ from openpuc_scrapers.models.generic import GenericCase
 from openpuc_scrapers.models.jurisdictions import CaseWithJurisdiction, JurisdictionInfo
 from openpuc_scrapers.models.timestamp import (
     RFC3339Time,
+    date_to_rfctime,
     is_after,
     rfc_time_now,
     rfctime_from_date,
@@ -184,11 +185,11 @@ def filter_off_filings_after_date(
 
         if not opened_date:
             default_logger.warning(
-                f"Case {generic_case.case_number} missing opened_date, excluding from results"
+                f"Case {generic_case.case_govid} missing opened_date, excluding from results"
             )
             continue
 
-        if is_after(rfctime=opened_date, compare_to=after_date):
+        if is_after(rfctime=date_to_rfctime(opened_date), compare_to=after_date):
             filtered_cases.append(case)
         else:
             pass
