@@ -4,6 +4,10 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 
+import shutil
+import glob
+from pathlib import Path
+
 from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
     generate_intermediate_object_save_path,
     get_all_caselist_raw_jsonified,
@@ -16,6 +20,20 @@ from openpuc_scrapers.scrapers.scraper_lookup import SCRAPER_REGISTRY, ScraperIn
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
+
+def cleanup_selenium_temp_files():
+    """Clean up selenium temporary files."""
+    try:
+        selenium_paths = glob.glob("/tmp/selenium*")
+        for path in selenium_paths:
+            if Path(path).is_dir():
+                shutil.rmtree(path)
+            else:
+                Path(path).unlink()
+        logging.info(f"Cleaned up {len(selenium_paths)} selenium temp files/dirs")
+    except Exception as e:
+        logging.warning(f"Error cleaning up selenium temp files: {e}")
 
 
 def run_all_cases(scraper_info: ScraperInfoObject, years: list[int] | None):
@@ -43,6 +61,8 @@ def run_all_cases(scraper_info: ScraperInfoObject, years: list[int] | None):
                 logging.info(f"Successfully processed case: {result}")
             except Exception as e:
                 logging.error(f"Error processing case: {e}")
+            finally:
+                cleanup_selenium_temp_files()
 
 
 def run_new_cases(scraper_info: ScraperInfoObject, after_date: str | None):
