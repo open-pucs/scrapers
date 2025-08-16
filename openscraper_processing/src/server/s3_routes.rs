@@ -186,9 +186,9 @@ pub fn handle_case_filing_from_s3_docs(op: TransformOperation) -> TransformOpera
 #[derive(Deserialize, JsonSchema)]
 pub struct JurisdictionPath {
     /// The state of the jurisdiction.
-    state: String,
+    pub state: String,
     /// The name of the jurisdiction.
-    jurisdiction_name: String,
+    pub jurisdiction_name: String,
 }
 
 pub async fn handle_caselist_jurisdiction_fetch_all(
@@ -199,7 +199,6 @@ pub async fn handle_caselist_jurisdiction_fetch_all(
     Query(PaginationData { limit, offset }): Query<PaginationData>,
 ) -> impl IntoApiResponse {
     info!(state = %state, jurisdiction = %jurisdiction_name, "Request received for case list");
-    warn!("I dont know what the fuck is going wrong with this stuff");
     let s3_client = crate::s3_stuff::make_s3_client().await;
 
     info!("Sucessfully created s3 client.");

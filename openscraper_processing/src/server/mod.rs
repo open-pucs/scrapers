@@ -2,7 +2,7 @@ use aide::{
     self,
     axum::{
         ApiRouter,
-        routing::{delete, get, get_with, post_with},
+        routing::{delete, get, get_with, post, post_with},
     },
 };
 use direct_file_fetch::{
@@ -11,11 +11,15 @@ use direct_file_fetch::{
 use std::sync::LazyLock;
 use tracing::info;
 
-use crate::common::misc::is_env_var_true;
+use crate::{
+    common::misc::is_env_var_true,
+    server::scraper_check_completed::get_completed_cases_differential,
+};
 
 pub mod direct_file_fetch;
 pub mod queue_routes;
 pub mod s3_routes;
+pub mod scraper_check_completed;
 
 static PUBLIC_SAFE_MODE: LazyLock<bool> = LazyLock::new(|| is_env_var_true("PUBLIC_SAFE_MODE"));
 
@@ -42,6 +46,10 @@ pub fn define_routes() -> ApiRouter {
                 s3_routes::handle_caselist_jurisdiction_fetch_all,
                 s3_routes::handle_caselist_jurisdiction_fetch_all_docs,
             ),
+        )
+        .api_route(
+            "/public/caselist/{state}/{jurisdiction_name}/completed_differential",
+            post(get_completed_cases_differential),
         )
         .api_route(
             "/public/raw_attachments/{blake2b_hash}/obj",
