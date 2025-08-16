@@ -17,41 +17,46 @@ impl<T> Default for DoubleDeduplicated<T> {
     }
 }
 
-impl<T: Hash + Eq> DoubleDeduplicated<T> {
-    pub fn make_double_deduplicated(base: Vec<T>, comparison: Vec<T>) -> Self {
+impl<Obj> DoubleDeduplicated<Obj> {
+    pub fn make_double_deduplicated_with_keys<Key: Hash + Eq>(
+        base: Vec<(Key, Obj)>,
+        comparison: Vec<(Key, Obj)>,
+    ) -> Self {
         enum SetMarker {
             Both,
             Base,
             Comparison,
         }
-        fn combine_comparison_and_hashret(opt: Option<&SetMarker>) -> SetMarker {
+        fn combine_comparison_and_hashret(opt: &SetMarker) -> SetMarker {
             match opt {
-                // If not in there at all it isnt in base.
-                None => SetMarker::Comparison,
                 // If only in comparison it isnt in base
-                Some(SetMarker::Comparison) => SetMarker::Comparison,
+                SetMarker::Comparison => SetMarker::Comparison,
                 // If it was marked as in base, and is in comparison, then its in both
-                Some(SetMarker::Base) => SetMarker::Both,
+                SetMarker::Base => SetMarker::Both,
                 // If in both its still in both
-                Some(SetMarker::Both) => SetMarker::Both,
+                SetMarker::Both => SetMarker::Both,
             }
         }
 
-        let mut hashmap: HashMap<T, SetMarker> = HashMap::new();
-        for val in base {
-            hashmap.insert(val, SetMarker::Base);
+        let mut hashmap: HashMap<Key, (SetMarker, Obj)> = HashMap::new();
+        for (key, val) in base {
+            hashmap.insert(key, (SetMarker::Base, val));
         }
-        for val in comparison {
-            let insert_marker = combine_comparison_and_hashret(hashmap.get(&val));
-            hashmap.insert(val, insert_marker);
+        for (key, obj) in comparison {
+            if let Some((mark, _)) = hashmap.get(&key) {
+                let insert_marker = combine_comparison_and_hashret(mark);
+                hashmap.insert(key, (insert_marker, obj));
+            } else {
+                hashmap.insert(key, (SetMarker::Comparison, obj));
+            }
         }
-        let mut return_deduped = DoubleDeduplicated::<T>::default();
-        let x = hashmap
+        let mut return_deduped = DoubleDeduplicated::default();
+        let _ = hashmap
             .into_iter()
-            .map(|(val, marker)| match marker {
-                SetMarker::Both => return_deduped.in_both.push(val),
-                SetMarker::Base => return_deduped.in_base.push(val),
-                SetMarker::Comparison => return_deduped.in_comparison.push(val),
+            .map(|(_, (mark, obj))| match mark {
+                SetMarker::Both => return_deduped.in_both.push(obj),
+                SetMarker::Base => return_deduped.in_base.push(obj),
+                SetMarker::Comparison => return_deduped.in_comparison.push(obj),
             })
             .count();
         return_deduped

@@ -13,7 +13,7 @@ use tracing::info;
 
 use crate::{
     common::misc::is_env_var_true,
-    server::scraper_check_completed::get_completed_cases_differential,
+    server::scraper_check_completed::get_completed_casedata_differential,
 };
 
 pub mod direct_file_fetch;
@@ -48,8 +48,8 @@ pub fn define_routes() -> ApiRouter {
             ),
         )
         .api_route(
-            "/public/caselist/{state}/{jurisdiction_name}/completed_differential",
-            post(get_completed_cases_differential),
+            "/public/caselist/{state}/{jurisdiction_name}/casedata_differential",
+            post(get_completed_casedata_differential),
         )
         .api_route(
             "/public/raw_attachments/{blake2b_hash}/obj",
