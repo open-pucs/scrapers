@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::mem;
 
 use chrono::NaiveDate;
 
@@ -27,6 +28,15 @@ impl Revalidate for GenericCase {
 
 impl Revalidate for GenericFiling {
     fn revalidate(&mut self) {
+        self.organization_authors = mem::take(&mut self.organization_authors)
+            .into_iter()
+            .filter(|x| !x.is_empty())
+            .collect();
+        self.individual_authors = mem::take(&mut self.individual_authors)
+            .into_iter()
+            .filter(|x| !x.is_empty())
+            .collect();
+        // Name stuff
         if !self.name.is_empty() {
             return;
         }
