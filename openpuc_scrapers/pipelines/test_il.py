@@ -13,7 +13,7 @@ async def test_il_on_single_case() -> None:
     # Create a test case
     test_case = ILICCCaseData(
         case_url="https://www.icc.illinois.gov/docket/P2025-0274",
-        case_number="25-0274",
+        docket_govid="25-0274",
         category="Electric"
     )
     

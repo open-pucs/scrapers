@@ -165,7 +165,7 @@ def test_full_case_scraping():
         # Create a case data object
         case_data = ILICCCaseData(
             case_url="https://www.icc.illinois.gov/docket/P2025-0274",
-            case_number="25-0274",
+            docket_govid="25-0274",
             category="Electric"
         )
         
@@ -173,7 +173,7 @@ def test_full_case_scraping():
         result = scraper.filing_data(case_data)
         
         # Verify basics
-        assert result.case_number == "25-0274"
+        assert result.docket_govid == "25-0274"
         
         # Check service list
         print(f"Service list entries: {len(result.service_list)}")
@@ -186,7 +186,7 @@ def test_full_case_scraping():
         print(f"Documents: {len(result.documents)}")
         
         # Print overall success message
-        print(f"Successfully scraped case {result.case_number}")
+        print(f"Successfully scraped case {result.docket_govid}")
     
     except ImportError as e:
         pytest.skip(f"Required module not available: {e}")

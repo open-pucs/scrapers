@@ -32,7 +32,7 @@ class DummyAttachment(BaseModel):
 
 class DummyFilingData(BaseModel):
     filing_id: str
-    case_number: str
+    docket_govid: str
     date_filed: RFC3339Time
     description: str
     attachments: List[DummyAttachment] = []
@@ -71,7 +71,7 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
     def _generate_dummy_filing(self, case: DummyCaseData) -> DummyFilingData:
         return DummyFilingData(
             filing_id=f"FILING-{randint(10000, 99999)}",
-            case_number=case.docket_govid,
+            docket_govid=case.docket_govid,
             date_filed=date_to_rfctime(fake.date_this_year()),
             description=fake.sentence(),
             attachments=[

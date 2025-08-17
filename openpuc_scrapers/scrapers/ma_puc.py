@@ -41,10 +41,10 @@ class MassachusettsDPUScraper(GenericScraper[GenericCase, GenericFiling]):
 
     def filing_data_intermediate(self, data: GenericCase) -> Dict[str, Any]:
         """Capture case details HTML as intermediate"""
-        response = requests.get(self._get_case_details_url(data.case_number))
+        response = requests.get(self._get_case_details_url(data.docket_govid))
         response.raise_for_status()
         return {
-            "case_number": data.case_number,
+            "docket_govid": data.docket_govid,
             "html": response.text,
             "existing_case": data.model_dump(),
         }
@@ -140,7 +140,7 @@ class MassachusettsDPUScraper(GenericScraper[GenericCase, GenericFiling]):
         """Get the URL for a case.
 
         Args:
-            case_number (str): The case number.
+            docket_govid (str): The case number.
 
         Returns:
             str: The URL for the case.
@@ -179,7 +179,7 @@ class MassachusettsDPUScraper(GenericScraper[GenericCase, GenericFiling]):
                 opened_date = date_to_rfctime(opened_date)
 
             case = GenericCase(
-                case_number=cells[0].get_text(strip=True),
+                docket_govid=cells[0].get_text(strip=True),
                 case_type=cells[1].get_text(strip=True) or None,
                 industry=cells[2].get_text(strip=True) or None,
                 petitioner=cells[4].get_text(strip=True) or None,
@@ -209,7 +209,7 @@ class MassachusettsDPUScraper(GenericScraper[GenericCase, GenericFiling]):
             requests.HTTPError: If the request to the website fails.
         """
         # Query the website for the case details
-        request_url = self._get_case_details_url(case.case_number)
+        request_url = self._get_case_details_url(case.docket_govid)
         response = requests.get(request_url)
         response.raise_for_status()
 
@@ -224,16 +224,16 @@ class MassachusettsDPUScraper(GenericScraper[GenericCase, GenericFiling]):
 
         return case
 
-    def _get_case_details_url(self, case_number: str):
+    def _get_case_details_url(self, docket_govid: str):
         """Get the URL for a case.
 
         Args:
-            case_number (str): The case number.
+            docket_govid (str): The case number.
 
         Returns:
             str: The URL for the case.
         """
-        return f"https://eeaonline.eea.state.ma.us/DPU/Fileroom/dockets/get/?number={case_number}&edit=false"
+        return f"https://eeaonline.eea.state.ma.us/DPU/Fileroom/dockets/get/?number={docket_govid}&edit=false"
 
     def _parse_case_details(
         self, soup: BeautifulSoup, case: GenericCase
