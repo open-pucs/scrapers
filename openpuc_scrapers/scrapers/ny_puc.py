@@ -44,7 +44,7 @@ class NYPUCFiling(BaseModel):
 
 
 class NYPUCDocket(BaseModel):
-    docket_govid: str  # 24-C-0663
+    case_number: str  # 24-C-0663
     case_url: str
     matter_type: str  # Complaint
     matter_subtype: str  # Appeal of an Informal Hearing Decision
@@ -69,7 +69,7 @@ def combine_dockets(docket_lists: List[List[NYPUCDocket]]) -> List[NYPUCDocket]:
 def process_docket(docket: NYPUCDocket) -> str:
     """Task to process a single docket and return its files"""
     default_logger.info(
-        f"Processing docket {docket.docket_govid} from {docket.date_filed}"
+        f"Processing docket {docket.case_number} from {docket.date_filed}"
     )
     default_logger.debug(f"Docket metadata: {docket.model_dump_json()}")
 
@@ -77,9 +77,9 @@ def process_docket(docket: NYPUCDocket) -> str:
     from selenium.webdriver.chrome.options import Options
 
     # Validate input before proceeding
-    assert docket.docket_govid, "Docket case number cannot be empty"
-    assert len(docket.docket_govid) >= 6, (
-        f"Invalid case number format: {docket.docket_govid}"
+    assert docket.case_number, "Docket case number cannot be empty"
+    assert len(docket.case_number) >= 6, (
+        f"Invalid case number format: {docket.case_number}"
     )
 
     # Create unique temp directory for user data
@@ -94,11 +94,11 @@ def process_docket(docket: NYPUCDocket) -> str:
 
     driver = webdriver.Chrome(options=chrome_options)
     try:
-        url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={docket.docket_govid}"
+        url = f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={docket.case_number}"
         docket.case_url = url
         default_logger.debug(f"Navigating to docket URL: {url}")
         driver.get(url)
-        default_logger.info(f"Loaded docket page for {docket.docket_govid}")
+        default_logger.info(f"Loaded docket page for {docket.case_number}")
 
         # Custom wait logic
         default_logger.debug("Waiting for page overlay to clear")
@@ -124,14 +124,14 @@ def process_docket(docket: NYPUCDocket) -> str:
         )
 
         default_logger.info(
-            f"Successfully retrieved table data for {docket.docket_govid} "
+            f"Successfully retrieved table data for {docket.case_number} "
             f"({len(outer_html_table)} bytes)"
         )
         driver.quit()
         return outer_html_table
 
     except Exception as e:
-        default_logger.error(f"Error processing docket {docket.docket_govid}: {e}")
+        default_logger.error(f"Error processing docket {docket.case_number}: {e}")
         raise e
     finally:
         driver.quit()
@@ -397,7 +397,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
 
     def filing_data_intermediate(self, data: NYPUCDocket) -> Dict[str, Any]:
         """Get HTML content for a docket's filings"""
-        return {"docket_id": data.docket_govid, "html": process_docket(data)}
+        return {"docket_id": data.case_number, "html": process_docket(data)}
 
     def filing_data_from_intermediate(
         self, intermediate: Dict[str, Any]
@@ -427,7 +427,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         """Convert to generic case format"""
         return GenericCase(
             case_url=state_data.case_url,
-            case_govid=state_data.docket_govid,
+            case_govid=state_data.case_number,
             case_type=f"{state_data.matter_type} - {state_data.matter_subtype}",
             description=state_data.case_title,
             case_name=state_data.case_title,
