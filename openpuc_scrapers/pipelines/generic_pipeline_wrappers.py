@@ -245,7 +245,7 @@ def get_all_caselist_raw(
 
     # Get and save case list
     caselist_intermediate = scraper.universal_caselist_intermediate()
-    caselist_path = f"{base_path}/caselist.json"
+    caselist_path = f"{base_path}/caselist-intermediate.json"
     save_json_sync(
         path=caselist_path,
         data=caselist_intermediate,
@@ -253,11 +253,13 @@ def get_all_caselist_raw(
 
     # Process cases and apply date filter
     state_cases = scraper.universal_caselist_from_intermediate(caselist_intermediate)
-    filtered_cases = filter_off_filings_in_yearlist(
-        scraper=scraper, caselist=state_cases, yearlist=year_list
+    caselist_path = f"{base_path}/caselist-all.json"
+    save_json_sync(
+        path=caselist_path,
+        data=state_cases,
     )
 
-    return filtered_cases
+    return state_cases
 
 
 def get_all_caselist_raw_jsonified(
