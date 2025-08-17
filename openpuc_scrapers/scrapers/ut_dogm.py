@@ -240,8 +240,10 @@ def extract_filings_from_dockethtml(table_html: str, case: str) -> List[UTDOGMFi
 def deduplicate_individual_attachments_into_files(
     raw_files: List[UTDOGMFiling],
 ) -> List[UTDOGMFiling]:
-    assert raw_files, "Empty raw_files input"
-    assert len(raw_files) != 0, "No Raw Files to deduplicate"
+    if not isinstance(raw_files, list):
+        return []
+    if len(raw_files) == 0:
+        return []
 
     dict_utdogm = {}
 
