@@ -43,7 +43,7 @@ def run_all_cases(scraper_info: ScraperInfoObject, years: list[int] | None):
     logging.info(f"Running scraper for all cases for {scraper_info.id}")
 
     if not years:
-        years = [2025]
+        years = []
     logging.info(f"Filtering for years: {years}")
 
     cases = get_all_caselist_raw_jsonified(
