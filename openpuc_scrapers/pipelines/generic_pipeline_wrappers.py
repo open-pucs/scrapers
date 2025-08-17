@@ -23,7 +23,7 @@ from openpuc_scrapers.models.timestamp import (
 import requests
 
 
-from openpuc_scrapers.pipelines.helper_utils import save_json_sync
+from openpuc_scrapers.pipelines.helper_utils import create_json_string, save_json_sync
 from openpuc_scrapers.scrapers.base import (
     GenericScraper,
     StateCaseData,
@@ -258,8 +258,26 @@ def get_all_caselist_raw(
         path=caselist_path,
         data=state_cases,
     )
+    state = scraper.state
+    jurisdiction = scraper.jurisdiction_name
+    diff_url = f"{OPENSCRAPERS_INTERNAL_API_URL}/public/caselist/{state}/{jurisdiction}/casedata_differential"
+    cases_json_str = create_json_string(state_cases)
+    cases_json_obj = json.loads(cases_json_str)
+    response = requests.post(url=diff_url, json=cases_json_obj)
+    response.raise_for_status()
+    response_obj = json.loads(response.content)
+    diff_caselist_path = f"{base_path}/caselist-differential.json"
+    save_json_sync(
+        path=diff_caselist_path,
+        data=response_obj,
+    )
+    py_caselist = response_obj["to_process"]
+    ret_caselist = []
+    casetype = scraper.state_case_type
+    for pycase in py_caselist:
+        ret_caselist.append(casetype.model_validate(pycase))
 
-    return state_cases
+    return ret_caselist
 
 
 # def get_all_caselist_raw(
