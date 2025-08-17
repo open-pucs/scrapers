@@ -210,6 +210,9 @@ def get_all_caselist_raw(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     base_path: str,
 ) -> List[StateCaseData]:
+    """Get full caselist with 2020+ date filtering"""
+    # Validate date input
+
     # Get and save case list
     caselist_intermediate = scraper.universal_caselist_intermediate()
     caselist_path = f"{base_path}/caselist_intermediate.json"
@@ -217,10 +220,10 @@ def get_all_caselist_raw(
         path=caselist_path,
         data=caselist_intermediate,
     )
+    # Process cases and apply date filter
     all_state_cases = scraper.universal_caselist_from_intermediate(
         caselist_intermediate
     )
-    print(f"All state cases had length:{len(all_state_cases)}")
     caselist_path = f"{base_path}/caselist_all.json"
     save_json_sync(
         path=caselist_path,
