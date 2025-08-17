@@ -262,6 +262,43 @@ def get_all_caselist_raw(
     return state_cases
 
 
+# def get_all_caselist_raw(
+#     scraper: GenericScraper[StateCaseData, StateFilingData],
+#     base_path: str,
+# ) -> List[StateCaseData]:
+#     # Get and save case list
+#     caselist_intermediate = scraper.universal_caselist_intermediate()
+#     caselist_path = f"{base_path}/caselist_intermediate.json"
+#     save_json_sync(
+#         path=caselist_path,
+#         data=caselist_intermediate,
+#     )
+#     all_state_cases = scraper.universal_caselist_from_intermediate(
+#         caselist_intermediate
+#     )
+#     print(f"All state cases had length:{len(all_state_cases)}")
+#     caselist_path = f"{base_path}/caselist_all.json"
+#     save_json_sync(
+#         path=caselist_path,
+#         data=all_state_cases,
+#     )
+#     state = scraper.state
+#     jurisdiction = scraper.jurisdiction_name
+#     url = f"{OPENSCRAPERS_INTERNAL_API_URL}/public/caselist/{state}/{jurisdiction}/casedata_differential"
+#     json_str = create_json_string(all_state_cases)
+#     json_obj = json.loads(json_str)
+#     response = requests.post(url, json=json_obj)
+#     response.raise_for_status()
+#     response_data = json.loads(response.content)
+#     save_json_sync(path=f"{base_path}/caselist_processed.json", data=response_data)
+#     actual_cases_python_code = response_data.to_process
+#     cases_pydantic = []
+#     case_type = scraper.state_case_type
+#     for py_case in actual_cases_python_code:
+#         cases_pydantic.append(case_type.model_validate(py_case))
+#     return cases_pydantic
+
+
 def get_all_caselist_raw_jsonified(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     base_path: str,
