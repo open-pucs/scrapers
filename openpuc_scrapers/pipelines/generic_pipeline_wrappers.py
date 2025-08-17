@@ -238,10 +238,12 @@ def get_all_caselist_raw(
     response.raise_for_status()
     response_data = json.loads(response.content)
     save_json_sync(path=f"{base_path}/caselist_processed.json", data=response_data)
-    actual_cases = response_data.to_process
-    adapter = TypeAdapter(list[StateCaseData])
-    to_process_cases = adapter.validate_python(actual_cases)
-    return to_process_cases
+    actual_cases_python_code = response_data.to_process
+    cases_pydantic = []
+    case_type = scraper.state_case_type
+    for py_case in actual_cases_python_code:
+        cases_pydantic.append(case_type.model_validate(py_case))
+    return cases_pydantic
 
 
 def get_all_caselist_raw_jsonified(
