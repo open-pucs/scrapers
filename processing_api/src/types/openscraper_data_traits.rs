@@ -72,7 +72,7 @@ impl ReParse for GenericFiling {
                 .map(|f| &*f.name)
                 .collect::<Vec<_>>();
             let guess = guess_at_filling_title(&attach_names).await;
-            // self.name = guess;
+            self.name = guess;
         }
         Ok(())
     }

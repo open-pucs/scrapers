@@ -153,7 +153,7 @@ pub async fn split_mutate_author_list(auth_list: &mut Vec<String>) {
             return;
         };
         tracing::info!(previous_name=%first_el, new_list =?llm_parsed_names,"Parsed list into a bunch of llm names.");
-        // *auth_list = llm_parsed_names
+        *auth_list = llm_parsed_names
     }
 }
 
