@@ -2,8 +2,7 @@ use std::mem;
 use std::{collections::HashMap, convert::Infallible};
 
 use chrono::NaiveDate;
-use futures_util::future::join_all;
-use futures_util::{StreamExt, stream};
+use futures_util::{StreamExt, join, stream};
 
 use crate::common::llm_deepinfra::guess_at_filling_title;
 use crate::{
@@ -71,12 +70,11 @@ impl ReParse for GenericFiling {
                 *nameref = guess;
             }
         }
-        let _x = join_all([
+        let _x = join!(
             replace_name(&mut self.name, &self.attachments),
             split_mutate_author_list(&mut self.organization_authors),
             split_mutate_author_list(&mut self.individual_authors),
-        ])
-        .await;
+        );
 
         Ok(())
     }

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::fmt::Debug;
 use std::sync::LazyLock;
 
 use crate::common::misc::fmap_empty;
@@ -157,7 +158,7 @@ pub async fn split_mutate_author_list(auth_list: &mut Vec<String>) {
     }
 }
 
-pub async fn guess_at_filling_title<T: AsRef<str>>(attachment_names: &[T]) -> String {
+pub async fn guess_at_filling_title<T: AsRef<str> + Serialize>(attachment_names: &[T]) -> String {
     if attachment_names.len() == 1
         && let Some(first) = attachment_names.first()
     {
@@ -199,7 +200,7 @@ Response:
     );
     let guess = cheap_prompt(&prompt).await.unwrap_or("".to_string());
 
-    tracing::info!(%guess, initial_names=?attachment_names,"Guesing at attachment title");
+    tracing::info!(%guess, initial_names=?serialized_attach_names,"Guesing at attachment title");
     guess
 }
 
