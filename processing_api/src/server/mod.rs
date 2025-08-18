@@ -12,7 +12,7 @@ use std::sync::LazyLock;
 use tracing::info;
 
 use crate::{
-    common::misc::is_env_var_true,
+    common::{llm_deepinfra::test_deepinfra, misc::is_env_var_true},
     server::scraper_check_completed::get_completed_casedata_differential,
 };
 
@@ -33,6 +33,7 @@ pub fn define_routes() -> ApiRouter {
     let mut app = ApiRouter::new()
         .api_route("/", get(return_healthy))
         .api_route("/health", get(return_healthy))
+        .api_route("/test/deepinfra", get(test_deepinfra))
         .api_route(
             "/public/cases/{state}/{jurisdiction_name}/{case_name}",
             get_with(

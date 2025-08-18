@@ -8,6 +8,7 @@ use common::{
 use tracing::info;
 
 use crate::{
+    common::llm_deepinfra::DEEPINFRA_API_KEY,
     server::define_routes,
     types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET},
 };
@@ -43,10 +44,15 @@ static PORT: LazyLock<u16> = LazyLock::new(|| {
 async fn main() -> anyhow::Result<()> {
     let _ = *OPENSCRAPERS_S3;
     let _ = *OPENSCRAPERS_S3_OBJECT_BUCKET;
+    let _ = *DEEPINFRA_API_KEY;
     if let Err(e) = do_i_have_internet() {
         tracing::error!(err = %e,"NO INTERNET DETECTED");
         panic!("NO INTERNET DETECTED");
     }
+    // check address early
+    let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *PORT);
+    info!(?addr, "Starting application on adress");
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     // initialise our subscriber
     let make_api = || {
         let routes = define_routes();
@@ -68,10 +74,6 @@ async fn main() -> anyhow::Result<()> {
     // Spawns the background processing loop
     spawn_worker_loop();
 
-    // bind and serve
-    let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *PORT);
-    info!(?addr, "Starting application on adress");
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     let app_description = "A component of the openscrapers library designed to efficently and cheaply process goverment docs at scale.";
     let Err(serve_error) = generate_api_docs_and_serve(listener, app, app_description).await;
     tracing::error!(

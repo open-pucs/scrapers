@@ -248,15 +248,14 @@ pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blak
     result
 }
 
-pub async fn push_case_to_s3_and_db(
+pub async fn push_case_to_s3(
     s3_client: &S3Client,
-    case: &mut GenericCase,
+    case: &GenericCase,
     jurisdiction: &JurisdictionInfo,
 ) -> anyhow::Result<()> {
     info!(case_number = %case.case_govid, "Pushing case to S3 and DB");
     let key = get_case_s3_key(case.case_govid.as_ref(), jurisdiction);
     debug!("Pushing case with key: {}", key);
-    case.indexed_at = offset::Utc::now();
     let case_jsonified = serde_json::to_string(case)?;
     upload_s3_bytes(
         s3_client,
@@ -272,15 +271,17 @@ pub async fn push_case_to_s3_and_db(
 
 pub async fn list_cases_for_jurisdiction(
     s3_client: &S3Client,
-    jurisdiction_name: &str,
-    state: &str,
-    country: &str,
+    JurisdictionInfo {
+        jurisdiction,
+        state,
+        country,
+    }: &JurisdictionInfo,
 ) -> anyhow::Result<Vec<String>> {
     info!(
-        jurisdiction_name,
+        jurisdiction,
         state, country, "Listing cases for jurisdiction"
     );
-    let prefix = format!("objects/{country}/{state}/{jurisdiction_name}/");
+    let prefix = format!("objects/{country}/{state}/{jurisdiction}/");
     let mut case_names = Vec::new();
     info!("Listing cases with prefix: {}", prefix);
 

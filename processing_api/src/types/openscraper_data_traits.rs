@@ -1,11 +1,15 @@
-use std::collections::HashMap;
 use std::mem;
+use std::{collections::HashMap, convert::Infallible};
 
 use chrono::NaiveDate;
+use futures_util::future::join_all;
 
-use crate::types::{
-    data_processing_traits::{Revalidate, UpdateFromCache},
-    openscraper_types::{GenericAttachment, GenericCase, GenericFiling},
+use crate::{
+    common::llm_deepinfra::{org_split_from_dump, split_mutate_author_list},
+    types::{
+        data_processing_traits::{ReParse, Revalidate, UpdateFromCache},
+        openscraper_types::{GenericAttachment, GenericCase, GenericFiling},
+    },
 };
 
 impl Revalidate for GenericCase {
@@ -43,6 +47,24 @@ impl Revalidate for GenericFiling {
         if let Some(attach) = self.attachments.first() {
             self.name = attach.name.clone();
         }
+    }
+}
+
+impl ReParse for GenericCase {
+    type ParseError = Infallible;
+    async fn re_parse(&mut self) -> Result<(), Self::ParseError> {
+        // Call re_parse on each of the fillings, and await the futures all at once
+        let futs = self.filings.iter_mut().map(ReParse::re_parse);
+        join_all(futs).await;
+        Ok(())
+    }
+}
+impl ReParse for GenericFiling {
+    type ParseError = Infallible;
+    async fn re_parse(&mut self) -> Result<(), Self::ParseError> {
+        split_mutate_author_list(&mut self.organization_authors).await;
+        split_mutate_author_list(&mut self.individual_authors).await;
+        Ok(())
     }
 }
 

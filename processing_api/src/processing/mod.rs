@@ -1,5 +1,5 @@
 use crate::processing::attachments::OpenscrapersExtraData;
-use crate::s3_stuff::{fetch_case_filing_from_s3, push_case_to_s3_and_db};
+use crate::s3_stuff::{fetch_case_filing_from_s3, push_case_to_s3};
 use crate::types::data_processing_traits::{DownloadIncomplete, Revalidate, UpdateFromCache};
 use crate::types::openscraper_types::{
     GenericAttachment, GenericCase
@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod attachments;
 pub mod file_fetching;
+pub mod reparse_all;
 
 #[derive(Serialize)]
 struct CrimsonPDFIngestParamsS3 {
@@ -80,7 +81,7 @@ pub async fn process_case(
         jurisdiction=%jur_info.jurisdiction,
         "Finished all attachments, pushing case to db."
     );
-    let s3_result = push_case_to_s3_and_db(
+    let s3_result = push_case_to_s3(
         s3_client,
         &mut case,
         jur_info
