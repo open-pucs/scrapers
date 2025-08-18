@@ -15,6 +15,8 @@ use tokio::{
 };
 use tracing::{Instrument, info};
 
+use crate::common::misc::prettyprint_duration;
+
 use super::{ExecuteUserTask, TaskState, TaskStatus};
 
 pub struct PriorityTaskObject {
@@ -94,6 +96,28 @@ pub async fn add_task_to_queue(obj: impl ExecuteUserTask, priority: i32) -> Task
     task_status
 }
 
+pub async fn read_task_status(task_id: u64) -> Option<TaskStatus> {
+    let read_guard = (*TASK_STATUS_DATA).read().await;
+    let status = read_guard.get(&task_id).cloned();
+    return status;
+}
+pub async fn add_task_to_queue_and_wait_to_see_if_done(
+    obj: impl ExecuteUserTask,
+    priority: i32,
+    wait: Duration,
+) -> TaskStatus {
+    let entry_status = add_task_to_queue(obj, priority).await;
+    let task_id = entry_status.task_id;
+    let is_running_task = task_poll_now().await;
+    if is_running_task {
+        sleep(wait).await;
+        let new_status = read_task_status(task_id).await;
+        new_status.unwrap_or(entry_status)
+    } else {
+        return entry_status;
+    }
+}
+
 async fn pop_task_from_queue() -> Option<PriorityTaskObject> {
     let mut queue_guard = TASK_PRIORITY_QUEUE.lock().await;
     let option = queue_guard.pop();
@@ -111,7 +135,7 @@ async fn pop_task_from_queue() -> Option<PriorityTaskObject> {
     }
 }
 
-const DEFAULT_SIMULTANEOUS_TASKS: usize = 1;
+const DEFAULT_SIMULTANEOUS_TASKS: usize = 2;
 static SIMULTANEOUS_TASKS: LazyLock<usize> = LazyLock::new(|| {
     env::var("SIMULTANEOUS_TASKS")
         .ok()
@@ -120,47 +144,57 @@ static SIMULTANEOUS_TASKS: LazyLock<usize> = LazyLock::new(|| {
 });
 static USER_TASK_SEMAPHORE: LazyLock<Semaphore> =
     LazyLock::new(|| Semaphore::new(*SIMULTANEOUS_TASKS));
-
 pub async fn start_workers() -> Infallible {
     let mut trips_since_last_task: u64 = 0;
     loop {
-        let permit = USER_TASK_SEMAPHORE.acquire().await.unwrap();
-        match pop_task_from_queue().await {
-            None => {
-                trips_since_last_task += 1;
-                if trips_since_last_task.is_power_of_two() {
-                    info!(seconds=%trips_since_last_task,"Have not gotten a new task dispite waiting at least n seconds.")
-                }
-                drop(permit);
-                sleep(Duration::from_secs(1)).await
+        let was_poll_successful = task_poll_now().await;
+        if !was_poll_successful {
+            trips_since_last_task += 1;
+            if trips_since_last_task.is_power_of_two() {
+                let time_since_last_task =
+                    prettyprint_duration(Duration::from_secs(trips_since_last_task));
+                info!(%time_since_last_task,"Have not gotten a new task dispite waiting a long time")
             }
-            Some(res) => {
-                tokio::spawn(async move {
-                    let task_id = res.task_id;
-                    let obj = res.task_object;
-                    let task_type_label = obj.get_task_label();
-                    async move {
-                        let task_status_readlock = (*TASK_STATUS_DATA).read().await;
-                        let mut task_obj = task_status_readlock
-                            .get(&task_id)
-                            .cloned()
-                            .unwrap_or_else(|| TaskStatus::new(task_id, &*obj));
-                        drop(task_status_readlock);
-                        obj.execute_task_raw(&mut task_obj).await;
+            sleep(Duration::from_secs(1)).await
+        }
+    }
+}
 
-                        let mut task_status_writelock = (*TASK_STATUS_DATA).write().await;
-                        task_status_writelock.insert(task_id, task_obj);
-                        drop(task_status_writelock);
-                        drop(permit);
-                    }
-                    .instrument(tracing::info_span!(
-                        "task_execution",
-                        task_id = task_id,
-                        task_type = task_type_label
-                    ))
-                    .await
-                });
-            }
+pub async fn task_poll_now() -> bool {
+    let Ok(permit) = USER_TASK_SEMAPHORE.try_acquire() else {
+        return false;
+    };
+    match pop_task_from_queue().await {
+        None => {
+            drop(permit);
+            false
+        }
+        Some(res) => {
+            let task_id = res.task_id;
+            let obj = res.task_object;
+            let task_type_label = obj.get_task_label();
+            tokio::spawn(
+                async move {
+                    let task_status_readlock = (*TASK_STATUS_DATA).read().await;
+                    let mut task_obj = task_status_readlock
+                        .get(&task_id)
+                        .cloned()
+                        .unwrap_or_else(|| TaskStatus::new(task_id, &*obj));
+                    drop(task_status_readlock);
+                    obj.execute_task_raw(&mut task_obj).await;
+
+                    let mut task_status_writelock = (*TASK_STATUS_DATA).write().await;
+                    task_status_writelock.insert(task_id, task_obj);
+                    drop(task_status_writelock);
+                    drop(permit);
+                }
+                .instrument(tracing::info_span!(
+                    "task_execution",
+                    task_id = task_id,
+                    task_type = task_type_label
+                )),
+            );
+            true
         }
     }
 }
