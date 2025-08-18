@@ -1,4 +1,3 @@
-use aws_sdk_s3::config::auth;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::sync::LazyLock;

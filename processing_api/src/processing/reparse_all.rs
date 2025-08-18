@@ -17,7 +17,7 @@ use crate::{
 
 pub struct ReparseCleanJurisdiction(pub JurisdictionInfo);
 
-// #[async_trait]
+#[async_trait]
 impl ExecuteUserTask for ReparseCleanJurisdiction {
     async fn execute_task(self: Box<Self>) -> Result<serde_json::Value, serde_json::Value> {
         let res = reparse_clean_jurisdiction(self.0).await;
@@ -40,9 +40,10 @@ impl ExecuteUserTask for ReparseCleanJurisdiction {
 async fn reparse_clean_jurisdiction(jur_info: JurisdictionInfo) -> anyhow::Result<()> {
     let s3_client = OPENSCRAPERS_S3.make_s3_client().await;
     let docketlist = list_cases_for_jurisdiction(&s3_client, &jur_info).await?;
-    let docket_futures = docketlist.iter().map(async |docket_govid| {
+    let docket_closure = async |docket_govid: &String| {
         let _ = reparse_clean_docket(&s3_client, docket_govid, &jur_info).await;
-    });
+    };
+    let docket_futures = docketlist.iter().map(docket_closure);
     let _ = stream::iter(docket_futures)
         .buffer_unordered(5)
         .count()

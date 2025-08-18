@@ -9,7 +9,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use crate::{
     common::hash::Blake2bHash,
