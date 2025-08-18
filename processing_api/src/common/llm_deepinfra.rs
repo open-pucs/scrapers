@@ -7,7 +7,7 @@ use crate::common::misc::fmap_empty;
 pub static DEEPINFRA_API_KEY: LazyLock<String> =
     LazyLock::new(|| env::var("DEEPINFRA_API_KEY").expect("Expected DEEPINFRA_API_KEY"));
 
-pub const CHEAP_MODEL_NAME: &str = "Qwen/Qwen3-32B";
+pub const FAST_CHEAP_MODEL_NAME: &str = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-Turbo";
 pub const REASONING_MODEL_NAME: &str = "meta-llama/Meta-Llama-3-70B-Instruct";
 
 #[derive(Debug, thiserror::Error)]
@@ -100,7 +100,7 @@ async fn simple_prompt(
 }
 
 pub async fn cheap_prompt(sys_prompt: &str) -> Result<String, DeepInfraError> {
-    simple_prompt(CHEAP_MODEL_NAME, Some(sys_prompt), None).await
+    simple_prompt(FAST_CHEAP_MODEL_NAME, Some(sys_prompt), None).await
 }
 
 pub async fn reasoning_prompt(sys_prompt: &str) -> Result<String, DeepInfraError> {
@@ -109,7 +109,7 @@ pub async fn reasoning_prompt(sys_prompt: &str) -> Result<String, DeepInfraError
 
 pub async fn org_split_from_dump(org_dump: &str) -> anyhow::Result<Vec<String>> {
     let prompt = format!(
-        r#"We have an unformatted list of individuals and or organizations, try and parse them out as a json serializable list of organizations like so, we are also trying to match the organizations on their name, so removing the variable suffixes is important as well::
+        r#"We have an unformatted list of individuals and or organizations, try and parse them out as a json serializable list of organizations like so, we are also trying to match the organizations on their name, so removing the variable suffixes is important as well. YOUR RESPONSE MUST BE JSON SERIALIZABLE AND CONTAIN NO OTHER TEXT:
 Example 1:
 Manhattan Telecommunications Corporation LLC d/b/a Metropolitan Communications Solutions, LLC
 Response 1:
@@ -152,9 +152,55 @@ pub async fn split_mutate_author_list(auth_list: &mut Vec<String>) {
         let Ok(llm_parsed_names) = org_split_from_dump(first_el).await else {
             return;
         };
-
-        *auth_list = llm_parsed_names
+        tracing::info!(previous_name=%first_el, new_list =?llm_parsed_names,"Parsed list into a bunch of llm names.");
+        // *auth_list = llm_parsed_names
     }
+}
+
+pub async fn guess_at_filling_title(attachment_names: &[&str]) -> String {
+    if attachment_names.len() == 1
+        && let Some(first) = attachment_names.first()
+    {
+        return first.to_string();
+    };
+    let Ok(serialized_attach_names) = serde_json::to_string(attachment_names) else {
+        return "".to_string();
+    };
+
+    let prompt = format!(
+        r#"There is a filling consisting of a bunch of attachment with names given below, come up with a good sensible guess for what the entire filling should be named. In general it should be the name of the most important filling in the attachment
+ONLY RETURN THE SUGGESTED NAME RETURN NO OTHER TEXT:
+
+Example 1:
+["Notice of Minor Changes to Compliance Filing", "Notice of Minor Changes to Compliance Filing"]
+Response 1:
+Notice of Minor Changes to Compliance Filing
+Example 2:
+["C-8003CF.pdf", "C-8002CF.pdf", "C-8001CF.pdf", "C-8000CF.pdf", "Bikeway Design.pdf", "Bikeway Cover Letter.pdf"]
+Response 2:
+Bikeway Design
+Example 3:
+["Empire Decommissioning 2022 Addendum", "Cover Letter"]
+Response 3:
+Empire Decommissioning 2022 Addendum
+Example 3:
+["Empire Generating submits cover letter and drawing C-1002 which indicates the details of Empire Generating's driveway turn control design.", "Drawing C-1002"]
+Response 4:
+Empire Generating Driveway Turn Control Design C-1002
+Example 5:
+["Cover Letter", "BOS-PF-24-30 Empire Decommissioning Review - Main", "BOS-PF-24-30 Empire Decommissioning Review - Appendix 1", "BOS-PF-24-30 Empire Decommissioning Review - Appendix 2"]
+Response 6:
+BOS-PF-24-30 Empire Decommissioning Review
+
+Attachment Names:
+{serialized_attach_names}
+Response:
+"#
+    );
+    let guess = cheap_prompt(&prompt).await.unwrap_or("".to_string());
+
+    tracing::info!(%guess, initial_names=?attachment_names,"Guesing at attachment title");
+    guess
 }
 
 fn strip_think(input: &str) -> &str {
@@ -166,4 +212,3 @@ pub async fn test_deepinfra() -> Result<String, String> {
         .await
         .map_err(|e| e.to_string())
 }
-

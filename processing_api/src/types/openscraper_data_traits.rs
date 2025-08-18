@@ -4,6 +4,7 @@ use std::{collections::HashMap, convert::Infallible};
 use chrono::NaiveDate;
 use futures_util::future::join_all;
 
+use crate::common::llm_deepinfra::guess_at_filling_title;
 use crate::{
     common::llm_deepinfra::split_mutate_author_list,
     types::{
@@ -64,6 +65,15 @@ impl ReParse for GenericFiling {
     async fn re_parse(&mut self) -> Result<(), Self::ParseError> {
         split_mutate_author_list(&mut self.organization_authors).await;
         split_mutate_author_list(&mut self.individual_authors).await;
+        if self.name.is_empty() {
+            let attach_names = self
+                .attachments
+                .iter()
+                .map(|f| &*f.name)
+                .collect::<Vec<_>>();
+            let guess = guess_at_filling_title(&attach_names).await;
+            // self.name = guess;
+        }
         Ok(())
     }
 }

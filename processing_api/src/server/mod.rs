@@ -13,6 +13,7 @@ use tracing::info;
 
 use crate::{
     common::{llm_deepinfra::test_deepinfra, misc::is_env_var_true},
+    processing::reparse_all::reparse_clean_jurisdiction_handler,
     server::scraper_check_completed::get_completed_casedata_differential,
 };
 
@@ -51,6 +52,10 @@ pub fn define_routes() -> ApiRouter {
         .api_route(
             "/public/caselist/{state}/{jurisdiction_name}/casedata_differential",
             post(get_completed_casedata_differential),
+        )
+        .api_route(
+            "/public/caselist/{state}/{jurisdiction_name}/reparse_and_clean",
+            post(reparse_clean_jurisdiction_handler),
         )
         .api_route(
             "/public/raw_attachments/{blake2b_hash}/obj",

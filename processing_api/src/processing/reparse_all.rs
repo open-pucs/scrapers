@@ -1,13 +1,19 @@
+use std::time::Duration;
+
 use async_trait::async_trait;
 use aws_sdk_s3::Client;
+use axum::{Json, extract::Path};
 use futures_util::{StreamExt, stream};
 
 use crate::{
-    common::tasks::ExecuteUserTask,
+    common::tasks::{
+        ExecuteUserTask, TaskStatusDisplay, workers::add_task_to_queue_and_wait_to_see_if_done,
+    },
     s3_stuff::{
         delete_s3_file, fetch_case_filing_from_s3, get_case_s3_key, list_cases_for_jurisdiction,
         push_case_to_s3,
     },
+    server::s3_routes::JurisdictionPath,
     types::{
         data_processing_traits::{ReParse, Revalidate},
         env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET},
@@ -37,6 +43,26 @@ impl ExecuteUserTask for ReparseCleanJurisdiction {
     }
 }
 
+pub async fn reparse_clean_jurisdiction_handler(
+    Path(JurisdictionPath {
+        state,
+        jurisdiction_name,
+    }): Path<JurisdictionPath>,
+) -> Json<TaskStatusDisplay> {
+    let country = "usa".to_string();
+    let jur_info = JurisdictionInfo {
+        state,
+        country,
+        jurisdiction: jurisdiction_name,
+    };
+    let obj = ReparseCleanJurisdiction(jur_info);
+    let wait_dur = Duration::from_secs(1);
+    let display_return = add_task_to_queue_and_wait_to_see_if_done(obj, 0, wait_dur)
+        .await
+        .into();
+    Json(display_return)
+}
+
 async fn reparse_clean_jurisdiction(jur_info: JurisdictionInfo) -> anyhow::Result<()> {
     let s3_client = OPENSCRAPERS_S3.make_s3_client().await;
     let docketlist = list_cases_for_jurisdiction(&s3_client, &jur_info).await?;
@@ -45,7 +71,7 @@ async fn reparse_clean_jurisdiction(jur_info: JurisdictionInfo) -> anyhow::Resul
     };
     let docket_futures = docketlist.iter().map(docket_closure);
     let _ = stream::iter(docket_futures)
-        .buffer_unordered(5)
+        .buffer_unordered(10)
         .count()
         .await;
 
@@ -60,6 +86,7 @@ async fn reparse_clean_docket(
     let Ok(mut docket) = fetch_case_filing_from_s3(s3_client, docket_govid, jur_info).await else {
         // Clean docket if fetch failed.
         let docket_key = get_case_s3_key(docket_govid, jur_info);
+        tracing::warn!(%docket_govid, %docket_key,"Could not properly serialize docket, deleting out of an abundance of caution.");
         delete_s3_file(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &docket_key).await?;
         return Ok(());
     };
