@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::common::tasks::workers::{add_task_to_queue_and_wait_to_see_if_done, read_task_status};
 use std::time::Duration;
 
-use super::{ExecuteUserTask, TaskStatusDisplay, workers::add_task_to_queue};
+use super::{ExecuteUserTask, TaskStatusDisplay};
 pub const CHECK_TASK_URL_LEAF: &str = "/tasks";
 
 #[derive(Clone, Copy, Serialize, Deserialize, JsonSchema)]

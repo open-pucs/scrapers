@@ -83,7 +83,7 @@ pub async fn process_case(
     );
     let s3_result = push_case_to_s3(
         s3_client,
-        &mut case,
+        &case,
         jur_info
     )
     .await;

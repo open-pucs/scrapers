@@ -41,6 +41,8 @@
           sqlalchemy
           fastapi
           uvicorn
+          # opentelemetry-distro
+          opentelemetry-exporter-otlp
         ];
 
         python = pkgs.python312;
@@ -84,10 +86,20 @@
             
             # Activate virtual environment
             source .venv/bin/activate
+            # include all environment variables in .env
+            if [ -f ".env" ]; then
+                echo "Loading environment variables from .env..."
+                set -a
+                source .env
+                set +a
+            else
+                echo "Warning: .env file not found"
+            fi
             
             # Install dependencies with UV
             echo "Installing dependencies with UV..."
             uv pip install -e .
+            opentelemetry-bootstrap --action=install
             
             echo "Development environment is ready!"
             echo "Python: $(which python)"

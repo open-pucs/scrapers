@@ -99,7 +99,7 @@ pub async fn add_task_to_queue(obj: impl ExecuteUserTask, priority: i32) -> Task
 pub async fn read_task_status(task_id: u64) -> Option<TaskStatus> {
     let read_guard = (*TASK_STATUS_DATA).read().await;
     let status = read_guard.get(&task_id).cloned();
-    return status;
+    status
 }
 pub async fn add_task_to_queue_and_wait_to_see_if_done(
     obj: impl ExecuteUserTask,
@@ -114,7 +114,7 @@ pub async fn add_task_to_queue_and_wait_to_see_if_done(
         let new_status = read_task_status(task_id).await;
         new_status.unwrap_or(entry_status)
     } else {
-        return entry_status;
+        entry_status
     }
 }
 
