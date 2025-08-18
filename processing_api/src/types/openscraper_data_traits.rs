@@ -3,6 +3,7 @@ use std::{collections::HashMap, convert::Infallible};
 
 use chrono::NaiveDate;
 use futures_util::future::join_all;
+use futures_util::{StreamExt, stream};
 
 use crate::common::llm_deepinfra::guess_at_filling_title;
 use crate::{
@@ -56,24 +57,27 @@ impl ReParse for GenericCase {
     async fn re_parse(&mut self) -> Result<(), Self::ParseError> {
         // Call re_parse on each of the fillings, and await the futures all at once
         let futs = self.filings.iter_mut().map(ReParse::re_parse);
-        join_all(futs).await;
+        stream::iter(futs).buffer_unordered(40).count().await;
         Ok(())
     }
 }
 impl ReParse for GenericFiling {
     type ParseError = Infallible;
     async fn re_parse(&mut self) -> Result<(), Self::ParseError> {
-        split_mutate_author_list(&mut self.organization_authors).await;
-        split_mutate_author_list(&mut self.individual_authors).await;
-        if self.name.is_empty() {
-            let attach_names = self
-                .attachments
-                .iter()
-                .map(|f| &*f.name)
-                .collect::<Vec<_>>();
-            let guess = guess_at_filling_title(&attach_names).await;
-            self.name = guess;
+        async fn replace_name(nameref: &mut String, attaches: &[GenericAttachment]) {
+            if nameref.is_empty() {
+                let attach_names = attaches.iter().map(|f| &*f.name).collect::<Vec<_>>();
+                let guess = guess_at_filling_title(&attach_names).await;
+                *nameref = guess;
+            }
         }
+        let _x = join_all([
+            replace_name(&mut self.name, &self.attachments),
+            split_mutate_author_list(&mut self.organization_authors),
+            split_mutate_author_list(&mut self.individual_authors),
+        ])
+        .await;
+
         Ok(())
     }
 }

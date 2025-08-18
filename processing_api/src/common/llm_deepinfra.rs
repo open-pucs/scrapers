@@ -157,11 +157,11 @@ pub async fn split_mutate_author_list(auth_list: &mut Vec<String>) {
     }
 }
 
-pub async fn guess_at_filling_title(attachment_names: &[&str]) -> String {
+pub async fn guess_at_filling_title<T: AsRef<str>>(attachment_names: &[T]) -> String {
     if attachment_names.len() == 1
         && let Some(first) = attachment_names.first()
     {
-        return first.to_string();
+        return first.as_ref().to_string();
     };
     let Ok(serialized_attach_names) = serde_json::to_string(attachment_names) else {
         return "".to_string();

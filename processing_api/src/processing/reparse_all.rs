@@ -71,7 +71,7 @@ async fn reparse_clean_jurisdiction(jur_info: JurisdictionInfo) -> anyhow::Resul
     };
     let docket_futures = docketlist.iter().map(docket_closure);
     let _ = stream::iter(docket_futures)
-        .buffer_unordered(10)
+        .buffer_unordered(30)
         .count()
         .await;
 
