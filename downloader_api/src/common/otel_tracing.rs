@@ -14,14 +14,6 @@ pub fn initialize_tracing_and_wrap_router(
         // a) Crate name – compile‑time constant, always available.
         let crate_name = env!("CARGO_PKG_NAME");
 
-        // b) Build type – `cfg!(debug_assertions)` is true for a debug build,
-        //    false for a release build.
-        let build_type = if cfg!(debug_assertions) {
-            "debug"
-        } else {
-            "release"
-        };
-
         // c) Host name – use the `hostname` crate.
         //    If it fails for any reason we fall back to "unknown".
         let host = hostname::get()
@@ -30,7 +22,7 @@ pub fn initialize_tracing_and_wrap_router(
             .unwrap_or_else(|| "unknown".to_string());
 
         // d) Assemble the final string.
-        let generated = format!("{}-{}-{}", crate_name, build_type, host);
+        let generated = format!("{crate_name}-{host}");
         println!("OTEL_SERVICE_NAME was not set, defaulting to {generated}");
 
         // this is only used in a single threaded context upon initialization, so its fine.
