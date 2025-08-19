@@ -65,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
                     .allow_headers(Any),
             )
     };
-    let app = initialize_tracing_and_wrap_router(make_api)?;
+    let (app, guard) = initialize_tracing_and_wrap_router(make_api)?;
 
     // Spawn background worker to process PDF tasks
     // This worker runs indefinitely
@@ -81,5 +81,6 @@ async fn main() -> anyhow::Result<()> {
         "Encountered error while serving applicaiton, exiting immediately."
     );
 
+    drop(guard);
     Ok(())
 }
