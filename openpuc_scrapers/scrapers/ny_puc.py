@@ -34,7 +34,7 @@ class NYPUCAttachment(BaseModel):
 class NYPUCFiling(BaseModel):
     attachments: List[NYPUCAttachment] = []
     filing_type: str = ""
-    case_number: str = ""
+    docket_govid: str = ""
     date_filed: str = ""
     filing_on_behalf_of: str = ""
     description_of_filing: str = ""
@@ -178,12 +178,12 @@ def extract_docket_info_from_caselisthtml(
         assert len(cells) >= 6, f"Row only has {len(cells)} cells (needs 6)"
         try:
             # Validate core fields before creating object
-            case_number = cells[0].find("a").text.strip()
-            assert case_number, "Empty case number in row"
+            docket_govid = cells[0].find("a").text.strip()
+            assert docket_govid, "Empty case number in row"
 
             docket_info = NYPUCDocket(
-                case_number=cells[0].find("a").text.strip(),
-                case_url=f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={case_number}",
+                docket_govid=cells[0].find("a").text.strip(),
+                case_url=f"https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo={docket_govid}",
                 matter_type=cells[1].text.strip(),
                 matter_subtype=cells[2].text.strip(),
                 date_filed=cells[3].text.strip(),
@@ -252,7 +252,7 @@ def extract_filings_from_dockethtml(table_html: str, case: str) -> List[NYPUCFil
                     )
                 ],
                 filing_type=cells[2].get_text(strip=True),
-                case_number=case,
+                docket_govid=case,
                 date_filed=cells[1].get_text(strip=True),
                 filing_on_behalf_of=cells[4].get_text(strip=True),
                 description_of_filing=link.get_text(strip=True),
@@ -270,17 +270,19 @@ def extract_filings_from_dockethtml(table_html: str, case: str) -> List[NYPUCFil
 def deduplicate_individual_attachments_into_files(
     raw_files: List[NYPUCFiling],
 ) -> List[NYPUCFiling]:
-    assert raw_files, "Empty raw_files input"
-    assert len(raw_files) != 0, "No Raw Files to deduplicate"
+    if not isinstance(raw_files, list):
+        return []
+    if len(raw_files) == 0:
+        return []
 
     dict_nypuc = {}
 
     def make_dedupe_string(file: NYPUCFiling) -> str:
-        return f"filing-{file.filing_no}-case-{file.case_number}"
+        return f"filing-{file.filing_no}-case-{file.docket_govid}"
 
     for file in raw_files:
         assert file.filing_no, "Filing missing filing_no"
-        assert file.case_number, "Filing missing case_number"
+        assert file.docket_govid, "Filing missing docket_govid"
         assert file.attachments, "Filing has no attachments"
 
         dedupestr = make_dedupe_string(file)
@@ -465,7 +467,7 @@ class NYPUCScraper(GenericScraper[NYPUCDocket, NYPUCFiling]):
         ]
 
         return GenericFiling(
-            # case_number=self.docket_id,
+            # docket_govid=self.docket_id,
             name="",
             filed_date=date_to_rfctime(filed_date_obj),
             organization_authors=[state_data.filing_on_behalf_of],

@@ -2,9 +2,17 @@ use async_trait::async_trait;
 use routing::CHECK_TASK_URL_LEAF;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 pub mod routing;
 pub mod workers;
+
+pub fn display_error_as_json(err: &impl std::error::Error) -> serde_json::Value {
+    json!({
+        "error_string":err.to_string(),
+        "error_debug": format!("{:?}", err),
+        "error_type": std::any::type_name_of_val(err)
+    })
+}
 
 #[async_trait]
 pub trait ExecuteUserTask: 'static + Send {

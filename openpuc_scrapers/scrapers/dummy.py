@@ -32,7 +32,7 @@ class DummyAttachment(BaseModel):
 
 class DummyFilingData(BaseModel):
     filing_id: str
-    case_number: str
+    docket_govid: str
     date_filed: RFC3339Time
     description: str
     attachments: List[DummyAttachment] = []
@@ -40,7 +40,7 @@ class DummyFilingData(BaseModel):
 
 
 class DummyCaseData(BaseModel):
-    case_number: str
+    docket_govid: str
     description: str
     opened_date: RFC3339Time
     status: str = "open"
@@ -63,7 +63,7 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
 
     def _generate_dummy_case(self) -> DummyCaseData:
         return DummyCaseData(
-            case_number=f"DUMMY-{randint(1000, 9999)}",
+            docket_govid=f"DUMMY-{randint(1000, 9999)}",
             description=fake.sentence(),
             opened_date=date_to_rfctime(fake.date_this_decade()),
         )
@@ -71,7 +71,7 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
     def _generate_dummy_filing(self, case: DummyCaseData) -> DummyFilingData:
         return DummyFilingData(
             filing_id=f"FILING-{randint(10000, 99999)}",
-            case_number=case.case_number,
+            docket_govid=case.docket_govid,
             date_filed=date_to_rfctime(fake.date_this_year()),
             description=fake.sentence(),
             attachments=[
@@ -143,8 +143,8 @@ class DummyScraper(GenericScraper[DummyCaseData, DummyFilingData]):
 
     def into_generic_case_data(self, state_data: DummyCaseData) -> GenericCase:
         return GenericCase(
-            case_govid=state_data.case_number,
-            case_name=f"Dummy Case {state_data.case_number}",
+            case_govid=state_data.docket_govid,
+            case_name=f"Dummy Case {state_data.docket_govid}",
             case_url="",
             case_type="dummy_case",
             description=state_data.description,

@@ -80,10 +80,10 @@ def test_case_summary_scraping():
         # Test each case
         for case_data in test_cases:
             case_url = case_data["url"]
-            case_number = case_data["number"]
+            docket_govid = case_data["number"]
             case_category = case_data["category"]
             
-            print(f"\nTesting case summary scraping for case: {case_number}")
+            print(f"\nTesting case summary scraping for case: {docket_govid}")
             print(f"URL: {case_url}")
             
             # Navigate to the case page
@@ -106,7 +106,7 @@ def test_case_summary_scraping():
             case = scraper.scrape_case_summary(
                 {
                     "case_url": case_url,
-                    "case_number": case_number,
+                    "docket_govid": docket_govid,
                     "category": case_category
                 }
             )
@@ -122,7 +122,7 @@ def test_case_summary_scraping():
             
             # Check basic case properties
             print("\nCase summary details:")
-            print(f"  Case Number: {case.case_number}")
+            print(f"  Case Number: {case.docket_govid}")
             print(f"  Title: {case.case_title}")
             print(f"  Category: {case.category}")
             print(f"  Status: {case.case_status}")

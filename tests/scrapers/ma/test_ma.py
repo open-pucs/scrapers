@@ -13,7 +13,7 @@ class TestMassachusettsDPU(unittest.TestCase):
     def setUp(self):
         """Prepare the initial test setup."""
         # Create a sample case object
-        self.case = GenericCase(case_number="20-75")
+        self.case = GenericCase(docket_govid="20-75")
 
         # Read the desired response HTML file into the test suite
         case_detail_filepath = os.path.join(
@@ -88,7 +88,7 @@ class TestMassachusettsDPU(unittest.TestCase):
         # Check a few specific cases from the test HTML
         # (Update these assertions based on your test HTML content)
         electric_case = next(
-            (case for case in cases if case.case_number == "25-EB-02"), None
+            (case for case in cases if case.docket_govid == "25-EB-02"), None
         )
         self.assertIsNotNone(electric_case)
         if electric_case:

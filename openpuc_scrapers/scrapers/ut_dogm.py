@@ -32,7 +32,7 @@ class UTDOGMAttachment(BaseModel):
 class UTDOGMFiling(BaseModel):
     attachments: List[UTDOGMAttachment] = []
     filing_type: str = ""
-    case_number: str = ""
+    docket_govid: str = ""
     date_filed: str = ""
     filing_on_behalf_of: str = ""
     description_of_filing: str = ""
@@ -42,7 +42,7 @@ class UTDOGMFiling(BaseModel):
 
 
 class UTDOGMDocket(BaseModel):
-    case_number: str
+    docket_govid: str
     matter_type: str
     matter_subtype: str
     case_title: str
@@ -64,16 +64,16 @@ def combine_dockets(docket_lists: List[List[UTDOGMDocket]]) -> List[UTDOGMDocket
 
 def process_docket(docket: UTDOGMDocket) -> str:
     default_logger.info(
-        f"Processing docket {docket.case_number} from {docket.date_filed}"
+        f"Processing docket {docket.docket_govid} from {docket.date_filed}"
     )
     default_logger.debug(f"Docket metadata: {docket.model_dump_json()}")
 
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
 
-    assert docket.case_number, "Docket case number cannot be empty"
-    assert len(docket.case_number) >= 6, (
-        f"Invalid case number format: {docket.case_number}"
+    assert docket.docket_govid, "Docket case number cannot be empty"
+    assert len(docket.docket_govid) >= 6, (
+        f"Invalid case number format: {docket.docket_govid}"
     )
 
     user_data_dir = Path("/tmp/", "selenium-userdir-" + rand_string())
@@ -87,10 +87,10 @@ def process_docket(docket: UTDOGMDocket) -> str:
 
     driver = webdriver.Chrome(options=chrome_options)
     try:
-        url = f"https://ogm.utah.gov/cgi-bin/cfms/index.cfm?action=docket&docket_number={docket.case_number}"
+        url = f"https://ogm.utah.gov/cgi-bin/cfms/index.cfm?action=docket&docket_number={docket.docket_govid}"
         default_logger.debug(f"Navigating to docket URL: {url}")
         driver.get(url)
-        default_logger.info(f"Loaded docket page for {docket.case_number}")
+        default_logger.info(f"Loaded docket page for {docket.docket_govid}")
 
         default_logger.debug("Waiting for page overlay to clear")
         for attempt in range(20):
@@ -115,14 +115,14 @@ def process_docket(docket: UTDOGMDocket) -> str:
         )
 
         default_logger.info(
-            f"Successfully retrieved table data for {docket.case_number} "
+            f"Successfully retrieved table data for {docket.docket_govid} "
             f"({len(outer_html_table)} bytes)"
         )
         driver.quit()
         return outer_html_table
 
     except Exception as e:
-        default_logger.error(f"Error processing docket {docket.case_number}: {e}")
+        default_logger.error(f"Error processing docket {docket.docket_govid}: {e}")
         raise e
     finally:
         driver.quit()
@@ -162,11 +162,11 @@ def extract_docket_info_from_caselisthtml(
         default_logger.debug(f"Processing row with {len(cells)} cells")
         assert len(cells) >= 6, f"Row only has {len(cells)} cells (needs 6)"
         try:
-            case_number = cells[0].find("a").text.strip()
-            assert case_number, "Empty case number in row"
+            docket_govid = cells[0].find("a").text.strip()
+            assert docket_govid, "Empty case number in row"
 
             docket_info = UTDOGMDocket(
-                case_number=cells[0].find("a").text.strip(),
+                docket_govid=cells[0].find("a").text.strip(),
                 matter_type=cells[1].text.strip(),
                 matter_subtype=cells[2].text.strip(),
                 date_filed=cells[3].text.strip(),
@@ -222,7 +222,7 @@ def extract_filings_from_dockethtml(table_html: str, case: str) -> List[UTDOGMFi
                     )
                 ],
                 filing_type=cells[2].get_text(strip=True),
-                case_number=case,
+                docket_govid=case,
                 date_filed=cells[1].get_text(strip=True),
                 filing_on_behalf_of=cells[4].get_text(strip=True),
                 description_of_filing=link.get_text(strip=True),
@@ -240,17 +240,19 @@ def extract_filings_from_dockethtml(table_html: str, case: str) -> List[UTDOGMFi
 def deduplicate_individual_attachments_into_files(
     raw_files: List[UTDOGMFiling],
 ) -> List[UTDOGMFiling]:
-    assert raw_files, "Empty raw_files input"
-    assert len(raw_files) != 0, "No Raw Files to deduplicate"
+    if not isinstance(raw_files, list):
+        return []
+    if len(raw_files) == 0:
+        return []
 
     dict_utdogm = {}
 
     def make_dedupe_string(file: UTDOGMFiling) -> str:
-        return f"filing-{file.filing_no}-case-{file.case_number}"
+        return f"filing-{file.filing_no}-case-{file.docket_govid}"
 
     for file in raw_files:
         assert file.filing_no, "Filing missing filing_no"
-        assert file.case_number, "Filing missing case_number"
+        assert file.docket_govid, "Filing missing docket_govid"
         assert file.attachments, "Filing has no attachments"
 
         dedupestr = make_dedupe_string(file)
@@ -353,7 +355,7 @@ class UTDOGMScraper(GenericScraper[UTDOGMDocket, UTDOGMFiling]):
         return caselist
 
     def filing_data_intermediate(self, data: UTDOGMDocket) -> Dict[str, Any]:
-        return {"docket_id": data.case_number, "html": process_docket(data)}
+        return {"docket_id": data.docket_govid, "html": process_docket(data)}
 
     def filing_data_from_intermediate(
         self, intermediate: Dict[str, Any]
@@ -378,7 +380,7 @@ class UTDOGMScraper(GenericScraper[UTDOGMDocket, UTDOGMFiling]):
 
     def into_generic_case_data(self, state_data: UTDOGMDocket) -> GenericCase:
         return GenericCase(
-            case_number=state_data.case_number,
+            docket_govid=state_data.docket_govid,
             case_type=f"{state_data.matter_type} - {state_data.matter_subtype}",
             description=state_data.case_title,
             industry=state_data.industry_affected,

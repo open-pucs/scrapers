@@ -10,10 +10,8 @@ from pathlib import Path
 
 from openpuc_scrapers.pipelines.generic_pipeline_wrappers import (
     generate_intermediate_object_save_path,
-    get_all_caselist_raw,
     get_all_caselist_raw_jsonified,
     get_new_caselist_since_date_jsonified,
-    process_case,
     process_case_jsonified,
 )
 from openpuc_scrapers.scrapers.scraper_lookup import SCRAPER_REGISTRY, ScraperInfoObject
@@ -44,11 +42,18 @@ def run_all_cases(scraper_info: ScraperInfoObject, years: list[int] | None):
     base_path = generate_intermediate_object_save_path(scraper)
     logging.info(f"Running scraper for all cases for {scraper_info.id}")
 
-    cases = get_all_caselist_raw(scraper=scraper, base_path=base_path)
+    if not years:
+        years = []
+    logging.info(f"Filtering for years: {years}")
+
+    cases = get_all_caselist_raw_jsonified(
+        scraper=scraper, base_path=base_path, year_list=years
+    )
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = [
-            executor.submit(process_case, scraper, case, base_path) for case in cases
+            executor.submit(process_case_jsonified, scraper, case, base_path)
+            for case in cases
         ]
         for future in as_completed(futures):
             try:

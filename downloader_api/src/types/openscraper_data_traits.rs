@@ -1,10 +1,16 @@
-use std::collections::HashMap;
+use std::mem;
+use std::{collections::HashMap, convert::Infallible};
 
 use chrono::NaiveDate;
+use futures_util::{StreamExt, join, stream};
 
-use crate::types::{
-    data_processing_traits::{Revalidate, UpdateFromCache},
-    openscraper_types::{GenericAttachment, GenericCase, GenericFiling},
+use crate::common::llm_deepinfra::guess_at_filling_title;
+use crate::{
+    common::llm_deepinfra::split_mutate_author_list,
+    types::{
+        data_processing_traits::{ReParse, Revalidate, UpdateFromCache},
+        openscraper_types::{GenericAttachment, GenericCase, GenericFiling},
+    },
 };
 
 impl Revalidate for GenericCase {
@@ -27,12 +33,50 @@ impl Revalidate for GenericCase {
 
 impl Revalidate for GenericFiling {
     fn revalidate(&mut self) {
+        self.organization_authors = mem::take(&mut self.organization_authors)
+            .into_iter()
+            .filter(|x| !x.is_empty())
+            .collect();
+        self.individual_authors = mem::take(&mut self.individual_authors)
+            .into_iter()
+            .filter(|x| !x.is_empty())
+            .collect();
+        // Name stuff
         if !self.name.is_empty() {
             return;
         }
         if let Some(attach) = self.attachments.first() {
             self.name = attach.name.clone();
         }
+    }
+}
+
+impl ReParse for GenericCase {
+    type ParseError = Infallible;
+    async fn re_parse(&mut self) -> Result<(), Self::ParseError> {
+        // Call re_parse on each of the fillings, and await the futures all at once
+        let futs = self.filings.iter_mut().map(ReParse::re_parse);
+        stream::iter(futs).buffer_unordered(40).count().await;
+        Ok(())
+    }
+}
+impl ReParse for GenericFiling {
+    type ParseError = Infallible;
+    async fn re_parse(&mut self) -> Result<(), Self::ParseError> {
+        async fn replace_name(nameref: &mut String, attaches: &[GenericAttachment]) {
+            if nameref.is_empty() {
+                let attach_names = attaches.iter().map(|f| &*f.name).collect::<Vec<_>>();
+                let guess = guess_at_filling_title(&attach_names).await;
+                *nameref = guess;
+            }
+        }
+        let _x = join!(
+            replace_name(&mut self.name, &self.attachments),
+            split_mutate_author_list(&mut self.organization_authors),
+            split_mutate_author_list(&mut self.individual_authors),
+        );
+
+        Ok(())
     }
 }
 

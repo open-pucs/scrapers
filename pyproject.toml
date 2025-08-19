@@ -28,6 +28,8 @@ dependencies = [
     "requests>=2.32.3",
     "selenium>=4.29.0",
     "sqlalchemy>=2.0.40",
+    "opentelemetry-distro",
+    "opentelemetry-exporter-otlp",
 ]
 
 [project.optional-dependencies]

@@ -9,11 +9,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use crate::{
     common::hash::Blake2bHash,
-    s3_stuff::{delete_all_with_prefix, delete_s3_file, get_case_s3_key, get_jurisdiction_prefix},
+    s3_stuff::{
+        delete_all_with_prefix, delete_s3_file, get_case_s3_key, get_jurisdiction_prefix,
+        list_cases_for_jurisdiction,
+    },
     types::{
         env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
         openscraper_types::{GenericCase, JurisdictionInfo, RawAttachment},
@@ -202,23 +205,22 @@ pub async fn handle_caselist_jurisdiction_fetch_all(
     let s3_client = crate::s3_stuff::make_s3_client().await;
 
     info!("Sucessfully created s3 client.");
-    let country = "usa"; // Or get from somewhere else
-    let result = crate::s3_stuff::list_cases_for_jurisdiction(
-        &s3_client,
-        &jurisdiction_name,
-        &state,
+    let country = "usa".to_string(); // Or get from somewhere else
+    let jur_info = JurisdictionInfo {
+        state,
         country,
-    )
-    .await;
+        jurisdiction: jurisdiction_name,
+    };
+    let result = list_cases_for_jurisdiction(&s3_client, &jur_info).await;
     info!("Completed call to s3 to get jurisdiction list.");
     let pagination = PaginationData { limit, offset };
     match result {
         Ok(cases) => {
-            info!(state = %state, jurisdiction = %jurisdiction_name, "Successfully fetched case list");
+            info!(state = %jur_info.state, jurisdiction = %jur_info.jurisdiction, "Successfully fetched case list");
             Json(make_paginated_subslice(pagination, &cases)).into_response()
         }
         Err(e) => {
-            error!(state = %state, jurisdiction = %jurisdiction_name, error = %e, "Error fetching case list");
+            error!(state = %jur_info.state, jurisdiction = %jur_info.jurisdiction, error = %e, "Error fetching case list");
             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
         }
     }

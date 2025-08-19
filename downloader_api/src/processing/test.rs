@@ -65,8 +65,8 @@ async fn test_process_case() {
         filed_date: filing_date_1,
         attachments: vec![attachment_1],
         description: "The plaintiff filed the initial complaint.".to_string(),
-        organization_authors: vec![non_empty_string!("Acme Corp")],
-        individual_authors: vec![non_empty_string!("John Doe")],
+        organization_authors: vec![non_empty_string!("Acme Corp").into()],
+        individual_authors: vec![non_empty_string!("John Doe").into()],
         extra_metadata: filing_meta.clone(),
         filing_type: Default::default(),
     };

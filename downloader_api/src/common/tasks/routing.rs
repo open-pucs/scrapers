@@ -9,10 +9,10 @@ use axum::{Json, extract::Path, response::IntoResponse};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{
-    ExecuteUserTask, TaskStatusDisplay,
-    workers::{TASK_STATUS_DATA, add_task_to_queue},
-};
+use crate::common::tasks::workers::{add_task_to_queue_and_wait_to_see_if_done, read_task_status};
+use std::time::Duration;
+
+use super::{ExecuteUserTask, TaskStatusDisplay};
 pub const CHECK_TASK_URL_LEAF: &str = "/tasks";
 
 #[derive(Clone, Copy, Serialize, Deserialize, JsonSchema)]
@@ -22,9 +22,7 @@ pub struct TaskIDNumber {
 pub async fn check_task_status(
     Path(TaskIDNumber { task_id }): Path<TaskIDNumber>,
 ) -> impl IntoApiResponse {
-    let read_guard = (*TASK_STATUS_DATA).read().await;
-    let status = read_guard.get(&task_id).cloned();
-    drop(read_guard);
+    let status = read_task_status(task_id).await;
     match status {
         None => (axum::http::StatusCode::NOT_FOUND, format!("Could not find task with task_id: {task_id}")).into_response()
 , // Return a 404 error with an error string "Could not find task with that id"
@@ -69,9 +67,10 @@ pub async fn handle_generic_task_route<
 >(
     Json(extractor): Json<GeneralExtractor<T>>,
 ) -> Json<TaskStatusDisplay> {
+    const WAIT_DURATION: Duration = Duration::from_secs(2);
     let obj = extractor.object;
     let priority = extractor.priority.unwrap_or(0);
-    let taskinfo = add_task_to_queue(obj, priority).await;
+    let taskinfo = add_task_to_queue_and_wait_to_see_if_done(obj, priority, WAIT_DURATION).await;
     Json(taskinfo.into())
 }
 

@@ -76,7 +76,7 @@ def test_document_listing():
         # Create a mock case data object for intermediate result
         intermediate_result = {
             "case_url": case_url,
-            "case_number": "21-0858"
+            "docket_govid": "21-0858"
         }
         
         # Find document URLs

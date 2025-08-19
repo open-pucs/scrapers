@@ -1,12 +1,15 @@
 use aide::axum::IntoApiResponse;
-use axum::{Json, body::Body, extract::Path};
+use axum::{Json, extract::Path};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
     server::s3_routes::JurisdictionPath,
-    types::{deduplication::DoubleDeduplicated, env_vars::OPENSCRAPERS_S3},
+    types::{
+        deduplication::DoubleDeduplicated, env_vars::OPENSCRAPERS_S3,
+        openscraper_types::JurisdictionInfo,
+    },
 };
 
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
@@ -32,14 +35,13 @@ pub async fn get_completed_casedata_differential(
         })
         .collect::<Vec<_>>();
     let s3_client = OPENSCRAPERS_S3.make_s3_client().await;
-    let country = "usa"; // Or get from somewhere else
-    let result = crate::s3_stuff::list_cases_for_jurisdiction(
-        &s3_client,
-        &jurisdiction_name,
-        &state,
+    let country = "usa".to_string(); // Or get from somewhere else
+    let jur_info = JurisdictionInfo {
+        state,
         country,
-    )
-    .await;
+        jurisdiction: jurisdiction_name,
+    };
+    let result = crate::s3_stuff::list_cases_for_jurisdiction(&s3_client, &jur_info).await;
     let s3_caselist = match result {
         Ok(val) => val,
         Err(err) => return Err(err.to_string()),

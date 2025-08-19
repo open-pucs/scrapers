@@ -61,9 +61,9 @@ pub struct GenericFiling {
     #[serde(default)]
     pub name: String,
     #[serde(default)]
-    pub organization_authors: Vec<NonEmptyString>,
+    pub organization_authors: Vec<String>,
     #[serde(default)]
-    pub individual_authors: Vec<NonEmptyString>,
+    pub individual_authors: Vec<String>,
     #[serde(default)]
     pub filing_type: String,
     #[serde(default)]

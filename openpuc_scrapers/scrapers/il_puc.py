@@ -88,7 +88,7 @@ class ILICCCaseData(BaseModel):
     """Model for Illinois ICC case data"""
 
     case_url: str
-    case_number: str
+    docket_govid: str
     category: Optional[str] = None
     case_details: Optional[ILICCCaseDetails] = None
     docket_sheet: List[ILICCDocketSheetEntry] = []
@@ -274,7 +274,7 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
 
         """
         Constructs search URL, navigates, handles pagination, and extracts
-        (case_url, case_number) tuples directly using Selenium until
+        (case_url, docket_govid) tuples directly using Selenium until
         stop_at_case_identifier is found (if provided).
         Returns a dictionary containing the list of extracted tuples.
 
@@ -370,9 +370,9 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
                     for link_tag_element in link_elements:  # Loop through cases on page
                         try:
                             relative_url = link_tag_element.get_attribute("href")
-                            case_number = link_tag_element.text.strip()
+                            docket_govid = link_tag_element.text.strip()
 
-                            if not relative_url or not case_number:
+                            if not relative_url or not docket_govid:
                                 continue
 
                             case_url = (
@@ -384,7 +384,7 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
 
                             # --- Check against stop identifier ---
                             # Decide whether to use URL or number as the identifier
-                            identifier_to_check = case_number
+                            identifier_to_check = docket_govid
                             if (
                                 stop_at_case_identifier
                                 and identifier_to_check == stop_at_case_identifier
@@ -394,7 +394,7 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
                                 )
                                 # Add the anchor case to the list before stopping
                                 if case_url not in processed_case_urls:
-                                    extracted_cases.append((case_url, case_number))
+                                    extracted_cases.append((case_url, docket_govid))
                                     processed_case_urls.add(case_url)
                                     page_cases_added += 1
                                 stop_processing = True
@@ -402,7 +402,7 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
                             # --- End check ---
 
                             if case_url not in processed_case_urls:
-                                extracted_cases.append((case_url, case_number))
+                                extracted_cases.append((case_url, docket_govid))
                                 processed_case_urls.add(case_url)
                                 page_cases_added += 1
 
@@ -483,7 +483,7 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
         self, intermediate: Dict[str, Any]
     ) -> List[ILICCCaseData]:
         """
-        Converts the list of (case_url, case_number) tuples from the intermediate
+        Converts the list of (case_url, docket_govid) tuples from the intermediate
         dictionary into a list of ILICCCaseData objects.
         """
         if intermediate.get("error"):
@@ -505,18 +505,18 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
         print(
             f"Converting {len(extracted_cases)} extracted tuples to ILICCCaseData objects..."
         )
-        for case_url, case_number in extracted_cases:
+        for case_url, docket_govid in extracted_cases:
             try:
                 case_data = ILICCCaseData(
                     case_url=case_url,
-                    case_number=case_number,
+                    docket_govid=docket_govid,
                     category=category,  # Use determined category
                 )
                 cases.append(case_data)
             except Exception as e:
                 # Handle potential Pydantic validation errors or other issues
                 print(
-                    f"Error creating ILICCCaseData for URL {case_url}, Number {case_number}: {e}"
+                    f"Error creating ILICCCaseData for URL {case_url}, Number {docket_govid}: {e}"
                 )
 
         print(f"Successfully created {len(cases)} ILICCCaseData objects.")
@@ -616,7 +616,7 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
 
                 intermediate_result["document_detail_urls"] = list(set(document_urls))
                 print(
-                    f"Found {len(intermediate_result['document_detail_urls'])} document URLs for {data.case_number}."
+                    f"Found {len(intermediate_result['document_detail_urls'])} document URLs for {data.docket_govid}."
                 )
             except TimeoutException:
                 print(f"Warning: Timeout while loading documents page: {documents_url}")
@@ -839,7 +839,7 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
                 parsed_beginning_date = date_to_rfctime(intermediate_date)
 
         return GenericCase(
-            case_number=state_data.case_number,
+            docket_govid=state_data.docket_govid,
             case_name=(
                 state_data.case_details.title if state_data.case_details else None
             )
@@ -865,7 +865,7 @@ class IllinoisICCScraper(GenericScraper[ILICCCaseData, ILICCFilingData]):
         }
 
         return GenericFiling(
-            case_number=state_data.case_id,
+            docket_govid=state_data.case_id,
             filed_date=self._parse_date(state_data.filing_date),
             party_name=state_data.filing_party,
             filing_type=state_data.filing_type,

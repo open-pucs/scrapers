@@ -1,6 +1,4 @@
 import logging
-from pydantic import TypeAdapter
-import re
 import traceback
 import time
 import random
@@ -43,6 +41,37 @@ def generate_intermediate_object_save_path(
     base_path = f"intermediates/{scraper.state}/{scraper.jurisdiction_name}/{rfctime_serializer(time_now)}"
 
     return base_path
+
+
+def shuffle_split_string_list(biglist: List[str], split_number: int) -> List[List[str]]:
+    """Splits list into N chunks with shuffled order"""
+    assert isinstance(biglist, list), "Input must be a list"
+
+    # Create copy to avoid modifying original list
+    shuffled = biglist.copy()
+    random.shuffle(shuffled)
+
+    # Calculate dynamic chunk size based on desired split count
+    chunk_size = max(1, (len(shuffled) + split_number - 1) // split_number)
+
+    list_list = [
+        shuffled[i : i + chunk_size] for i in range(0, len(shuffled), chunk_size)
+    ]
+
+    # Validate output dimensions
+    actual_chunks = len(list_list)
+    if actual_chunks != split_number:
+        default_logger.warning(
+            f"Requested {split_number} chunks but created {actual_chunks} "
+            f"(original size: {len(shuffled)}, chunk size: {chunk_size})"
+        )
+
+    default_logger.debug(
+        f"Split {len(shuffled)} items into {actual_chunks} chunks "
+        f"(target: {split_number}), sizes: {[len(chunk) for chunk in list_list]}"
+    )
+
+    return list_list
 
 
 def process_case(
@@ -209,49 +238,92 @@ def filter_off_filings_in_yearlist(
 def get_all_caselist_raw(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     base_path: str,
+    year_list: List[int] = [],
 ) -> List[StateCaseData]:
     """Get full caselist with 2020+ date filtering"""
     # Validate date input
 
     # Get and save case list
     caselist_intermediate = scraper.universal_caselist_intermediate()
-    caselist_path = f"{base_path}/caselist_intermediate.json"
+    caselist_path = f"{base_path}/caselist-intermediate.json"
     save_json_sync(
         path=caselist_path,
         data=caselist_intermediate,
     )
+
     # Process cases and apply date filter
-    all_state_cases = scraper.universal_caselist_from_intermediate(
-        caselist_intermediate
-    )
-    caselist_path = f"{base_path}/caselist_all.json"
+    state_cases = scraper.universal_caselist_from_intermediate(caselist_intermediate)
+    caselist_path = f"{base_path}/caselist-all.json"
     save_json_sync(
         path=caselist_path,
-        data=all_state_cases,
+        data=state_cases,
     )
     state = scraper.state
     jurisdiction = scraper.jurisdiction_name
-    url = f"{OPENSCRAPERS_INTERNAL_API_URL}/public/caselist/{state}/{jurisdiction}/casedata_differential"
-    json_str = create_json_string(all_state_cases)
-    json_obj = json.loads(json_str)
-    response = requests.post(url, json=json_obj)
+    diff_url = f"{OPENSCRAPERS_INTERNAL_API_URL}/public/caselist/{state}/{jurisdiction}/casedata_differential"
+    cases_json_str = create_json_string(state_cases)
+    cases_json_obj = json.loads(cases_json_str)
+    response = requests.post(url=diff_url, json=cases_json_obj)
     response.raise_for_status()
-    response_data = json.loads(response.content)
-    save_json_sync(path=f"{base_path}/caselist_processed.json", data=response_data)
-    actual_cases_python_code = response_data.to_process
-    cases_pydantic = []
-    case_type = scraper.state_case_type
-    for py_case in actual_cases_python_code:
-        cases_pydantic.append(case_type.model_validate(py_case))
-    return cases_pydantic
+    response_obj = json.loads(response.content)
+    diff_caselist_path = f"{base_path}/caselist-differential.json"
+    save_json_sync(
+        path=diff_caselist_path,
+        data=response_obj,
+    )
+    py_caselist = response_obj["to_process"]
+    ret_caselist = []
+    casetype = scraper.state_case_type
+    for pycase in py_caselist:
+        ret_caselist.append(casetype.model_validate(pycase))
+
+    return ret_caselist
+
+
+# def get_all_caselist_raw(
+#     scraper: GenericScraper[StateCaseData, StateFilingData],
+#     base_path: str,
+# ) -> List[StateCaseData]:
+#     # Get and save case list
+#     caselist_intermediate = scraper.universal_caselist_intermediate()
+#     caselist_path = f"{base_path}/caselist_intermediate.json"
+#     save_json_sync(
+#         path=caselist_path,
+#         data=caselist_intermediate,
+#     )
+#     all_state_cases = scraper.universal_caselist_from_intermediate(
+#         caselist_intermediate
+#     )
+#     print(f"All state cases had length:{len(all_state_cases)}")
+#     caselist_path = f"{base_path}/caselist_all.json"
+#     save_json_sync(
+#         path=caselist_path,
+#         data=all_state_cases,
+#     )
+#     state = scraper.state
+#     jurisdiction = scraper.jurisdiction_name
+#     url = f"{OPENSCRAPERS_INTERNAL_API_URL}/public/caselist/{state}/{jurisdiction}/casedata_differential"
+#     json_str = create_json_string(all_state_cases)
+#     json_obj = json.loads(json_str)
+#     response = requests.post(url, json=json_obj)
+#     response.raise_for_status()
+#     response_data = json.loads(response.content)
+#     save_json_sync(path=f"{base_path}/caselist_processed.json", data=response_data)
+#     actual_cases_python_code = response_data.to_process
+#     cases_pydantic = []
+#     case_type = scraper.state_case_type
+#     for py_case in actual_cases_python_code:
+#         cases_pydantic.append(case_type.model_validate(py_case))
+#     return cases_pydantic
 
 
 def get_all_caselist_raw_jsonified(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     base_path: str,
+    year_list: List[int] = [],
 ) -> List[str]:
     """JSON-serializable version for Airflow XComs"""
-    cases = get_all_caselist_raw(scraper, base_path)
+    cases = get_all_caselist_raw(scraper, base_path, year_list=year_list)
     return [case.model_dump_json() for case in cases]
 
 
@@ -259,9 +331,8 @@ def get_new_caselist_since_date(
     scraper: GenericScraper[StateCaseData, StateFilingData],
     after_date: RFC3339Time,
     base_path: str,
+    year_list: List[int] = [],
 ) -> List[StateCaseData]:
-    state = scraper.state
-    jurisdiction_name = scraper.jurisdiction_name
     # Get and save updated cases
     updated_intermediate = scraper.updated_cases_since_date_intermediate(after_date)
     updated_path = f"{base_path}/updated_cases.json"
