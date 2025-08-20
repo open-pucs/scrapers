@@ -5,42 +5,19 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::collections::HashMap;
 
-use crate::common::{file_extension::FileExtension, hash::Blake2bHash};
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Hash, PartialEq, Eq)]
-pub struct JurisdictionInfo {
-    pub country: String,
-    pub state: String,
-    pub jurisdiction: String,
-}
-impl Default for JurisdictionInfo {
-    fn default() -> Self {
-        let unknown_static = "unknown";
-        JurisdictionInfo {
-            country: unknown_static.to_string(),
-            state: unknown_static.to_string(),
-            jurisdiction: unknown_static.to_string(),
-        }
-    }
-}
-
-impl JurisdictionInfo {
-    pub fn new_usa(jurisdiction: &str, state: &str) -> Self {
-        JurisdictionInfo {
-            country: "usa".to_string(),
-            state: state.to_string(),
-            jurisdiction: jurisdiction.to_string(),
-        }
-    }
-}
+use crate::{
+    common::{file_extension::FileExtension, hash::Blake2bHash},
+    types::jurisdictions::JurisdictionInfo,
+};
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct CaseWithJurisdiction {
-    pub case: GenericCase,
+    pub case: RawGenericCase,
     pub jurisdiction: JurisdictionInfo,
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct GenericAttachment {
+pub struct RawGenericAttachment {
     pub name: String,
     pub document_extension: FileExtension,
     #[serde(default)]
@@ -56,7 +33,7 @@ pub struct GenericAttachment {
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct GenericFiling {
+pub struct RawGenericFiling {
     pub filed_date: NaiveDate,
     #[serde(default)]
     pub name: String,
@@ -69,13 +46,13 @@ pub struct GenericFiling {
     #[serde(default)]
     pub description: String,
     #[serde(default)]
-    pub attachments: Vec<GenericAttachment>,
+    pub attachments: Vec<RawGenericAttachment>,
     #[serde(default)]
     pub extra_metadata: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct GenericCase {
+pub struct RawGenericCase {
     pub case_govid: NonEmptyString,
     // This shouldnt be an optional field in the final submission, since it can be calculated from
     // the minimum of the fillings, and the scraper should calculate it.
@@ -99,7 +76,7 @@ pub struct GenericCase {
     #[serde(default)]
     pub closed_date: Option<NaiveDate>,
     #[serde(default)]
-    pub filings: Vec<GenericFiling>,
+    pub filings: Vec<RawGenericFiling>,
     #[serde(default)]
     pub case_parties: Vec<GenericParty>,
     #[serde(default)]
@@ -123,7 +100,7 @@ pub struct GenericFilingLegacy {
     pub party_name: String,
     pub filing_type: String,
     pub description: String,
-    pub attachments: Vec<GenericAttachment>,
+    pub attachments: Vec<RawGenericAttachment>,
     pub extra_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -164,7 +141,7 @@ pub struct RawAttachmentText {
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct RawAttachment {
     pub hash: Blake2bHash,
-    pub jurisdiction_info: JurisdictionInfo,
+    pub jurisdiction_info: jurisdictions::JurisdictionInfo,
     pub name: NonEmptyString,
     pub extension: FileExtension,
     pub text_objects: Vec<RawAttachmentText>,

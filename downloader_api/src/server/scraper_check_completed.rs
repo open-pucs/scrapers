@@ -8,7 +8,7 @@ use crate::{
     server::s3_routes::JurisdictionPath,
     types::{
         deduplication::DoubleDeduplicated, env_vars::OPENSCRAPERS_S3,
-        openscraper_types::JurisdictionInfo,
+        jurisdictions::JurisdictionInfo,
     },
 };
 

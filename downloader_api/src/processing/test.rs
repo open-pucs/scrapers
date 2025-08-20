@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use super::*;
 use crate::common::file_extension::{FileExtension, StaticExtension};
 use crate::s3_stuff::make_s3_client;
-use crate::types::openscraper_types::{
-    CaseWithJurisdiction, GenericAttachment, GenericCase, GenericFiling, JurisdictionInfo,
+use crate::types::raw::{
+    CaseWithJurisdiction, RawGenericAttachment, RawGenericCase, RawGenericFiling,
+    modname::JurisdictionInfo,
 };
 
 use chrono::{NaiveDate, Utc};
@@ -38,7 +39,7 @@ async fn test_process_case() {
     filing_meta.insert("confidence".to_string(), json!(0.96));
 
     // Attachments for the first filing.
-    let attachment_1 = GenericAttachment {
+    let attachment_1 = RawGenericAttachment {
         name: non_empty_string!("Judgement PDF").into(),
         url: "https://example.com/judgement.pdf".to_string(),
         document_extension: FileExtension::Static(StaticExtension::Pdf),
@@ -49,7 +50,7 @@ async fn test_process_case() {
     };
 
     // Attachments for the second filing (different extension, no hash).
-    let attachment_2 = GenericAttachment {
+    let attachment_2 = RawGenericAttachment {
         name: non_empty_string!("Exhibit Image").into(),
         url: "https://example.com/exhibit.png".to_string(),
         document_extension: FileExtension::Static(StaticExtension::Png),
@@ -60,7 +61,7 @@ async fn test_process_case() {
     };
 
     // First filing – contains one attachment and some authors.
-    let filing_1 = GenericFiling {
+    let filing_1 = RawGenericFiling {
         name: non_empty_string!("Initial Complaint").into(),
         filed_date: filing_date_1,
         attachments: vec![attachment_1],
@@ -72,7 +73,7 @@ async fn test_process_case() {
     };
 
     // Second filing – different date, different attachment.
-    let filing_2 = GenericFiling {
+    let filing_2 = RawGenericFiling {
         name: non_empty_string!("Supplemental Exhibit").into(),
         filed_date: filing_date_2,
         attachments: vec![attachment_2],
@@ -84,7 +85,7 @@ async fn test_process_case() {
     };
 
     // Top‑level case.
-    let case = GenericCase {
+    let case = RawGenericCase {
         case_govid: non_empty_string!("TEST-CASE-123"),
         opened_date: None, // we let the scraper calculate this later
         case_name: "Example Case".to_string(),
@@ -104,7 +105,7 @@ async fn test_process_case() {
         case_parties: vec![],
         indexed_at: Utc::now(),
     };
-    let jurisdiction = JurisdictionInfo::new_usa("test", "test");
+    let jurisdiction = modname::JurisdictionInfo::new_usa("test", "test");
     let casewith = CaseWithJurisdiction { case, jurisdiction };
 
     // let result = process_case(&casewith, &s3_client).await;

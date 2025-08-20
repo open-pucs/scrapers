@@ -1,8 +1,8 @@
 use crate::processing::attachments::OpenscrapersExtraData;
 use crate::s3_stuff::{fetch_case_filing_from_s3, push_case_to_s3};
 use crate::types::data_processing_traits::{DownloadIncomplete, Revalidate, UpdateFromCache};
-use crate::types::openscraper_types::{
-    GenericAttachment, GenericCase
+use crate::types::raw::{
+    RawGenericAttachment, RawGenericCase
 };
 use futures_util::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -30,7 +30,7 @@ struct CrimsonStatusResponse {
 }
 
 
-pub fn make_reflist_of_attachments(case: &mut GenericCase) -> Vec<&mut GenericAttachment> {
+pub fn make_reflist_of_attachments(case: &mut RawGenericCase) -> Vec<&mut RawGenericAttachment> {
     let mut case_refs= Vec::with_capacity(case.filings.len());
     for filling in case.filings.iter_mut() {
         for attachment in filling.attachments.iter_mut() {
@@ -40,7 +40,7 @@ pub fn make_reflist_of_attachments(case: &mut GenericCase) -> Vec<&mut GenericAt
     case_refs
 }
 
-impl DownloadIncomplete for GenericCase {
+impl DownloadIncomplete for RawGenericCase {
     type ExtraData = OpenscrapersExtraData;
     type SucessData = ();
     async fn download_incomplete(
@@ -49,7 +49,7 @@ impl DownloadIncomplete for GenericCase {
         ) -> anyhow::Result<Self::SucessData> {
 
         let attachment_refs = make_reflist_of_attachments(self);
-        let wraped_download = async |val: &mut GenericAttachment| {DownloadIncomplete::download_incomplete(val, extra).await};
+        let wraped_download = async |val: &mut RawGenericAttachment| {DownloadIncomplete::download_incomplete(val, extra).await};
         let futures_stream = stream::iter(attachment_refs.into_iter().map(wraped_download));
         const CONCURRENT_ATTACHMENTS :usize = 2;
         let _ = futures_stream.buffer_unordered(CONCURRENT_ATTACHMENTS).count().await;
@@ -59,7 +59,7 @@ impl DownloadIncomplete for GenericCase {
 
 
 pub async fn process_case(
-    mut case: GenericCase,
+    mut case: RawGenericCase,
     extra_data: &OpenscrapersExtraData,
     download_files: bool,
 ) -> anyhow::Result<()> {

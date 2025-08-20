@@ -9,11 +9,11 @@ use crate::{
     common::llm_deepinfra::split_mutate_author_list,
     types::{
         data_processing_traits::{ReParse, Revalidate, UpdateFromCache},
-        openscraper_types::{GenericAttachment, GenericCase, GenericFiling},
+        raw::{RawGenericAttachment, RawGenericCase, RawGenericFiling},
     },
 };
 
-impl Revalidate for GenericCase {
+impl Revalidate for RawGenericCase {
     fn revalidate(&mut self) {
         if self.opened_date.is_some() {
             return;
@@ -31,7 +31,7 @@ impl Revalidate for GenericCase {
     }
 }
 
-impl Revalidate for GenericFiling {
+impl Revalidate for RawGenericFiling {
     fn revalidate(&mut self) {
         self.organization_authors = mem::take(&mut self.organization_authors)
             .into_iter()
@@ -51,7 +51,7 @@ impl Revalidate for GenericFiling {
     }
 }
 
-impl ReParse for GenericCase {
+impl ReParse for RawGenericCase {
     type ParseError = Infallible;
     async fn re_parse(&mut self) -> Result<(), Self::ParseError> {
         // Call re_parse on each of the fillings, and await the futures all at once
@@ -60,10 +60,10 @@ impl ReParse for GenericCase {
         Ok(())
     }
 }
-impl ReParse for GenericFiling {
+impl ReParse for RawGenericFiling {
     type ParseError = Infallible;
     async fn re_parse(&mut self) -> Result<(), Self::ParseError> {
-        async fn replace_name(nameref: &mut String, attaches: &[GenericAttachment]) {
+        async fn replace_name(nameref: &mut String, attaches: &[RawGenericAttachment]) {
             if nameref.is_empty() {
                 let attach_names = attaches.iter().map(|f| &*f.name).collect::<Vec<_>>();
                 let guess = guess_at_filling_title(&attach_names).await;
@@ -81,7 +81,7 @@ impl ReParse for GenericFiling {
 }
 
 // Cache update logic
-impl UpdateFromCache for GenericAttachment {
+impl UpdateFromCache for RawGenericAttachment {
     fn update_from_cache(&mut self, cache: &Self) {
         if self.hash.is_none() {
             self.hash = cache.hash
@@ -89,7 +89,7 @@ impl UpdateFromCache for GenericAttachment {
     }
 }
 
-impl UpdateFromCache for GenericFiling {
+impl UpdateFromCache for RawGenericFiling {
     fn update_from_cache(&mut self, cache: &Self) {
         let cache_urls = cache
             .attachments
@@ -106,7 +106,7 @@ impl UpdateFromCache for GenericFiling {
     }
 }
 
-impl UpdateFromCache for GenericCase {
+impl UpdateFromCache for RawGenericCase {
     fn update_from_cache(&mut self, cache: &Self) {
         let mut cache_urls = HashMap::new();
         for filling in cache.filings.iter() {

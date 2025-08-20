@@ -8,8 +8,9 @@ use crate::s3_stuff::{
 };
 use crate::types::data_processing_traits::DownloadIncomplete;
 use crate::types::env_vars::CRIMSON_URL;
-use crate::types::openscraper_types::{
-    AttachmentTextQuality, GenericAttachment, JurisdictionInfo, RawAttachment, RawAttachmentText,
+use crate::types::{
+    jurisdictions::JurisdictionInfo,
+    raw::{AttachmentTextQuality, RawAttachment, RawAttachmentText, RawGenericAttachment},
 };
 use anyhow::{anyhow, bail};
 use aws_sdk_s3::Client as S3Client;
@@ -29,7 +30,7 @@ const ATTACHMENT_DOWNLOAD_TRIES: usize = 2;
 const DOWNLOAD_RETRY_DELAY_SECONDS: u64 = 2;
 
 pub type OpenscrapersExtraData = (S3Client, JurisdictionInfo);
-impl DownloadIncomplete for GenericAttachment {
+impl DownloadIncomplete for RawGenericAttachment {
     type ExtraData = OpenscrapersExtraData;
     type SucessData = ();
     async fn download_incomplete(
@@ -117,7 +118,7 @@ pub struct DirectAttachmentProcessInfo {
     pub file_name: Option<String>,
     pub extension: FileExtension,
     pub fetch_info: AdvancedFetchData,
-    pub jurisdiction_info: JurisdictionInfo,
+    pub jurisdiction_info: modname::JurisdictionInfo,
     pub wait_for_s3_upload: bool,
     pub process_text_before_upload: bool,
 }

@@ -7,7 +7,7 @@ use tracing::{debug, error, info};
 
 use crate::common::hash::Blake2bHash;
 use crate::types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET};
-use crate::types::openscraper_types::{GenericCase, JurisdictionInfo, RawAttachment};
+use crate::types::raw::{JurisdictionInfo, RawAttachment, RawGenericCase};
 use crate::types::s3_uri::S3Location;
 use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
 
@@ -141,8 +141,8 @@ pub async fn delete_all_with_prefix(
 pub async fn fetch_case_filing_from_s3(
     s3_client: &S3Client,
     case_govid: &str,
-    jurisdiction: &JurisdictionInfo,
-) -> anyhow::Result<GenericCase> {
+    jurisdiction: &modname::JurisdictionInfo,
+) -> anyhow::Result<RawGenericCase> {
     info!(case_govid, jurisdiction_name=%jurisdiction.jurisdiction, "Fetching case filing from S3");
     let key = get_case_s3_key(case_govid, jurisdiction);
     let bytes = download_s3_bytes(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key).await?;
@@ -199,7 +199,7 @@ pub async fn fetch_attachment_file_from_s3_with_filename(
         .unwrap_or_else(|| non_empty_string!("unknown_filename.pdf"));
     Ok((filename.to_string(), bytes))
 }
-pub fn get_case_s3_key(case_name: &str, jurisdiction: &JurisdictionInfo) -> String {
+pub fn get_case_s3_key(case_name: &str, jurisdiction: &modname::JurisdictionInfo) -> String {
     let country = &*jurisdiction.country;
     let state = &*jurisdiction.state;
     let jurisdiction_name = &*jurisdiction.jurisdiction;
@@ -210,7 +210,7 @@ pub fn get_case_s3_key(case_name: &str, jurisdiction: &JurisdictionInfo) -> Stri
     );
     key
 }
-pub fn get_jurisdiction_prefix(jurisdiction: &JurisdictionInfo) -> String {
+pub fn get_jurisdiction_prefix(jurisdiction: &modname::JurisdictionInfo) -> String {
     let country = &*jurisdiction.country;
     let state = &*jurisdiction.state;
     let jurisdiction_name = &*jurisdiction.jurisdiction;
@@ -249,8 +249,8 @@ pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blak
 
 pub async fn push_case_to_s3(
     s3_client: &S3Client,
-    case: &GenericCase,
-    jurisdiction: &JurisdictionInfo,
+    case: &RawGenericCase,
+    jurisdiction: &modname::JurisdictionInfo,
 ) -> anyhow::Result<()> {
     info!(case_number = %case.case_govid, "Pushing case to S3 and DB");
     let key = get_case_s3_key(case.case_govid.as_ref(), jurisdiction);
@@ -270,11 +270,11 @@ pub async fn push_case_to_s3(
 
 pub async fn list_cases_for_jurisdiction(
     s3_client: &S3Client,
-    JurisdictionInfo {
+    modname::JurisdictionInfo {
         jurisdiction,
         state,
         country,
-    }: &JurisdictionInfo,
+    }: &modname::JurisdictionInfo,
 ) -> anyhow::Result<Vec<String>> {
     info!(
         jurisdiction,
