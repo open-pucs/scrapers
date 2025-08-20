@@ -118,7 +118,7 @@ pub struct DirectAttachmentProcessInfo {
     pub file_name: Option<String>,
     pub extension: FileExtension,
     pub fetch_info: AdvancedFetchData,
-    pub jurisdiction_info: modname::JurisdictionInfo,
+    pub jurisdiction_info: JurisdictionInfo,
     pub wait_for_s3_upload: bool,
     pub process_text_before_upload: bool,
 }

@@ -50,7 +50,7 @@ pub async fn reparse_clean_jurisdiction_handler(
     }): Path<JurisdictionPath>,
 ) -> Json<TaskStatusDisplay> {
     let country = "usa".to_string();
-    let jur_info = modname::JurisdictionInfo {
+    let jur_info = JurisdictionInfo {
         state,
         country,
         jurisdiction: jurisdiction_name,
@@ -63,7 +63,7 @@ pub async fn reparse_clean_jurisdiction_handler(
     Json(display_return)
 }
 
-async fn reparse_clean_jurisdiction(jur_info: modname::JurisdictionInfo) -> anyhow::Result<()> {
+async fn reparse_clean_jurisdiction(jur_info: JurisdictionInfo) -> anyhow::Result<()> {
     let s3_client = OPENSCRAPERS_S3.make_s3_client().await;
     let docketlist = list_cases_for_jurisdiction(&s3_client, &jur_info).await?;
     let docket_closure = async |docket_govid: &String| {
@@ -81,7 +81,7 @@ async fn reparse_clean_jurisdiction(jur_info: modname::JurisdictionInfo) -> anyh
 async fn reparse_clean_docket(
     s3_client: &Client,
     docket_govid: &str,
-    jur_info: &modname::JurisdictionInfo,
+    jur_info: &JurisdictionInfo,
 ) -> anyhow::Result<()> {
     let Ok(mut docket) = fetch_case_filing_from_s3(s3_client, docket_govid, jur_info).await else {
         // Clean docket if fetch failed.

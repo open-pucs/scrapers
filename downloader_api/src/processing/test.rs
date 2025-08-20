@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use super::*;
 use crate::common::file_extension::{FileExtension, StaticExtension};
 use crate::s3_stuff::make_s3_client;
+use crate::types::jurisdictions::JurisdictionInfo;
 use crate::types::raw::{
     CaseWithJurisdiction, RawGenericAttachment, RawGenericCase, RawGenericFiling,
-    modname::JurisdictionInfo,
 };
 
 use chrono::{NaiveDate, Utc};
@@ -105,7 +105,7 @@ async fn test_process_case() {
         case_parties: vec![],
         indexed_at: Utc::now(),
     };
-    let jurisdiction = modname::JurisdictionInfo::new_usa("test", "test");
+    let jurisdiction = JurisdictionInfo::new_usa("test", "test");
     let casewith = CaseWithJurisdiction { case, jurisdiction };
 
     // let result = process_case(&casewith, &s3_client).await;

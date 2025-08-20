@@ -141,7 +141,7 @@ pub struct RawAttachmentText {
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct RawAttachment {
     pub hash: Blake2bHash,
-    pub jurisdiction_info: jurisdictions::JurisdictionInfo,
+    pub jurisdiction_info: JurisdictionInfo,
     pub name: NonEmptyString,
     pub extension: FileExtension,
     pub text_objects: Vec<RawAttachmentText>,

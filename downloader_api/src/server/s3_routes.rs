@@ -117,7 +117,7 @@ pub async fn handle_case_filing_from_s3(
 ) -> impl IntoApiResponse {
     info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Request received for case filing");
     let s3_client = crate::s3_stuff::make_s3_client().await;
-    let jurisdiction_info = modname::JurisdictionInfo::new_usa(&jurisdiction_name, &state);
+    let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
     let result =
         crate::s3_stuff::fetch_case_filing_from_s3(&s3_client, &case_name, &jurisdiction_info)
             .await;
@@ -142,7 +142,7 @@ pub async fn delete_case_filing_from_s3(
 ) -> impl IntoApiResponse {
     info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Request received to delete case filing");
     let s3_client = crate::s3_stuff::make_s3_client().await;
-    let jurisdiction_info = modname::JurisdictionInfo::new_usa(&jurisdiction_name, &state);
+    let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
     let case_key = get_case_s3_key(&case_name, &jurisdiction_info);
     let result = delete_s3_file(&s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &case_key).await;
     match result {
@@ -165,7 +165,7 @@ pub async fn recursive_delete_all_jurisdiction_data(
 ) -> impl IntoApiResponse {
     info!(state = %state, jurisdiction = %jurisdiction_name, "Deleting all data for jurisdiction");
     let s3_client = crate::s3_stuff::make_s3_client().await;
-    let jurisdiction_info = modname::JurisdictionInfo::new_usa(&jurisdiction_name, &state);
+    let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
     let prefix = get_jurisdiction_prefix(&jurisdiction_info);
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
     let result = delete_all_with_prefix(&s3_client, bucket, &prefix).await;
@@ -207,7 +207,7 @@ pub async fn handle_caselist_jurisdiction_fetch_all(
 
     info!("Sucessfully created s3 client.");
     let country = "usa".to_string(); // Or get from somewhere else
-    let jur_info = modname::JurisdictionInfo {
+    let jur_info = JurisdictionInfo {
         state,
         country,
         jurisdiction: jurisdiction_name,
