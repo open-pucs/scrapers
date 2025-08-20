@@ -2,14 +2,14 @@ use std::env;
 
 use aide::axum::ApiRouter;
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-use init_tracing_opentelemetry::tracing_subscriber_ext::{
-    TracingGuard, init_subscribers_and_loglevel,
+use init_tracing_opentelemetry::{
+    otlp::OtelGuard, tracing_subscriber_ext::init_subscribers_and_loglevel,
 };
 use tracing::info;
 
 pub fn initialize_tracing_and_wrap_router(
     make_api: impl FnOnce() -> ApiRouter,
-) -> anyhow::Result<(ApiRouter, TracingGuard)> {
+) -> anyhow::Result<(ApiRouter, OtelGuard)> {
     if env::var("OTEL_SERVICE_NAME").is_err() {
         // a) Crate name – compile‑time constant, always available.
         let crate_name = env!("CARGO_PKG_NAME");
