@@ -70,18 +70,5 @@ describe("template spec", () => {
     //     #[serde(default)]
     //     pub hash: Option<Blake2bHash>,
     // }
-    //
-    // After you have created the json object, save it to a file <permit-id>.json
-
-    // cy.get('c-uttm_-coal_-public-documents-component').click();
-    // cy.get('c-uttm_-coal_-public-documents-component').click();
-    // cy.get('c-uttm_-coal_-public-documents-component').click();
-    // cy.get('c-uttm_-coal_-public-documents-component').click();
-    // cy.get('c-uttm_-coal_-public-documents-component').click();
-    // cy.get('c-uttm_-coal_-public-documents-component').click();
-    // cy.get('c-uttm_-coal_-public-documents-component').click();
-    // cy.get('c-uttm_-coal_-public-documents-component').click();
-    // cy.get('c-uttm_-coal_-public-documents-component').click();
-    /* ==== End Cypress Studio ==== */
   });
 });
