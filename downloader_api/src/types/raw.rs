@@ -21,6 +21,8 @@ pub struct RawGenericAttachment {
     pub name: String,
     pub document_extension: FileExtension,
     #[serde(default)]
+    pub attachment_govid: String,
+    #[serde(default)]
     pub url: String,
     #[serde(default)]
     pub attachment_type: String,
@@ -35,6 +37,8 @@ pub struct RawGenericAttachment {
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct RawGenericFiling {
     pub filed_date: NaiveDate,
+    #[serde(default)]
+    pub filling_govid: String,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
