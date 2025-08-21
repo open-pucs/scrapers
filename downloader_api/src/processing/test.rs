@@ -91,6 +91,7 @@ async fn test_process_case() {
         case_name: "Example Case".to_string(),
         case_url: "https://court.gov/cases/TEST-CASE-123".to_string(),
         case_type: "Civil".to_string(),
+        case_subtype: "Submetering".to_string(),
         description: "A test case used for unit‑testing".to_string(),
         industry: "Technology".to_string(),
         petitioner: "Jane Smith".to_string(),

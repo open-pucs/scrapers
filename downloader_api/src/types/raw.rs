@@ -58,13 +58,14 @@ pub struct RawGenericCase {
     // the minimum of the fillings, and the scraper should calculate it.
     #[serde(default)]
     pub opened_date: Option<NaiveDate>,
-
     #[serde(default)]
     pub case_name: String,
     #[serde(default)]
     pub case_url: String,
     #[serde(default)]
     pub case_type: String,
+    #[serde(default)]
+    pub case_subtype: String,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
@@ -90,36 +91,6 @@ pub struct GenericParty {
     name: NonEmptyString,
     is_corperate_entity: bool,
     is_human: bool,
-}
-
-#[skip_serializing_none]
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Default)]
-pub struct GenericFilingLegacy {
-    pub name: String,
-    pub filed_date: DateTime<Utc>,
-    pub party_name: String,
-    pub filing_type: String,
-    pub description: String,
-    pub attachments: Vec<RawGenericAttachment>,
-    pub extra_metadata: HashMap<String, serde_json::Value>,
-}
-
-#[skip_serializing_none]
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Default)]
-pub struct GenericCaseLegacy {
-    pub case_number: String,
-    pub case_name: String,
-    pub case_url: String,
-    pub case_type: Option<String>,
-    pub description: Option<String>,
-    pub industry: Option<String>,
-    pub petitioner: Option<String>,
-    pub hearing_officer: Option<String>,
-    pub opened_date: Option<DateTime<Utc>>,
-    pub closed_date: Option<DateTime<Utc>>,
-    pub filings: Vec<GenericFilingLegacy>,
-    pub extra_metadata: HashMap<String, serde_json::Value>,
-    pub indexed_at: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, JsonSchema)]
