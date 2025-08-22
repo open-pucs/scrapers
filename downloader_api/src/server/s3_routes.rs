@@ -7,7 +7,7 @@ use axum::{
 use hyper::{StatusCode, body::Bytes, header};
 use mycorrhiza_common::{
     hash::Blake2bHash,
-    s3_generic::fetchers_and_getters::{S3Addr, S3PrefixAddr},
+    s3_generic::fetchers_and_getters::{S3Addr, S3DirectoryAddr},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -169,7 +169,7 @@ pub async fn recursive_delete_all_jurisdiction_data(
     let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
     let prefix = get_jurisdiction_prefix(&jurisdiction_info);
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
-    let result = S3PrefixAddr::new(&s3_client, bucket, &prefix)
+    let result = S3DirectoryAddr::new(&s3_client, bucket, &prefix)
         .delete_all()
         .await;
     match result {

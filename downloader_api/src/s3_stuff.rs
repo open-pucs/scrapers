@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use futures_util::join;
-use mycorrhiza_common::s3_generic::fetchers_and_getters::{S3Addr, S3PrefixAddr};
-use mycorrhiza_common::s3_generic::s3_uri::{S3Location, S3LocationWithCredentials};
+use mycorrhiza_common::s3_generic::fetchers_and_getters::{S3Addr, S3DirectoryAddr};
+use mycorrhiza_common::s3_generic::s3_uri::S3LocationWithCredentials;
 use non_empty_string::non_empty_string;
 use tracing::{debug, info};
 
@@ -142,9 +142,10 @@ pub async fn push_case_to_s3(
 ) -> anyhow::Result<()> {
     info!(case_number = %case.case_govid, "Pushing case to S3 and DB");
     let key = get_case_s3_key(case.case_govid.as_ref(), jurisdiction);
-    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
     info!("Successfully pushed case to S3");
-    S3Addr::new(s3_client, bucket, &key).upload_json(case).await
+    S3Addr::new(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key)
+        .upload_json(case)
+        .await
 }
 
 pub async fn list_cases_for_jurisdiction(
@@ -159,10 +160,9 @@ pub async fn list_cases_for_jurisdiction(
         jurisdiction,
         state, country, "Listing cases for jurisdiction"
     );
-    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
     let prefix = format!("objects/{country}/{state}/{jurisdiction}/");
     info!("Listing cases with prefix: {}", prefix);
-    let mut matches = S3PrefixAddr::new(s3_client, bucket, &prefix)
+    let mut matches = S3DirectoryAddr::new(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &prefix)
         .list_all()
         .await?;
     for val in matches.iter_mut() {
@@ -180,9 +180,8 @@ pub async fn push_raw_attach_file_to_s3(
 ) -> anyhow::Result<()> {
     info!(hash = %raw_att.hash, "Pushing raw attachment file to S3");
     let file_key = get_raw_attach_file_key(raw_att.hash);
-    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
 
-    S3Addr::new(s3_client, bucket, &file_key)
+    S3Addr::new(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &file_key)
         .upload_bytes(file_contents)
         .await?;
     info!("Successfully pushed file to S3");
@@ -196,9 +195,8 @@ pub async fn push_raw_attach_object_to_s3(
 ) -> anyhow::Result<()> {
     info!(hash = %raw_att.hash, "Pushing raw attachment file to S3");
     let obj_key = get_raw_attach_obj_key(raw_att.hash);
-    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
 
-    S3Addr::new(s3_client, bucket, &obj_key)
+    S3Addr::new(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &obj_key)
         .upload_json(raw_att)
         .await?;
     info!("Successfully pushed metadata object to S3");
