@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 pub mod attachments;
 pub mod file_fetching;
 pub mod reparse_all;
+pub mod llm_prompts;
 
 #[derive(Serialize)]
 struct CrimsonPDFIngestParamsS3 {

@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 
-use super::*;
-use mycorrhiza_common::file_extension::{FileExtension, StaticExtension};
 use crate::s3_stuff::make_s3_client;
 use crate::types::jurisdictions::JurisdictionInfo;
 use crate::types::raw::{
     CaseWithJurisdiction, RawGenericAttachment, RawGenericCase, RawGenericFiling,
 };
+use mycorrhiza_common::file_extension::{FileExtension, StaticExtension};
 
 use chrono::{NaiveDate, Utc};
 use non_empty_string::non_empty_string;
@@ -28,7 +27,7 @@ async fn test_process_case() {
         .with_target(false)
         // sets this to be the default, global collector for this application.
         .init();
-    let s3_client = make_s3_client().await;
+    let _s3_client = make_s3_client().await;
 
     let filing_date_1 = NaiveDate::from_ymd_opt(2021, 3, 15).unwrap();
     let filing_date_2 = NaiveDate::from_ymd_opt(2022, 7, 22).unwrap();
@@ -111,7 +110,7 @@ async fn test_process_case() {
         indexed_at: Utc::now(),
     };
     let jurisdiction = JurisdictionInfo::new_usa("test", "test");
-    let casewith = CaseWithJurisdiction { case, jurisdiction };
+    let _casewith = CaseWithJurisdiction { case, jurisdiction };
 
     // let result = process_case(&casewith, &s3_client).await;
     // assert!(result.is_ok());
