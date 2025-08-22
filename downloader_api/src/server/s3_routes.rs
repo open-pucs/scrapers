@@ -12,11 +12,14 @@ use std::str::FromStr;
 use tracing::{error, info};
 
 use crate::{
-    common::hash::Blake2bHash,
-    s3_stuff::{
-        delete_all_with_prefix, delete_s3_file, get_case_s3_key, get_jurisdiction_prefix,
-        list_cases_for_jurisdiction,
+    common::{
+        hash::Blake2bHash,
+        s3_generic::fetchers_and_getters::{
+            delete_all_with_prefix, delete_s3_file, download_s3_bytes, upload_s3_bytes,
+            upload_s3_json,
+        },
     },
+    s3_stuff::{get_case_s3_key, get_jurisdiction_prefix, list_cases_for_jurisdiction},
     types::{
         env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
         jurisdictions::JurisdictionInfo,
@@ -34,7 +37,7 @@ pub async fn read_openscrapers_s3_file(
 ) -> impl IntoApiResponse {
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
     let s3_client = crate::s3_stuff::make_s3_client().await;
-    let result = crate::s3_stuff::download_s3_bytes(&s3_client, bucket, &path).await;
+    let result = download_s3_bytes(&s3_client, bucket, &path).await;
     match result {
         Ok(contents) => (axum::http::StatusCode::OK, Bytes::from(contents)).into_response(),
         Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -59,7 +62,7 @@ pub async fn write_s3_file_string(Json(payload): Json<S3UploadString>) -> impl I
     let bucket = (payload.bucket)
         .as_deref()
         .unwrap_or(&**OPENSCRAPERS_S3_OBJECT_BUCKET);
-    let result = crate::s3_stuff::upload_s3_bytes(&s3_client, bucket, &payload.key, contents).await;
+    let result = upload_s3_bytes(&s3_client, bucket, &payload.key, contents).await;
     match result {
         Ok(_) => (axum::http::StatusCode::OK).into_response(),
         Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -74,18 +77,11 @@ pub struct S3UploadJson {
 }
 pub async fn write_s3_file_json(Json(payload): Json<S3UploadJson>) -> impl IntoApiResponse {
     let s3_client = crate::s3_stuff::make_s3_client().await;
-    let contents = match serde_json::to_string(&payload.contents) {
-        Ok(string) => string.into_bytes(),
-        Err(err) => {
-            error!("Could not reserialize json value");
-            return (axum::http::StatusCode::BAD_REQUEST, err.to_string()).into_response();
-        }
-    };
 
     let bucket = (payload.bucket)
         .as_deref()
         .unwrap_or(&**OPENSCRAPERS_S3_OBJECT_BUCKET);
-    let result = crate::s3_stuff::upload_s3_bytes(&s3_client, bucket, &payload.key, contents).await;
+    let result = upload_s3_json(&s3_client, bucket, &payload.key, &payload.contents).await;
     match result {
         Ok(_) => (axum::http::StatusCode::OK).into_response(),
         Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),

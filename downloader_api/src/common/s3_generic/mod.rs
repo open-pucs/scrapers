@@ -4,6 +4,8 @@ use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::{Client, config::Credentials};
 use tracing::info;
 
+pub mod fetchers_and_getters;
+
 pub struct S3Credentials {
     pub cloud_region: String,
     pub endpoint: String,
