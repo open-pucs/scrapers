@@ -1,8 +1,6 @@
 use anyhow::anyhow;
 use futures_util::join;
-use mycorrhiza_common::s3_generic::fetchers_and_getters::{
-    PrefixLocationWithClient, S3LocationWithClient,
-};
+use mycorrhiza_common::s3_generic::fetchers_and_getters::{S3Addr, S3PrefixAddr};
 use mycorrhiza_common::s3_generic::s3_uri::{S3Location, S3LocationWithCredentials};
 use non_empty_string::non_empty_string;
 use tracing::{debug, info};
@@ -45,9 +43,7 @@ pub async fn fetch_attachment_data_from_s3(
     info!(%hash, "Fetching attachment data from S3");
     let key = get_raw_attach_obj_key(hash);
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
-    S3LocationWithClient::new(s3_client, bucket, &key)
-        .download_json()
-        .await
+    S3Addr::new(s3_client, bucket, &key).download_json().await
 }
 
 pub async fn fetch_attachment_file_from_s3(
@@ -56,7 +52,7 @@ pub async fn fetch_attachment_file_from_s3(
 ) -> anyhow::Result<Vec<u8>> {
     info!(%hash, "Fetching attachment file from S3");
     let key = get_raw_attach_file_key(hash);
-    S3LocationWithClient::new(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key)
+    S3Addr::new(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key)
         .download_bytes()
         .await
 }
@@ -67,7 +63,7 @@ pub async fn fetch_attachment_file_from_s3_with_filename(
 ) -> anyhow::Result<(String, Vec<u8>)> {
     info!(%hash, "Fetching attachment file from S3");
     let key = get_raw_attach_file_key(hash);
-    let location = S3LocationWithClient::new(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key);
+    let location = S3Addr::new(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key);
     let bytes_future = location.download_bytes();
     let metadata_future = fetch_attachment_data_from_s3(s3_client, hash);
     let (Ok(bytes), metadata) = join!(bytes_future, metadata_future) else {
@@ -136,9 +132,7 @@ pub async fn fetch_case_filing_from_s3(
     let key = get_case_s3_key(case_name, jurisdiction);
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
     info!("Successfully pushed case to S3");
-    S3LocationWithClient::new(s3_client, bucket, &key)
-        .download_json()
-        .await
+    S3Addr::new(s3_client, bucket, &key).download_json().await
 }
 
 pub async fn push_case_to_s3(
@@ -150,9 +144,7 @@ pub async fn push_case_to_s3(
     let key = get_case_s3_key(case.case_govid.as_ref(), jurisdiction);
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
     info!("Successfully pushed case to S3");
-    S3LocationWithClient::new(s3_client, bucket, &key)
-        .upload_json(case)
-        .await
+    S3Addr::new(s3_client, bucket, &key).upload_json(case).await
 }
 
 pub async fn list_cases_for_jurisdiction(
@@ -170,7 +162,7 @@ pub async fn list_cases_for_jurisdiction(
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
     let prefix = format!("objects/{country}/{state}/{jurisdiction}/");
     info!("Listing cases with prefix: {}", prefix);
-    let mut matches = PrefixLocationWithClient::new(s3_client, bucket, &prefix)
+    let mut matches = S3PrefixAddr::new(s3_client, bucket, &prefix)
         .list_all()
         .await?;
     for val in matches.iter_mut() {
@@ -190,7 +182,7 @@ pub async fn push_raw_attach_file_to_s3(
     let file_key = get_raw_attach_file_key(raw_att.hash);
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
 
-    S3LocationWithClient::new(s3_client, bucket, &file_key)
+    S3Addr::new(s3_client, bucket, &file_key)
         .upload_bytes(file_contents)
         .await?;
     info!("Successfully pushed file to S3");
@@ -206,7 +198,7 @@ pub async fn push_raw_attach_object_to_s3(
     let obj_key = get_raw_attach_obj_key(raw_att.hash);
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
 
-    S3LocationWithClient::new(s3_client, bucket, &obj_key)
+    S3Addr::new(s3_client, bucket, &obj_key)
         .upload_json(raw_att)
         .await?;
     info!("Successfully pushed metadata object to S3");

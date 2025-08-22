@@ -7,7 +7,7 @@ use axum::{
 use hyper::{StatusCode, body::Bytes, header};
 use mycorrhiza_common::{
     hash::Blake2bHash,
-    s3_generic::fetchers_and_getters::{PrefixLocationWithClient, S3LocationWithClient},
+    s3_generic::fetchers_and_getters::{S3Addr, S3PrefixAddr},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ pub async fn read_openscrapers_s3_file(
 ) -> impl IntoApiResponse {
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
     let s3_client = crate::s3_stuff::make_s3_client().await;
-    let result = S3LocationWithClient::new(&s3_client, bucket, &path)
+    let result = S3Addr::new(&s3_client, bucket, &path)
         .download_bytes()
         .await;
     match result {
@@ -61,7 +61,7 @@ pub async fn write_s3_file_string(Json(payload): Json<S3UploadString>) -> impl I
     let bucket = (payload.bucket)
         .as_deref()
         .unwrap_or(&**OPENSCRAPERS_S3_OBJECT_BUCKET);
-    let result = S3LocationWithClient::new(&s3_client, bucket, &payload.key)
+    let result = S3Addr::new(&s3_client, bucket, &payload.key)
         .upload_bytes(contents)
         .await;
     match result {
@@ -82,7 +82,7 @@ pub async fn write_s3_file_json(Json(payload): Json<S3UploadJson>) -> impl IntoA
     let bucket = (payload.bucket)
         .as_deref()
         .unwrap_or(&**OPENSCRAPERS_S3_OBJECT_BUCKET);
-    let result = S3LocationWithClient::new(&s3_client, bucket, &payload.key)
+    let result = S3Addr::new(&s3_client, bucket, &payload.key)
         .upload_json(&payload.contents)
         .await;
     match result {
@@ -143,7 +143,7 @@ pub async fn delete_case_filing_from_s3(
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
     let case_key = get_case_s3_key(&case_name, &jurisdiction_info);
-    let result = S3LocationWithClient::new(&s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &case_key)
+    let result = S3Addr::new(&s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &case_key)
         .delete_file()
         .await;
     match result {
@@ -169,7 +169,7 @@ pub async fn recursive_delete_all_jurisdiction_data(
     let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
     let prefix = get_jurisdiction_prefix(&jurisdiction_info);
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
-    let result = PrefixLocationWithClient::new(&s3_client, bucket, &prefix)
+    let result = S3PrefixAddr::new(&s3_client, bucket, &prefix)
         .delete_all()
         .await;
     match result {
