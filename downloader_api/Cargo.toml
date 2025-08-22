@@ -45,4 +45,4 @@ serde_with = "3.14.0"
 async-trait = "0.1.88"
 tower-http = { version = "0.6.6", features = ["cors"] }
 hostname = "0.4.1"
-rkyv = { version = "0.8.11" }
+rkyv = { version = "0.8.11", features = ["aligned", "alloc"] }
