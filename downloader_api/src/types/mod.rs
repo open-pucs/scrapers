@@ -5,7 +5,6 @@ pub mod openscraper_data_traits;
 pub mod pagination;
 pub mod processed;
 pub mod raw;
-pub mod s3_uri;
 
 pub mod jurisdictions {
     use schemars::JsonSchema;

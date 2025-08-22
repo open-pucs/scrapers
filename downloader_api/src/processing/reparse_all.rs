@@ -5,7 +5,7 @@ use aws_sdk_s3::Client;
 use axum::{Json, extract::Path};
 use futures_util::{StreamExt, stream};
 use mycorrhiza_common::{
-    s3_generic::fetchers_and_getters::delete_s3_file,
+    s3_generic::fetchers_and_getters::S3LocationWithClient,
     tasks::{
         ExecuteUserTask, TaskStatusDisplay, workers::add_task_to_queue_and_wait_to_see_if_done,
     },
@@ -89,7 +89,9 @@ async fn reparse_clean_docket(
         // Clean docket if fetch failed.
         let docket_key = get_case_s3_key(docket_govid, jur_info);
         tracing::warn!(%docket_govid, %docket_key,"Could not properly serialize docket, deleting out of an abundance of caution.");
-        delete_s3_file(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &docket_key).await?;
+        S3LocationWithClient::new(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &docket_key)
+            .delete_file()
+            .await?;
         return Ok(());
     };
     docket.revalidate();
