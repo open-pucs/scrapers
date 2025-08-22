@@ -4,10 +4,10 @@ use tracing::info;
 
 use crate::{
     case_worker::{ProcessCaseWithDownload, ProcessCaseWithoutDownload},
-    common::tasks::{TaskStatusDisplay, workers::add_task_to_queue},
     types::raw::CaseWithJurisdiction,
 };
 
+use mycorrhiza_common::tasks::{TaskStatusDisplay, workers::add_task_to_queue};
 pub async fn submit_case_to_queue_with_download(
     Json(case): Json<CaseWithJurisdiction>,
 ) -> impl IntoApiResponse {

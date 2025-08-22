@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::*;
-use crate::common::file_extension::{FileExtension, StaticExtension};
+use mycorrhiza_common::file_extension::{FileExtension, StaticExtension};
 use crate::s3_stuff::make_s3_client;
 use crate::types::jurisdictions::JurisdictionInfo;
 use crate::types::raw::{

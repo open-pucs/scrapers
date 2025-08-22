@@ -1,8 +1,8 @@
-use crate::common::tasks::ExecuteUserTask;
 use crate::processing::process_case;
 use crate::s3_stuff::make_s3_client;
 use crate::types::raw::CaseWithJurisdiction;
 use async_trait::async_trait;
+use mycorrhiza_common::tasks::ExecuteUserTask;
 
 #[repr(transparent)]
 pub struct ProcessCaseWithDownload(pub CaseWithJurisdiction);

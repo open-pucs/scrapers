@@ -1,6 +1,7 @@
 #![allow(dead_code)]
-use common::{
+use mycorrhiza_common::{
     api_documentation::generate_api_docs_and_serve,
+    llm_deepinfra::DEEPINFRA_API_KEY,
     misc::internet_check::do_i_have_internet,
     otel_tracing::initialize_tracing_and_wrap_router,
     tasks::{routing::define_generic_task_routes, workers::spawn_worker_loop},
@@ -8,7 +9,6 @@ use common::{
 use tracing::info;
 
 use crate::{
-    common::llm_deepinfra::DEEPINFRA_API_KEY,
     server::define_routes,
     types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET},
 };
@@ -21,7 +21,6 @@ use std::{
 };
 
 mod case_worker;
-mod common;
 mod processing;
 mod s3_stuff;
 mod server;

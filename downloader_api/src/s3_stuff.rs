@@ -4,8 +4,8 @@ use futures_util::join;
 use non_empty_string::non_empty_string;
 use tracing::{debug, info};
 
-use crate::common::hash::Blake2bHash;
-use crate::common::s3_generic::fetchers_and_getters::{
+use mycorrhiza_common::hash::Blake2bHash;
+use mycorrhiza_common::s3_generic::fetchers_and_getters::{
     download_s3_bytes, download_s3_json, match_all_with_prefix, upload_s3_bytes, upload_s3_json,
 };
 use crate::types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET};

@@ -4,10 +4,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{
-    common::{file_extension::FileExtension, hash::Blake2bHash},
-    types::jurisdictions::JurisdictionInfo,
-};
+use crate::types::jurisdictions::JurisdictionInfo;
+use mycorrhiza_common::{file_extension::FileExtension, hash::Blake2bHash};
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct CaseWithJurisdiction {

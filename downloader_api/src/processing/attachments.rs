@@ -1,5 +1,5 @@
-use crate::common::file_extension::{FileExtension, StaticExtension};
-use crate::common::hash::Blake2bHash;
+use mycorrhiza_common::file_extension::{FileExtension, StaticExtension};
+use mycorrhiza_common::hash::Blake2bHash;
 use crate::processing::file_fetching::{FileDownloadError, RequestMethod};
 use crate::processing::{CrimsonInitialResponse, CrimsonPDFIngestParamsS3, CrimsonStatusResponse};
 use crate::s3_stuff::{

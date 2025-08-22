@@ -7,7 +7,7 @@ use serde_json::Value;
 use thiserror::Error;
 use tracing::{error, info};
 
-use crate::common::file_extension::FileValidationError;
+use mycorrhiza_common::file_extension::FileValidationError;
 
 #[derive(Debug, Clone)]
 pub struct FileDownloadResult {

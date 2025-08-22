@@ -8,11 +8,11 @@ use aide::{
 use direct_file_fetch::{
     handle_directly_process_file_request, handle_directly_process_file_request_docs,
 };
+use mycorrhiza_common::{llm_deepinfra::test_deepinfra, misc::is_env_var_true};
 use std::sync::LazyLock;
 use tracing::info;
 
 use crate::{
-    common::{llm_deepinfra::test_deepinfra, misc::is_env_var_true},
     processing::reparse_all::reparse_clean_jurisdiction_handler,
     server::scraper_check_completed::get_completed_casedata_differential,
 };
