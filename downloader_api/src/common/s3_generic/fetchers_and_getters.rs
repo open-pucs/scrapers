@@ -1,14 +1,11 @@
-use std::path::Path;
-
 use anyhow::anyhow;
 use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
-use futures_util::join;
-use non_empty_string::non_empty_string;
-use rkyv::{
-    Archive, CheckBytes, Serialize, archived_root, ser::serializers::AllocSerializer, to_bytes,
-    validation::validators::DefaultValidator,
-};
-use std::ops::Deref;
+// use rkyv::{
+//     Archive, Serialize, archived_root,
+//     ser::{Serializer, serializers::AllocSerializer},
+//     to_bytes,
+// };
+use std::path::Path;
 use tracing::{debug, error, info};
 
 // Core function to download bytes from S3
@@ -32,55 +29,45 @@ pub async fn upload_s3_json<T: serde::Serialize>(
     upload_s3_bytes(s3_client, bucket, key, obj_json_bytes).await
 }
 
-// it should return a safe way to access the object, ideally just returning some kind of wrapper over the s3 bytes, it shouldnt do anything to change the memory layout of from the vec.
-pub struct ArchivedS3Object<T: Archive>
-where
-    T::Archived: for<'a> CheckBytes<DefaultValidator<'a>>,
-{
-    bytes: Vec<u8>,
-    _phantom: std::marker::PhantomData<T>,
-}
-
-impl<T: Archive> Deref for ArchivedS3Object<T>
-where
-    T::Archived: for<'a> CheckBytes<DefaultValidator<'a>>,
-{
-    type Target = T::Archived;
-
-    fn deref(&self) -> &Self::Target {
-        // SAFETY: The bytes have been validated in the constructor.
-        unsafe { archived_root::<T>(&self.bytes) }
-    }
-}
-
-pub async fn upload_s3_rkyv<T>(
-    s3_client: &S3Client,
-    bucket: &str,
-    key: &str,
-    obj: &T,
-) -> anyhow::Result<()>
-where
-    T: Archive + Serialize<AllocSerializer<256>>,
-{
-    let obj_arkyv_bytes = to_bytes::<_, 256>(obj)?;
-    upload_s3_bytes(s3_client, bucket, key, obj_arkyv_bytes.to_vec()).await
-}
-
-pub async fn download_s3_rkyv<T: Archive>(
-    s3_client: &S3Client,
-    bucket: &str,
-    key: &str,
-) -> anyhow::Result<ArchivedS3Object<T>>
-where
-    T::Archived: for<'a> CheckBytes<DefaultValidator<'a>>,
-{
-    let bytes = download_s3_bytes(s3_client, bucket, key).await?;
-    rkyv::check_archived_root::<T>(&bytes)?;
-    Ok(ArchivedS3Object {
-        bytes,
-        _phantom: std::marker::PhantomData,
-    })
-}
+// // it should return a safe way to access the object, ideally just returning some kind of wrapper over the s3 bytes, it shouldnt do anything to change the memory layout of from the vec.
+// pub struct ArchivedS3Object<T: Archive> {
+//     bytes: Vec<u8>,
+//     _phantom: std::marker::PhantomData<T>,
+// }
+//
+// impl<T: Archive> Deref for ArchivedS3Object<T> {
+//     type Target = T::Archived;
+//
+//     fn deref(&self) -> &Self::Target {
+//         // SAFETY: The bytes are assumed to be a valid rkyv archive.
+//         unsafe { archived_root::<T>(&self.bytes) }
+//     }
+// }
+//
+// pub async fn upload_s3_rkyv<T>(
+//     s3_client: &S3Client,
+//     bucket: &str,
+//     key: &str,
+//     obj: &T,
+// ) -> anyhow::Result<()>
+// where
+//     T: Archive + Serialize<AllocSerializer<256>>,
+// {
+//     let bytes = rkyv::to_bytes::<_, 256>(obj)?;
+//     upload_s3_bytes(s3_client, bucket, key, bytes.to_vec()).await
+// }
+//
+// pub async fn download_s3_rkyv<T: Archive>(
+//     s3_client: &S3Client,
+//     bucket: &str,
+//     key: &str,
+// ) -> anyhow::Result<ArchivedS3Object<T>> {
+//     let bytes = download_s3_bytes(s3_client, bucket, key).await?;
+//     Ok(ArchivedS3Object {
+//         bytes,
+//         _phantom: std::marker::PhantomData,
+//     })
+// }
 pub async fn download_s3_bytes(
     s3_client: &S3Client,
     bucket: &str,
@@ -213,5 +200,3 @@ pub async fn match_all_with_prefix(
     }
     Ok(prefix_names)
 }
-
-pub async fn file_exists_s3(s3_client: &S3Client, bucket: &str, key: &str) -> anyhow::Result<()> {}

@@ -1,9 +1,8 @@
-use std::path::Path;
 
 use anyhow::anyhow;
 use futures_util::join;
 use non_empty_string::non_empty_string;
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 use crate::common::hash::Blake2bHash;
 use crate::common::s3_generic::fetchers_and_getters::{
@@ -13,7 +12,7 @@ use crate::types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET};
 use crate::types::jurisdictions::JurisdictionInfo;
 use crate::types::raw::{RawAttachment, RawGenericCase};
 use crate::types::s3_uri::S3Location;
-use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
+use aws_sdk_s3::Client as S3Client;
 
 pub fn get_raw_attach_obj_key(hash: Blake2bHash) -> String {
     let key = format!("raw/metadata/{hash}.json");
@@ -44,7 +43,7 @@ pub async fn fetch_attachment_data_from_s3(
     info!(%hash, "Fetching attachment data from S3");
     let key = get_raw_attach_obj_key(hash);
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
-    download_s3_json(s3_client, bucket, &key)
+    download_s3_json(s3_client, bucket, &key).await
 }
 
 pub async fn fetch_attachment_file_from_s3(
@@ -159,14 +158,14 @@ pub async fn list_cases_for_jurisdiction(
     );
     let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
     let prefix = format!("objects/{country}/{state}/{jurisdiction}/");
-    let mut case_names = Vec::new();
     info!("Listing cases with prefix: {}", prefix);
-    let matches = match_all_with_prefix(s3_client, bucket, &prefix).await?;
+    let mut matches = match_all_with_prefix(s3_client, bucket, &prefix).await?;
     for val in matches.iter_mut() {
         if let Some(stripped) = val.strip_suffix(".json") {
             *val = stripped.to_string();
         };
     }
+    Ok(matches)
 }
 
 pub async fn push_raw_attach_file_to_s3(

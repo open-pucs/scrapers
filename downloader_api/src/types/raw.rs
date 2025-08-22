@@ -2,7 +2,6 @@ use chrono::{DateTime, NaiveDate, Utc};
 use non_empty_string::NonEmptyString;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
 use std::collections::HashMap;
 
 use crate::{

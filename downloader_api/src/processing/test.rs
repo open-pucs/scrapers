@@ -40,6 +40,7 @@ async fn test_process_case() {
 
     // Attachments for the first filing.
     let attachment_1 = RawGenericAttachment {
+        attachment_govid: Default::default(),
         name: non_empty_string!("Judgement PDF").into(),
         url: "https://example.com/judgement.pdf".to_string(),
         document_extension: FileExtension::Static(StaticExtension::Pdf),
@@ -51,6 +52,7 @@ async fn test_process_case() {
 
     // Attachments for the second filing (different extension, no hash).
     let attachment_2 = RawGenericAttachment {
+        attachment_govid: Default::default(),
         name: non_empty_string!("Exhibit Image").into(),
         url: "https://example.com/exhibit.png".to_string(),
         document_extension: FileExtension::Static(StaticExtension::Png),
@@ -62,6 +64,7 @@ async fn test_process_case() {
 
     // First filing – contains one attachment and some authors.
     let filing_1 = RawGenericFiling {
+        filling_govid: Default::default(),
         name: non_empty_string!("Initial Complaint").into(),
         filed_date: filing_date_1,
         attachments: vec![attachment_1],
@@ -74,6 +77,7 @@ async fn test_process_case() {
 
     // Second filing – different date, different attachment.
     let filing_2 = RawGenericFiling {
+        filling_govid: Default::default(),
         name: non_empty_string!("Supplemental Exhibit").into(),
         filed_date: filing_date_2,
         attachments: vec![attachment_2],
