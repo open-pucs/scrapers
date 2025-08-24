@@ -1,13 +1,10 @@
 use aide::axum::{
     ApiRouter, IntoApiResponse,
-    routing::{post, post_with},
 };
-use aws_sdk_s3::Client as S3Client;
 use axum::{Json, response::IntoResponse};
 use mycorrhiza_common::s3_generic::fetchers_and_getters::S3DirectoryAddr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 
 use crate::types::env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET;
 
@@ -34,14 +31,14 @@ pub async fn move_s3_objects(Json(payload): Json<CopyPrefixRequest>) -> impl Int
 
     let source = S3DirectoryAddr::new(
         &s3_client,
-        (&payload.source.bucket)
+        payload.source.bucket
             .as_deref()
             .unwrap_or(default_bucket),
         &payload.source.prefix,
     );
     let destination = S3DirectoryAddr::new(
         &s3_client,
-        (&payload.destination.bucket)
+        payload.destination.bucket
             .as_deref()
             .unwrap_or(default_bucket),
         &payload.destination.prefix,

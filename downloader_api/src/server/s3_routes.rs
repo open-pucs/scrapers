@@ -25,7 +25,7 @@ use crate::{
         jurisdictions::JurisdictionInfo,
         pagination::{PaginationData, make_paginated_subslice},
         processed::ProcessedGenericDocket,
-        raw::{RawAttachment, RawGenericDocket},
+        raw::RawAttachment,
     },
 };
 

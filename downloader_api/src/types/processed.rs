@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
-use blake2::digest::typenum::Or;
 use chrono::{DateTime, NaiveDate, Utc};
 use mycorrhiza_common::{file_extension::FileExtension, hash::Blake2bHash};
 use non_empty_string::NonEmptyString;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::types::raw::{GenericParty, RawGenericAttachment};
+use crate::types::raw::GenericParty;
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct ProcessedGenericAttachment {

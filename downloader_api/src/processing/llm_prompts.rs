@@ -46,7 +46,7 @@ pub async fn split_and_fix_author_list(auth_list: &[String]) -> Vec<OrgName> {
     let backup_list = auth_list
         .iter()
         .cloned()
-        .filter_map(|string| clean_organization_name(string))
+        .filter_map(clean_organization_name)
         .collect();
 
     if auth_list.len() == 1

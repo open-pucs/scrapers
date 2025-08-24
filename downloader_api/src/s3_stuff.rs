@@ -1,4 +1,3 @@
-use std::fmt::format;
 
 use anyhow::anyhow;
 use futures_util::join;

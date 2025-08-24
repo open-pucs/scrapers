@@ -1,8 +1,7 @@
-use std::mem;
 use std::{collections::HashMap, convert::Infallible};
 
 use chrono::NaiveDate;
-use futures_util::{StreamExt, join, stream};
+use futures_util::{StreamExt, stream};
 use rand::random;
 
 use crate::processing::llm_prompts::split_and_fix_author_list;
@@ -79,7 +78,7 @@ impl ProcessFrom<RawGenericFiling> for ProcessedGenericFiling {
     ) -> Result<Self, Self::ParseError> {
         let processed_attach_map = cached.map(|filling| &filling.attachments);
         let matched_attach_list =
-            match_raw_attaches_to_processed_attaches(&*input.attachments, processed_attach_map);
+            match_raw_attaches_to_processed_attaches(&input.attachments, processed_attach_map);
         // Async match the raw attachments with the cached versions, and process them async 5 at a
         // time.
         let processed_attachments = stream::iter(matched_attach_list.iter())

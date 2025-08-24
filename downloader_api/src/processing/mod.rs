@@ -1,6 +1,6 @@
 use crate::processing::attachments::OpenscrapersExtraData;
 use crate::s3_stuff::{DocketAddress, download_openscrapers_object, upload_object};
-use crate::types::data_processing_traits::{DownloadIncomplete, ProcessFrom, Revalidate};
+use crate::types::data_processing_traits::{DownloadIncomplete, ProcessFrom};
 use crate::types::processed::{ProcessedGenericAttachment, ProcessedGenericDocket};
 use crate::types::raw::RawGenericDocket;
 use futures_util::{StreamExt, stream};
