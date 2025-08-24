@@ -16,12 +16,16 @@ use std::str::FromStr;
 use tracing::{error, info};
 
 use crate::{
-    s3_stuff::{get_case_s3_key, get_jurisdiction_prefix, list_cases_for_jurisdiction},
+    s3_stuff::{
+        DocketAddress, delete_openscrapers_s3_object, download_openscrapers_object,
+        get_jurisdiction_prefix, list_cases_for_jurisdiction,
+    },
     types::{
         env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
         jurisdictions::JurisdictionInfo,
         pagination::{PaginationData, make_paginated_subslice},
-        raw::{RawAttachment, RawGenericCase},
+        processed::ProcessedGenericDocket,
+        raw::{RawAttachment, RawGenericDocket},
     },
 };
 
@@ -107,27 +111,29 @@ pub struct CasePath {
     case_name: String,
 }
 
-pub async fn handle_case_filing_from_s3(
+pub async fn handle_processed_case_filing_from_s3(
     Path(CasePath {
         state,
         jurisdiction_name,
         case_name,
     }): Path<CasePath>,
-) -> impl IntoApiResponse {
+) -> Result<Json<ProcessedGenericDocket>, String> {
     info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Request received for case filing");
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
-    let result =
-        crate::s3_stuff::fetch_case_filing_from_s3(&s3_client, &case_name, &jurisdiction_info)
-            .await;
+    let addr_info = DocketAddress {
+        jurisdiction: jurisdiction_info,
+        name: case_name,
+    };
+    let result = download_openscrapers_object(&s3_client, &addr_info).await;
     match result {
         Ok(case) => {
-            info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Successfully fetched case filing");
-            Json(case).into_response()
+            info!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.name, "Successfully fetched case filing");
+            Ok(Json(case))
         }
         Err(e) => {
-            error!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, error = %e, "Error fetching case filing");
-            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+            error!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.name, error = %e, "Error fetching case filing");
+            Err(e.to_string())
         }
     }
 }
@@ -142,17 +148,20 @@ pub async fn delete_case_filing_from_s3(
     info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Request received to delete case filing");
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
-    let case_key = get_case_s3_key(&case_name, &jurisdiction_info);
-    let result = S3Addr::new(&s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &case_key)
-        .delete_file()
-        .await;
+
+    let addr_info = DocketAddress {
+        jurisdiction: jurisdiction_info,
+        name: case_name,
+    };
+    let result =
+        delete_openscrapers_s3_object::<ProcessedGenericDocket>(&s3_client, &addr_info).await;
     match result {
         Ok(_) => {
-            info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Successfully deleted case filing");
+            info!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.name, "Successfully deleted case filing");
             StatusCode::NO_CONTENT.into_response()
         }
         Err(e) => {
-            error!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, error = %e, "Error deleting case filing");
+            error!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.name, error = %e, "Error deleting case filing");
             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
         }
     }
@@ -182,12 +191,6 @@ pub async fn recursive_delete_all_jurisdiction_data(
             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
         }
     }
-}
-
-pub fn handle_case_filing_from_s3_docs(op: TransformOperation) -> TransformOperation {
-    op.description("Fetch a case filing from S3.")
-        .response::<200, Json<RawGenericCase>>()
-        .response_with::<500, String, _>(|res| res.description("Error fetching case filing."))
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -254,7 +257,7 @@ pub async fn handle_attachment_data_from_s3(
             return (axum::http::StatusCode::BAD_REQUEST, e.to_string()).into_response();
         }
     };
-    let result = crate::s3_stuff::fetch_attachment_data_from_s3(&s3_client, hash).await;
+    let result = download_openscrapers_object::<RawAttachment>(&s3_client, &hash).await;
     match result {
         Ok(attachment) => {
             info!(hash = %blake2b_hash, "Successfully fetched attachment data");

@@ -12,7 +12,8 @@ use std::borrow::Cow;
 use crate::types::env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET;
 
 pub fn define_temporary_routes(app: ApiRouter) -> ApiRouter {
-    app.api_route("/admin/temporary/copy_s3_directory", post(move_s3_objects))
+    // app.api_route("/admin/temporary/copy_s3_directory", post(move_s3_objects))
+    app
 }
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct CopyPrefixRequest {
@@ -46,7 +47,7 @@ pub async fn move_s3_objects(Json(payload): Json<CopyPrefixRequest>) -> impl Int
         &payload.destination.prefix,
     );
 
-    let result = source.copy_into(destination).await;
+    let result = source.copy_into(&destination).await;
 
     if result.is_ok() && payload.delete_after_copy {
         source.delete_all().await;
@@ -57,4 +58,3 @@ pub async fn move_s3_objects(Json(payload): Json<CopyPrefixRequest>) -> impl Int
         Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
-

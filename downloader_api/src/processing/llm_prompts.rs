@@ -1,13 +1,16 @@
 use mycorrhiza_common::llm_deepinfra::{cheap_prompt, strip_think};
+use non_empty_string::NonEmptyString;
 use serde::Serialize;
+
+use crate::types::processed::OrgName;
 
 pub async fn org_split_from_dump(org_dump: &str) -> anyhow::Result<Vec<String>> {
     let prompt = format!(
-        r#"We have an unformatted list of individuals and or organizations, try and parse them out as a json serializable list of organizations like so, we are also trying to match the organizations on their name, so removing the variable suffixes is important as well. YOUR RESPONSE MUST BE JSON SERIALIZABLE AND CONTAIN NO OTHER TEXT:
+        r#"We have an unformatted list of individuals and or organizations, try and parse them out as a json serializable list of organizations like so, we are also trying to match the organizations on their name, so removing the d/b/a suffix is important. YOUR RESPONSE MUST BE JSON SERIALIZABLE AND CONTAIN NO OTHER TEXT:
 Example 1:
 Manhattan Telecommunications Corporation LLC d/b/a Metropolitan Communications Solutions, LLC
 Response 1:
-["Manhattan Telecommunications Corporation"]
+["Manhattan Telecommunications Corporation LLC"]
 
 Example 2:
 Dunkirk and Fredonia Telephone Company, Niagara Mohawk Energy Marketing
@@ -17,7 +20,7 @@ Response 2:
 Example 3:
 Broadview Networks, Inc., CTC Communications Corp., Conversent Communications of New York, LLC, Eureka Telecom, Inc., PAETEC Communications, LLC, US LEC Communications, Inc.
 Response 3:
-["Broadview Networks","CTC Communications", "Conversent Communications of New York", "Eureka Telecom", "PAETEC Communications","US LEC Communications"]
+["Broadview Networks, Inc","CTC Communications Corp", "Conversent Communications of New York, LLC", "Eureka Telecom, Inc", "PAETEC Communications, LLC","US LEC Communications, Inc"]
 
 Example 4:
 City of Salamanca Board of Public Utilities
@@ -39,16 +42,82 @@ Response:
     json_res.map_err(anyhow::Error::from)
 }
 
-pub async fn split_mutate_author_list(auth_list: &mut Vec<String>) {
+pub async fn split_and_fix_author_list(auth_list: &[String]) -> Vec<OrgName> {
+    let backup_list = auth_list
+        .iter()
+        .cloned()
+        .filter_map(|string| clean_organization_name(string))
+        .collect();
+
     if auth_list.len() == 1
         && let Some(first_el) = auth_list.first()
     {
         let Ok(llm_parsed_names) = org_split_from_dump(first_el).await else {
-            return;
+            return backup_list;
         };
         tracing::info!(previous_name=%first_el, new_list =?llm_parsed_names,"Parsed list into a bunch of llm names.");
-        *auth_list = llm_parsed_names
+        clean_up_author_list(llm_parsed_names)
+    } else {
+        backup_list
     }
+}
+
+fn clean_up_author_list(raw_llmed_list: Vec<String>) -> Vec<OrgName> {
+    raw_llmed_list
+        .into_iter()
+        .filter_map(clean_organization_name)
+        .collect()
+}
+
+// The suffix should be a standardized lowercase string like ["llc", "co", "corp", "inc", "company", "ltd", "lp", "llp"]
+fn clean_organization_name(name: String) -> Option<OrgName> {
+    let mut cleaned = name.trim().to_string();
+
+    // Remove d/b/a patterns and everything after
+    if let Some(dba_pos) = cleaned.to_lowercase().find(" d/b/a ") {
+        cleaned = cleaned[..dba_pos].trim().to_string();
+    }
+
+    // Canonical suffixes (case insensitive matching → canonical lowercase form)
+    let suffixes_to_remove: Vec<(&str, &str)> = vec![
+        (" LLC", "llc"),
+        (" L.L.C", "llc"),
+        (" Inc", "inc"),
+        (" Incorporated", "inc"),
+        (" Corp", "corp"),
+        (" Corporation", "corp"),
+        (" Co", "co"),
+        (" Company", "company"),
+        (" Ltd", "ltd"),
+        (" Limited", "ltd"),
+        (" LP", "lp"),
+        (" L.P", "lp"),
+        (" LLP", "llp"),
+        (" L.L.P", "llp"),
+    ];
+    let trim_punctuation = &['\'', '.', ',', ' '];
+
+    let mut found_suffix: Option<String> = None;
+
+    // Remove suffixes (case insensitive)
+    for (suffix, canonical) in &suffixes_to_remove {
+        if cleaned.to_lowercase().ends_with(&suffix.to_lowercase()) {
+            let new_len = cleaned.len() - suffix.len();
+            cleaned = cleaned[..new_len].trim().to_string();
+            found_suffix = Some((*canonical).to_string());
+            break; // Only remove one suffix to avoid over-cleaning
+        }
+    }
+
+    cleaned = cleaned.trim_matches(trim_punctuation).trim().to_string();
+
+    // Ensure we have a nonempty name
+    let nonempty_name = NonEmptyString::new(cleaned).ok()?;
+
+    Some(OrgName {
+        name: nonempty_name,
+        suffix: found_suffix.unwrap_or_default(),
+    })
 }
 
 pub async fn guess_at_filling_title<T: AsRef<str> + Serialize>(attachment_names: &[T]) -> String {

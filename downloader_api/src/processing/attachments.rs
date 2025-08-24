@@ -1,13 +1,12 @@
-use mycorrhiza_common::file_extension::{FileExtension, StaticExtension};
-use mycorrhiza_common::hash::Blake2bHash;
 use crate::processing::file_fetching::{FileDownloadError, RequestMethod};
 use crate::processing::{CrimsonInitialResponse, CrimsonPDFIngestParamsS3, CrimsonStatusResponse};
 use crate::s3_stuff::{
-    generate_s3_object_uri_from_key, get_raw_attach_file_key, get_raw_attach_obj_key,
-    push_raw_attach_file_to_s3, push_raw_attach_object_to_s3,
+    generate_s3_object_uri_from_key, get_raw_attach_file_key, get_s3_json_uri,
+    push_raw_attach_file_to_s3, upload_object,
 };
 use crate::types::data_processing_traits::DownloadIncomplete;
 use crate::types::env_vars::CRIMSON_URL;
+use crate::types::processed::ProcessedGenericAttachment;
 use crate::types::{
     jurisdictions::JurisdictionInfo,
     raw::{AttachmentTextQuality, RawAttachment, RawAttachmentText, RawGenericAttachment},
@@ -15,6 +14,8 @@ use crate::types::{
 use anyhow::{anyhow, bail};
 use aws_sdk_s3::Client as S3Client;
 use chrono::Utc;
+use mycorrhiza_common::file_extension::{FileExtension, StaticExtension};
+use mycorrhiza_common::hash::Blake2bHash;
 use non_empty_string::{NonEmptyString, non_empty_string};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -30,7 +31,7 @@ const ATTACHMENT_DOWNLOAD_TRIES: usize = 2;
 const DOWNLOAD_RETRY_DELAY_SECONDS: u64 = 2;
 
 pub type OpenscrapersExtraData = (S3Client, JurisdictionInfo);
-impl DownloadIncomplete for RawGenericAttachment {
+impl DownloadIncomplete for ProcessedGenericAttachment {
     type ExtraData = OpenscrapersExtraData;
     type SucessData = ();
     async fn download_incomplete(
@@ -108,7 +109,7 @@ async fn shipout_attachment_to_s3(
             }
         }
     }
-    push_raw_attach_object_to_s3(s3_client, &raw_attachment).await?;
+    upload_object(s3_client, &hash, &raw_attachment).await?;
 
     Ok(raw_attachment)
 }
@@ -183,7 +184,7 @@ pub async fn process_attachment_with_direct_request(
         hash,
         server_file_name: server_filename,
         file_s3_uri: generate_s3_object_uri_from_key(&get_raw_attach_file_key(hash)),
-        object_s3_uri: generate_s3_object_uri_from_key(&get_raw_attach_obj_key(hash)),
+        object_s3_uri: get_s3_json_uri::<RawAttachment>(&hash),
     };
     let mut return_info_clone = return_info.clone();
     let should_process_text = direct_info.process_text_before_upload;

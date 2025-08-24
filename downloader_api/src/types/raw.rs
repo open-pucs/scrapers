@@ -9,7 +9,7 @@ use mycorrhiza_common::{file_extension::FileExtension, hash::Blake2bHash};
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct CaseWithJurisdiction {
-    pub case: RawGenericCase,
+    pub case: RawGenericDocket,
     pub jurisdiction: JurisdictionInfo,
 }
 
@@ -33,7 +33,7 @@ pub struct RawGenericAttachment {
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct RawGenericFiling {
-    pub filed_date: NaiveDate,
+    pub filed_date: Option<NaiveDate>,
     #[serde(default)]
     pub filling_govid: String,
     #[serde(default)]
@@ -53,7 +53,7 @@ pub struct RawGenericFiling {
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct RawGenericCase {
+pub struct RawGenericDocket {
     pub case_govid: NonEmptyString,
     // This shouldnt be an optional field in the final submission, since it can be calculated from
     // the minimum of the fillings, and the scraper should calculate it.

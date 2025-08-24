@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::s3_stuff::make_s3_client;
 use crate::types::jurisdictions::JurisdictionInfo;
 use crate::types::raw::{
-    CaseWithJurisdiction, RawGenericAttachment, RawGenericCase, RawGenericFiling,
+    CaseWithJurisdiction, RawGenericAttachment, RawGenericDocket, RawGenericFiling,
 };
 use mycorrhiza_common::file_extension::{FileExtension, StaticExtension};
 
@@ -65,7 +65,7 @@ async fn test_process_case() {
     let filing_1 = RawGenericFiling {
         filling_govid: Default::default(),
         name: non_empty_string!("Initial Complaint").into(),
-        filed_date: filing_date_1,
+        filed_date: Some(filing_date_1),
         attachments: vec![attachment_1],
         description: "The plaintiff filed the initial complaint.".to_string(),
         organization_authors: vec![non_empty_string!("Acme Corp").into()],
@@ -78,7 +78,7 @@ async fn test_process_case() {
     let filing_2 = RawGenericFiling {
         filling_govid: Default::default(),
         name: non_empty_string!("Supplemental Exhibit").into(),
-        filed_date: filing_date_2,
+        filed_date: Some(filing_date_2),
         attachments: vec![attachment_2],
         description: "An additional exhibit submitted by the defence.".to_string(),
         organization_authors: Default::default(),
@@ -88,7 +88,7 @@ async fn test_process_case() {
     };
 
     // Top‑level case.
-    let case = RawGenericCase {
+    let case = RawGenericDocket {
         case_govid: non_empty_string!("TEST-CASE-123"),
         opened_date: None, // we let the scraper calculate this later
         case_name: "Example Case".to_string(),
