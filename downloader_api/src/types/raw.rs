@@ -8,7 +8,7 @@ use crate::types::jurisdictions::JurisdictionInfo;
 use mycorrhiza_common::{file_extension::FileExtension, hash::Blake2bHash};
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct CaseWithJurisdiction {
+pub struct RawCaseWithJurisdiction {
     pub case: RawGenericDocket,
     pub jurisdiction: JurisdictionInfo,
 }

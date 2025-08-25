@@ -1,17 +1,17 @@
 use crate::processing::process_case;
 use crate::s3_stuff::make_s3_client;
-use crate::types::raw::CaseWithJurisdiction;
+use crate::types::raw::RawCaseWithJurisdiction;
 use async_trait::async_trait;
 use mycorrhiza_common::tasks::ExecuteUserTask;
 
 #[repr(transparent)]
-pub struct ProcessCaseWithDownload(pub CaseWithJurisdiction);
+pub struct ProcessCaseWithDownload(pub RawCaseWithJurisdiction);
 
 #[async_trait]
 impl ExecuteUserTask for ProcessCaseWithDownload {
     async fn execute_task(self: Box<Self>) -> Result<serde_json::Value, serde_json::Value> {
         let s3_client = make_s3_client().await;
-        let CaseWithJurisdiction { case, jurisdiction } = self.0;
+        let RawCaseWithJurisdiction { case, jurisdiction } = self.0;
         let extra_data = (s3_client, jurisdiction);
         // is download is set to true
         let res = process_case(case, &extra_data, true).await;
@@ -32,13 +32,13 @@ impl ExecuteUserTask for ProcessCaseWithDownload {
 }
 
 #[repr(transparent)]
-pub struct ProcessCaseWithoutDownload(pub CaseWithJurisdiction);
+pub struct ProcessCaseWithoutDownload(pub RawCaseWithJurisdiction);
 
 #[async_trait]
 impl ExecuteUserTask for ProcessCaseWithoutDownload {
     async fn execute_task(self: Box<Self>) -> Result<serde_json::Value, serde_json::Value> {
         let s3_client = make_s3_client().await;
-        let CaseWithJurisdiction { case, jurisdiction } = self.0;
+        let RawCaseWithJurisdiction { case, jurisdiction } = self.0;
         let extra_data = (s3_client, jurisdiction);
         // is download is set to false
         let res = process_case(case, &extra_data, false).await;

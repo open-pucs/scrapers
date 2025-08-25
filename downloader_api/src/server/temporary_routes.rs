@@ -1,6 +1,4 @@
-use aide::axum::{
-    ApiRouter, IntoApiResponse,
-};
+use aide::axum::{ApiRouter, IntoApiResponse, routing::post};
 use axum::{Json, response::IntoResponse};
 use mycorrhiza_common::s3_generic::fetchers_and_getters::S3DirectoryAddr;
 use schemars::JsonSchema;
@@ -9,8 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET;
 
 pub fn define_temporary_routes(app: ApiRouter) -> ApiRouter {
-    // app.api_route("/admin/temporary/copy_s3_directory", post(move_s3_objects))
-    app
+    app.api_route("/admin/temporary/copy_s3_directory", post(move_s3_objects))
 }
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct CopyPrefixRequest {
@@ -31,14 +28,14 @@ pub async fn move_s3_objects(Json(payload): Json<CopyPrefixRequest>) -> impl Int
 
     let source = S3DirectoryAddr::new(
         &s3_client,
-        payload.source.bucket
-            .as_deref()
-            .unwrap_or(default_bucket),
+        payload.source.bucket.as_deref().unwrap_or(default_bucket),
         &payload.source.prefix,
     );
     let destination = S3DirectoryAddr::new(
         &s3_client,
-        payload.destination.bucket
+        payload
+            .destination
+            .bucket
             .as_deref()
             .unwrap_or(default_bucket),
         &payload.destination.prefix,

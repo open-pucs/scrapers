@@ -34,10 +34,19 @@ fn match_individual_attach<'a>(
     processed_attaches: &HashMap<u64, &'a ProcessedGenericAttachment>,
 ) -> Option<&'a ProcessedGenericAttachment> {
     let govid = &*raw_attachment.attachment_govid;
-    todo!();
+    if !govid.is_empty() {
+        // iterate through the list and find the correct result.
+        let found_result = processed_attaches.iter().find_map(|(_, attach)| {
+            match attach.attachment_govid == govid {
+                false => None,
+                true => Some(*attach),
+            }
+        });
+        return found_result;
+    }
     None
 }
-fn match_raw_fillings_to_processed_fillings<'a>(
+pub fn match_raw_fillings_to_processed_fillings<'a>(
     raw_fillings: &'a [RawGenericFiling],
     processed_fillings: Option<&'a HashMap<u64, ProcessedGenericFiling>>,
 ) -> Vec<(&'a RawGenericFiling, Option<&'a ProcessedGenericFiling>)> {
@@ -57,10 +66,19 @@ fn match_raw_fillings_to_processed_fillings<'a>(
     return_vec
 }
 fn match_individual_filling<'a>(
-    raw_attachment: &'a RawGenericFiling,
-    processed_attaches: &HashMap<u64, &'a ProcessedGenericFiling>,
+    raw_filling: &'a RawGenericFiling,
+    processed_fillings: &HashMap<u64, &'a ProcessedGenericFiling>,
 ) -> Option<&'a ProcessedGenericFiling> {
-    let govid = &*raw_attachment.filling_govid;
-    todo!();
+    let govid = &*raw_filling.filling_govid;
+    if !govid.is_empty() {
+        // iterate through the hashmap and find the correct result.
+        let found_result = processed_fillings.iter().find_map(|(_, filling)| {
+            match filling.filling_govid == govid {
+                false => None,
+                true => Some(*filling),
+            }
+        });
+        return found_result;
+    }
     None
 }
