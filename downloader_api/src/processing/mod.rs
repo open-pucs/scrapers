@@ -95,14 +95,14 @@ pub async fn process_case(
             .ok();
 
     let mut processed_case =
-        ProcessedGenericDocket::process_from(&raw_case, processed_case_cache.as_ref(), ()).await?;
+        ProcessedGenericDocket::process_from(raw_case, processed_case_cache, ()).await?;
 
     if download_files {
         let _ = processed_case.download_incomplete(extra_data).await;
     }
 
     tracing::info!(
-        case_num=%raw_case.case_govid,
+        case_num=%processed_case.case_govid,
 
         state=%jur_info.state,
         jurisdiction=%jur_info.jurisdiction,

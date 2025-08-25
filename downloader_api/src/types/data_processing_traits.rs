@@ -7,8 +7,8 @@ pub trait ProcessFrom<T> {
     type ParseError: Error;
     type ExtraData;
     async fn process_from(
-        input: &T,
-        cached: Option<&Self>,
+        input: T,
+        cached: Option<Self>,
         extra_data: Self::ExtraData,
     ) -> Result<Self, Self::ParseError>
     where

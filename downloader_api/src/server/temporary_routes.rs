@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use crate::types::env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET;
 
 pub fn define_temporary_routes(app: ApiRouter) -> ApiRouter {
-    app.api_route("/admin/temporary/copy_s3_directory", post(move_s3_objects))
+    app.api_route("/admin/temporary/copy_s3_directory", post(|payload| async {
+        move_s3_objects(payload).await
+    }))
 }
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct CopyPrefixRequest {
