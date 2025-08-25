@@ -14,11 +14,12 @@ impl ExecuteUserTask for ProcessCaseWithDownload {
         let RawCaseWithJurisdiction { case, jurisdiction } = self.0;
         let extra_data = (s3_client, jurisdiction);
         // is download is set to true
-        let res = process_case(case, &extra_data, true).await;
-        match res {
-            Ok(()) => Ok("Task Completed Successfully".into()),
-            Err(err) => Err(err.to_string().into()),
-        }
+        todo!();
+        // let res = process_case(case, &extra_data, true).await;
+        // match res {
+        //     Ok(()) => Ok("Task Completed Successfully".into()),
+        //     Err(err) => Err(err.to_string().into()),
+        // }
     }
     fn get_task_label(&self) -> &'static str {
         "ingest_case_with_jurisdiction_and_download"
@@ -40,12 +41,12 @@ impl ExecuteUserTask for ProcessCaseWithoutDownload {
         let s3_client = make_s3_client().await;
         let RawCaseWithJurisdiction { case, jurisdiction } = self.0;
         let extra_data = (s3_client, jurisdiction);
-        // is download is set to false
-        let res = process_case(case, &extra_data, false).await;
-        match res {
-            Ok(()) => Ok("Task Completed Successfully".into()),
-            Err(err) => Err(err.to_string().into()),
-        }
+        todo!();
+        // let res = process_case(case, &extra_data, false).await;
+        // match res {
+        //     Ok(()) => Ok("Task Completed Successfully".into()),
+        //     Err(err) => Err(err.to_string().into()),
+        // }
     }
     fn get_task_label(&self) -> &'static str {
         "ingest_case_with_jurisdiction_and_download"
