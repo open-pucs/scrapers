@@ -39,7 +39,6 @@ impl ExecuteUserTask for ProcessCaseWithoutDownload {
         let s3_client = make_s3_client().await;
         let RawCaseWithJurisdiction { case, jurisdiction } = self.0;
         let extra_data = (s3_client, jurisdiction);
-        todo!();
         let res = process_case(case, &extra_data, false).await;
         match res {
             Ok(()) => Ok("Task Completed Successfully".into()),

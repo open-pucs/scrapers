@@ -44,7 +44,7 @@ fn match_individual_attach<'a>(
     }
     None
 }
-pub fn match_raw_fillings_to_processed_fillings<'a>(
+pub fn match_raw_fillings_to_processed_fillings(
     raw_fillings: Vec<RawGenericFiling>,
     processed_fillings: Option<HashMap<u64, ProcessedGenericFiling>>,
 ) -> Vec<(RawGenericFiling, Option<ProcessedGenericFiling>)> {
