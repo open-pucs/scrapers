@@ -1,149 +1,210 @@
-use std::mem;
 use std::{collections::HashMap, convert::Infallible};
 
 use chrono::NaiveDate;
-use futures_util::{StreamExt, join, stream};
+use futures_util::{StreamExt, stream};
+use rand::random;
+use tracing::warn;
 
-use crate::common::llm_deepinfra::guess_at_filling_title;
-use crate::{
-    common::llm_deepinfra::split_mutate_author_list,
-    types::{
-        data_processing_traits::{ReParse, Revalidate, UpdateFromCache},
-        openscraper_types::{GenericAttachment, GenericCase, GenericFiling},
-    },
+use crate::processing::llm_prompts::split_and_fix_author_list;
+use crate::processing::match_raw_processed::{
+    match_raw_attaches_to_processed_attaches, match_raw_fillings_to_processed_fillings,
+};
+use crate::types::processed::{
+    ProcessedGenericAttachment, ProcessedGenericDocket, ProcessedGenericFiling,
+};
+use crate::types::{
+    data_processing_traits::{ProcessFrom, Revalidate},
+    raw::{RawGenericAttachment, RawGenericDocket, RawGenericFiling},
 };
 
-impl Revalidate for GenericCase {
+impl Revalidate for ProcessedGenericDocket {
     fn revalidate(&mut self) {
-        if self.opened_date.is_some() {
-            return;
-        }
-        let mut opened_date = NaiveDate::MAX;
-        for filling in &self.filings {
-            if filling.filed_date < opened_date {
-                opened_date = filling.filed_date
-            }
-        }
-        self.opened_date = Some(opened_date);
-        for filling in &mut self.filings {
+        for (_, filling) in &mut self.filings.iter_mut() {
             filling.revalidate();
         }
     }
 }
 
-impl Revalidate for GenericFiling {
+impl Revalidate for ProcessedGenericFiling {
     fn revalidate(&mut self) {
-        self.organization_authors = mem::take(&mut self.organization_authors)
-            .into_iter()
-            .filter(|x| !x.is_empty())
-            .collect();
-        self.individual_authors = mem::take(&mut self.individual_authors)
-            .into_iter()
-            .filter(|x| !x.is_empty())
-            .collect();
         // Name stuff
         if !self.name.is_empty() {
             return;
         }
-        if let Some(attach) = self.attachments.first() {
-            self.name = attach.name.clone();
-        }
-    }
-}
-
-impl ReParse for GenericCase {
-    type ParseError = Infallible;
-    async fn re_parse(&mut self) -> Result<(), Self::ParseError> {
-        // Call re_parse on each of the fillings, and await the futures all at once
-        let futs = self.filings.iter_mut().map(ReParse::re_parse);
-        stream::iter(futs).buffer_unordered(40).count().await;
-        Ok(())
-    }
-}
-impl ReParse for GenericFiling {
-    type ParseError = Infallible;
-    async fn re_parse(&mut self) -> Result<(), Self::ParseError> {
-        async fn replace_name(nameref: &mut String, attaches: &[GenericAttachment]) {
-            if nameref.is_empty() {
-                let attach_names = attaches.iter().map(|f| &*f.name).collect::<Vec<_>>();
-                let guess = guess_at_filling_title(&attach_names).await;
-                *nameref = guess;
+        for (_, attach) in self.attachments.iter() {
+            if !attach.name.is_empty() {
+                self.name = attach.name.clone();
+                return;
             }
         }
-        let _x = join!(
-            replace_name(&mut self.name, &self.attachments),
-            split_mutate_author_list(&mut self.organization_authors),
-            split_mutate_author_list(&mut self.individual_authors),
-        );
-
-        Ok(())
     }
 }
 
-// Cache update logic
-impl UpdateFromCache for GenericAttachment {
-    fn update_from_cache(&mut self, cache: &Self) {
-        if self.hash.is_none() {
-            self.hash = cache.hash
+impl ProcessFrom<RawGenericDocket> for ProcessedGenericDocket {
+    type ParseError = Infallible;
+    type ExtraData = ();
+    async fn process_from(
+        input: &RawGenericDocket,
+        cached: Option<&Self>,
+        _: Self::ExtraData,
+    ) -> Result<Self, Self::ParseError> {
+        let cached_fillings = cached.map(|d| &d.filings);
+        let matched_fillings =
+            match_raw_fillings_to_processed_fillings(&input.filings, cached_fillings);
+        let processed_fillings = stream::iter(matched_fillings.into_iter())
+            .enumerate()
+            .map(|(index, (f_raw, f_cached))| {
+                let filling_index_data = IndexExtraData {
+                    index: index as u64,
+                };
+                ProcessedGenericFiling::process_from(f_raw, f_cached, filling_index_data)
+            })
+            .buffer_unordered(5)
+            .collect::<Vec<_>>()
+            .await;
+        let mut proc_filling_map = HashMap::new();
+        for filling in processed_fillings {
+            // Destructure here is fine since the filling process cannot error out.
+            let Ok(filling) = filling;
+            proc_filling_map.insert(filling.openscrapers_filling_id, filling);
         }
-    }
-}
-
-impl UpdateFromCache for GenericFiling {
-    fn update_from_cache(&mut self, cache: &Self) {
-        let cache_urls = cache
-            .attachments
-            .iter()
-            .map(|att| (&*att.url, att))
-            .collect::<HashMap<_, _>>();
-        for attach in self.attachments.iter_mut() {
-            if !attach.url.is_empty()
-                && let Some(cache_attach) = cache_urls.get(&*attach.url)
+        let opened_date_from_fillings = {
+            // TODO: Add logging here when a filling is found sooner then the opened date from the
+            // input.
+            let original_date = input.opened_date;
+            let mut min_date = original_date;
+            for filling_date in input
+                .filings
+                .iter()
+                .filter_map(|filling| filling.filed_date)
             {
-                attach.update_from_cache(cache_attach);
+                if let Some(real_min_date) = min_date
+                    && filling_date < real_min_date
+                {
+                    min_date = Some(filling_date);
+                    if let Some(real_original_date) = original_date {
+                        warn!(docket_opened_date =%real_original_date, oldest_date_found=%filling_date,"Found filling with date older then the docket opened date");
+                    };
+                };
             }
+            // This should almost never happen, because the chances of corruption happening on the
+            // docket date, and all the filling dates are very small.
+            min_date.unwrap_or(NaiveDate::MAX)
+        };
+        let final_processed_docket = ProcessedGenericDocket {
+            case_govid: input.case_govid.clone(),
+            filings: proc_filling_map,
+            opened_date: opened_date_from_fillings,
+            case_name: input.case_name.clone(),
+            case_url: input.case_url.clone(),
+            industry: input.industry.clone(),
+            case_type: input.case_type.clone(),
+            case_subtype: input.case_subtype.clone(),
+            indexed_at: input.indexed_at,
+            closed_date: input.closed_date,
+            case_parties: input.case_parties.clone(),
+            description: input.description.clone(),
+            extra_metadata: input.extra_metadata.clone(),
+            hearing_officer: input.hearing_officer.clone(),
+            petitioner: input.petitioner.clone(),
+        };
+        Ok(final_processed_docket)
+    }
+}
+impl ProcessFrom<RawGenericFiling> for ProcessedGenericFiling {
+    type ParseError = Infallible;
+    type ExtraData = IndexExtraData;
+    async fn process_from(
+        input: &RawGenericFiling,
+        cached: Option<&Self>,
+        index_data: Self::ExtraData,
+    ) -> Result<Self, Self::ParseError> {
+        let processed_attach_map = cached.map(|filling| &filling.attachments);
+        let matched_attach_list =
+            match_raw_attaches_to_processed_attaches(&input.attachments, processed_attach_map);
+        // Async match the raw attachments with the cached versions, and process them async 5 at a
+        // time.
+        let processed_attachments = stream::iter(matched_attach_list.iter())
+            .enumerate()
+            .map(|(attach_index, (raw_attach, cached_attach))| {
+                let attach_index_data = IndexExtraData {
+                    index: attach_index as u64,
+                };
+                ProcessedGenericAttachment::process_from(
+                    raw_attach,
+                    *cached_attach,
+                    attach_index_data,
+                )
+            })
+            .buffer_unordered(5)
+            .collect::<Vec<_>>()
+            .await;
+        let mut proc_attach_map = HashMap::new();
+        for attach in processed_attachments {
+            let Ok(attach) = attach;
+            proc_attach_map.insert(attach.openscrapers_attachment_id, attach);
         }
+        // Process org and individual author names.
+        let organization_authors = {
+            if let Some(cached) = cached {
+                cached.organization_authors.clone()
+            } else {
+                split_and_fix_author_list(&input.organization_authors).await
+            }
+        };
+
+        let individual_authors = {
+            if let Some(cached) = cached {
+                cached.individual_authors.clone()
+            } else {
+                split_and_fix_author_list(&input.individual_authors).await
+            }
+        };
+
+        let proc_filling = Self {
+            openscrapers_filling_id: index_data.index,
+            filed_date: input.filed_date,
+            index_in_docket: index_data.index,
+            attachments: proc_attach_map,
+            name: input.name.clone(),
+            filling_govid: input.filling_govid.clone(),
+            filing_type: input.filing_type.clone(),
+            description: input.description.clone(),
+            extra_metadata: input.extra_metadata.clone(),
+            organization_authors,
+            individual_authors,
+        };
+        Ok(proc_filling)
     }
 }
 
-impl UpdateFromCache for GenericCase {
-    fn update_from_cache(&mut self, cache: &Self) {
-        let mut cache_urls = HashMap::new();
-        for filling in cache.filings.iter() {
-            for attach in filling.attachments.iter() {
-                cache_urls.insert(&*attach.url, attach);
-            }
-        }
-        for filling in self.filings.iter_mut() {
-            for attach in filling.attachments.iter_mut() {
-                if !attach.url.is_empty()
-                    && let Some(cache_attach) = cache_urls.get(&*attach.url)
-                {
-                    attach.update_from_cache(cache_attach);
-                }
-            }
-        }
-
-        // Old approach that compars on file name and other metadata instead of just using the urls for all attachments
-        // in a filling.
-        // type ToCompare<'a> = (&'a NaiveDate, usize, &'a str, &'a str); // Date filed,number of attachments, Name, Description,
-        // fn make_compare(filling: &GenericFiling) -> ToCompare<'_> {
-        //     (
-        //         &filling.filed_date,
-        //         filling.attachments.len(),
-        //         &filling.name,
-        //         &filling.description,
-        //     )
-        // }
-        // let filling_comparison = cache
-        //     .filings
-        //     .iter()
-        //     .map(|f| (make_compare(f), f))
-        //     .collect::<HashMap<_, _>>();
-        // for filling in self.filings.iter_mut() {
-        //     if let Some(cached_filling) = filling_comparison.get(&make_compare(filling)) {
-        //         filling.update_from_cache(cached_filling);
-        //     }
-        // }
+pub struct IndexExtraData {
+    index: u64,
+}
+impl ProcessFrom<RawGenericAttachment> for ProcessedGenericAttachment {
+    type ParseError = Infallible;
+    type ExtraData = IndexExtraData;
+    async fn process_from(
+        input: &RawGenericAttachment,
+        cached: Option<&Self>,
+        index_data: Self::ExtraData,
+    ) -> Result<Self, Self::ParseError> {
+        let id = cached
+            .map(|val| val.openscrapers_attachment_id)
+            .unwrap_or(random());
+        let hash = (input.hash).or_else(|| cached.and_then(|v| v.hash));
+        let return_res = Self {
+            openscrapers_attachment_id: id,
+            index_in_filling: index_data.index,
+            name: input.name.clone(),
+            document_extension: input.document_extension.clone(),
+            attachment_govid: input.attachment_govid.clone(),
+            attachment_type: input.attachment_type.clone(),
+            attachment_subtype: input.attachment_subtype.clone(),
+            url: input.url.clone(),
+            extra_metadata: input.extra_metadata.clone(),
+            hash,
+        };
+        Ok(return_res)
     }
 }

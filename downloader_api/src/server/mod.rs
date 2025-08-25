@@ -8,19 +8,20 @@ use aide::{
 use direct_file_fetch::{
     handle_directly_process_file_request, handle_directly_process_file_request_docs,
 };
+use mycorrhiza_common::{llm_deepinfra::test_deepinfra, misc::is_env_var_true};
 use std::sync::LazyLock;
 use tracing::info;
 
-use crate::{
-    common::{llm_deepinfra::test_deepinfra, misc::is_env_var_true},
-    processing::reparse_all::reparse_clean_jurisdiction_handler,
-    server::scraper_check_completed::get_completed_casedata_differential,
+use crate::server::{
+    scraper_check_completed::get_completed_casedata_differential,
+    temporary_routes::define_temporary_routes,
 };
 
 pub mod direct_file_fetch;
 pub mod queue_routes;
 pub mod s3_routes;
 pub mod scraper_check_completed;
+pub mod temporary_routes;
 
 static PUBLIC_SAFE_MODE: LazyLock<bool> = LazyLock::new(|| is_env_var_true("PUBLIC_SAFE_MODE"));
 
@@ -37,10 +38,7 @@ pub fn define_routes() -> ApiRouter {
         .api_route("/test/deepinfra", get(test_deepinfra))
         .api_route(
             "/public/cases/{state}/{jurisdiction_name}/{case_name}",
-            get_with(
-                s3_routes::handle_case_filing_from_s3,
-                s3_routes::handle_case_filing_from_s3_docs,
-            ),
+            get(s3_routes::handle_processed_case_filing_from_s3),
         )
         .api_route(
             "/public/caselist/{state}/{jurisdiction_name}/all",
@@ -52,10 +50,6 @@ pub fn define_routes() -> ApiRouter {
         .api_route(
             "/public/caselist/{state}/{jurisdiction_name}/casedata_differential",
             post(get_completed_casedata_differential),
-        )
-        .api_route(
-            "/public/caselist/{state}/{jurisdiction_name}/reparse_and_clean",
-            post(reparse_clean_jurisdiction_handler),
         )
         .api_route(
             "/public/raw_attachments/{blake2b_hash}/obj",
@@ -80,7 +74,7 @@ pub fn define_routes() -> ApiRouter {
         );
 
     if !*PUBLIC_SAFE_MODE {
-        app = app
+        app = define_temporary_routes(app)
             .api_route(
                 "/admin/cases/submit",
                 post_with(

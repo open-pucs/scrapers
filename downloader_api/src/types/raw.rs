@@ -2,47 +2,23 @@ use chrono::{DateTime, NaiveDate, Utc};
 use non_empty_string::NonEmptyString;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
 use std::collections::HashMap;
 
-use crate::common::{file_extension::FileExtension, hash::Blake2bHash};
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Hash, PartialEq, Eq)]
-pub struct JurisdictionInfo {
-    pub country: String,
-    pub state: String,
-    pub jurisdiction: String,
-}
-impl Default for JurisdictionInfo {
-    fn default() -> Self {
-        let unknown_static = "unknown";
-        JurisdictionInfo {
-            country: unknown_static.to_string(),
-            state: unknown_static.to_string(),
-            jurisdiction: unknown_static.to_string(),
-        }
-    }
-}
-
-impl JurisdictionInfo {
-    pub fn new_usa(jurisdiction: &str, state: &str) -> Self {
-        JurisdictionInfo {
-            country: "usa".to_string(),
-            state: state.to_string(),
-            jurisdiction: jurisdiction.to_string(),
-        }
-    }
-}
+use crate::types::jurisdictions::JurisdictionInfo;
+use mycorrhiza_common::{file_extension::FileExtension, hash::Blake2bHash};
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct CaseWithJurisdiction {
-    pub case: GenericCase,
+pub struct RawCaseWithJurisdiction {
+    pub case: RawGenericDocket,
     pub jurisdiction: JurisdictionInfo,
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct GenericAttachment {
+pub struct RawGenericAttachment {
     pub name: String,
     pub document_extension: FileExtension,
+    #[serde(default)]
+    pub attachment_govid: String,
     #[serde(default)]
     pub url: String,
     #[serde(default)]
@@ -56,8 +32,10 @@ pub struct GenericAttachment {
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct GenericFiling {
-    pub filed_date: NaiveDate,
+pub struct RawGenericFiling {
+    pub filed_date: Option<NaiveDate>,
+    #[serde(default)]
+    pub filling_govid: String,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
@@ -69,25 +47,26 @@ pub struct GenericFiling {
     #[serde(default)]
     pub description: String,
     #[serde(default)]
-    pub attachments: Vec<GenericAttachment>,
+    pub attachments: Vec<RawGenericAttachment>,
     #[serde(default)]
     pub extra_metadata: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct GenericCase {
+pub struct RawGenericDocket {
     pub case_govid: NonEmptyString,
     // This shouldnt be an optional field in the final submission, since it can be calculated from
     // the minimum of the fillings, and the scraper should calculate it.
     #[serde(default)]
     pub opened_date: Option<NaiveDate>,
-
     #[serde(default)]
     pub case_name: String,
     #[serde(default)]
     pub case_url: String,
     #[serde(default)]
     pub case_type: String,
+    #[serde(default)]
+    pub case_subtype: String,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
@@ -99,7 +78,7 @@ pub struct GenericCase {
     #[serde(default)]
     pub closed_date: Option<NaiveDate>,
     #[serde(default)]
-    pub filings: Vec<GenericFiling>,
+    pub filings: Vec<RawGenericFiling>,
     #[serde(default)]
     pub case_parties: Vec<GenericParty>,
     #[serde(default)]
@@ -113,36 +92,6 @@ pub struct GenericParty {
     name: NonEmptyString,
     is_corperate_entity: bool,
     is_human: bool,
-}
-
-#[skip_serializing_none]
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Default)]
-pub struct GenericFilingLegacy {
-    pub name: String,
-    pub filed_date: DateTime<Utc>,
-    pub party_name: String,
-    pub filing_type: String,
-    pub description: String,
-    pub attachments: Vec<GenericAttachment>,
-    pub extra_metadata: HashMap<String, serde_json::Value>,
-}
-
-#[skip_serializing_none]
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Default)]
-pub struct GenericCaseLegacy {
-    pub case_number: String,
-    pub case_name: String,
-    pub case_url: String,
-    pub case_type: Option<String>,
-    pub description: Option<String>,
-    pub industry: Option<String>,
-    pub petitioner: Option<String>,
-    pub hearing_officer: Option<String>,
-    pub opened_date: Option<DateTime<Utc>>,
-    pub closed_date: Option<DateTime<Utc>>,
-    pub filings: Vec<GenericFilingLegacy>,
-    pub extra_metadata: HashMap<String, serde_json::Value>,
-    pub indexed_at: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, JsonSchema)]

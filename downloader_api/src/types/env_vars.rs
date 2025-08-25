@@ -1,6 +1,6 @@
 use std::{env, sync::LazyLock};
 
-use crate::common::s3_generic::{S3Credentials, S3EnvNames, make_s3_lazylock};
+use mycorrhiza_common::s3_generic::{S3Credentials, S3EnvNames, make_s3_lazylock};
 
 pub static OPENSCRAPERS_S3_OBJECT_BUCKET: LazyLock<String> = LazyLock::new(|| {
     env::var("OPENSCRAPERS_S3_OBJECT_BUCKET").unwrap_or_else(|_| "opescrapers".to_string())

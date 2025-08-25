@@ -67,6 +67,8 @@
         devShells.default = pkgs.mkShell {
           buildInputs = devPackages;
           nativeBuildInputs = with pkgs; [
+            nodejs
+            cypress
             python
             uv
           ];

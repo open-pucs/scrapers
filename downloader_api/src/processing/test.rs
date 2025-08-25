@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use super::*;
-use crate::common::file_extension::{FileExtension, StaticExtension};
 use crate::s3_stuff::make_s3_client;
-use crate::types::openscraper_types::{
-    CaseWithJurisdiction, GenericAttachment, GenericCase, GenericFiling, JurisdictionInfo,
+use crate::types::jurisdictions::JurisdictionInfo;
+use crate::types::raw::{
+    RawCaseWithJurisdiction, RawGenericAttachment, RawGenericDocket, RawGenericFiling,
 };
+use mycorrhiza_common::file_extension::{FileExtension, StaticExtension};
 
 use chrono::{NaiveDate, Utc};
 use non_empty_string::non_empty_string;
@@ -27,7 +27,7 @@ async fn test_process_case() {
         .with_target(false)
         // sets this to be the default, global collector for this application.
         .init();
-    let s3_client = make_s3_client().await;
+    let _s3_client = make_s3_client().await;
 
     let filing_date_1 = NaiveDate::from_ymd_opt(2021, 3, 15).unwrap();
     let filing_date_2 = NaiveDate::from_ymd_opt(2022, 7, 22).unwrap();
@@ -38,7 +38,8 @@ async fn test_process_case() {
     filing_meta.insert("confidence".to_string(), json!(0.96));
 
     // Attachments for the first filing.
-    let attachment_1 = GenericAttachment {
+    let attachment_1 = RawGenericAttachment {
+        attachment_govid: Default::default(),
         name: non_empty_string!("Judgement PDF").into(),
         url: "https://example.com/judgement.pdf".to_string(),
         document_extension: FileExtension::Static(StaticExtension::Pdf),
@@ -49,7 +50,8 @@ async fn test_process_case() {
     };
 
     // Attachments for the second filing (different extension, no hash).
-    let attachment_2 = GenericAttachment {
+    let attachment_2 = RawGenericAttachment {
+        attachment_govid: Default::default(),
         name: non_empty_string!("Exhibit Image").into(),
         url: "https://example.com/exhibit.png".to_string(),
         document_extension: FileExtension::Static(StaticExtension::Png),
@@ -60,9 +62,10 @@ async fn test_process_case() {
     };
 
     // First filing – contains one attachment and some authors.
-    let filing_1 = GenericFiling {
+    let filing_1 = RawGenericFiling {
+        filling_govid: Default::default(),
         name: non_empty_string!("Initial Complaint").into(),
-        filed_date: filing_date_1,
+        filed_date: Some(filing_date_1),
         attachments: vec![attachment_1],
         description: "The plaintiff filed the initial complaint.".to_string(),
         organization_authors: vec![non_empty_string!("Acme Corp").into()],
@@ -72,9 +75,10 @@ async fn test_process_case() {
     };
 
     // Second filing – different date, different attachment.
-    let filing_2 = GenericFiling {
+    let filing_2 = RawGenericFiling {
+        filling_govid: Default::default(),
         name: non_empty_string!("Supplemental Exhibit").into(),
-        filed_date: filing_date_2,
+        filed_date: Some(filing_date_2),
         attachments: vec![attachment_2],
         description: "An additional exhibit submitted by the defence.".to_string(),
         organization_authors: Default::default(),
@@ -84,12 +88,13 @@ async fn test_process_case() {
     };
 
     // Top‑level case.
-    let case = GenericCase {
+    let case = RawGenericDocket {
         case_govid: non_empty_string!("TEST-CASE-123"),
         opened_date: None, // we let the scraper calculate this later
         case_name: "Example Case".to_string(),
         case_url: "https://court.gov/cases/TEST-CASE-123".to_string(),
         case_type: "Civil".to_string(),
+        case_subtype: "Submetering".to_string(),
         description: "A test case used for unit‑testing".to_string(),
         industry: "Technology".to_string(),
         petitioner: "Jane Smith".to_string(),
@@ -105,7 +110,7 @@ async fn test_process_case() {
         indexed_at: Utc::now(),
     };
     let jurisdiction = JurisdictionInfo::new_usa("test", "test");
-    let casewith = CaseWithJurisdiction { case, jurisdiction };
+    let _casewith = RawCaseWithJurisdiction { case, jurisdiction };
 
     // let result = process_case(&casewith, &s3_client).await;
     // assert!(result.is_ok());

@@ -4,12 +4,12 @@ use tracing::info;
 
 use crate::{
     case_worker::{ProcessCaseWithDownload, ProcessCaseWithoutDownload},
-    common::tasks::{TaskStatusDisplay, workers::add_task_to_queue},
-    types::openscraper_types::CaseWithJurisdiction,
+    types::raw::RawCaseWithJurisdiction,
 };
 
+use mycorrhiza_common::tasks::{TaskStatusDisplay, workers::add_task_to_queue};
 pub async fn submit_case_to_queue_with_download(
-    Json(case): Json<CaseWithJurisdiction>,
+    Json(case): Json<RawCaseWithJurisdiction>,
 ) -> impl IntoApiResponse {
     let priority = 0;
     info!(case_number = %case.case.case_govid, %priority, "Request received to submit case to queue");
@@ -22,7 +22,7 @@ pub async fn submit_case_to_queue_with_download(
 }
 
 pub async fn submit_case_to_queue_without_download(
-    Json(case): Json<CaseWithJurisdiction>,
+    Json(case): Json<RawCaseWithJurisdiction>,
 ) -> impl IntoApiResponse {
     let priority = 0;
     info!(case_number = %case.case.case_govid, %priority, "Request received to submit case to queue");

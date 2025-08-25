@@ -3,13 +3,16 @@ pub trait Revalidate {
     fn revalidate(&mut self) {}
 }
 
-pub trait ReParse: Revalidate {
+pub trait ProcessFrom<T> {
     type ParseError: Error;
-    async fn re_parse(&mut self) -> Result<(), Self::ParseError>;
-}
-
-pub trait UpdateFromCache {
-    fn update_from_cache(&mut self, cache: &Self);
+    type ExtraData;
+    async fn process_from(
+        input: &T,
+        cached: Option<&Self>,
+        extra_data: Self::ExtraData,
+    ) -> Result<Self, Self::ParseError>
+    where
+        Self: Sized;
 }
 
 pub trait DownloadIncomplete {
