@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use mycorrhiza_common::file_extension::FileValidationError;
 
@@ -238,7 +238,7 @@ impl InternetFileFetch for AdvancedFetchData {
             .to_vec();
 
         if let Some(ref fname) = filename {
-            info!("Detected filename: {}", fname);
+            debug!("Detected filename: {}", fname);
         }
 
         Ok(FileDownloadResult {

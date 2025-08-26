@@ -2,6 +2,7 @@ use axum::Json;
 use chrono::{DateTime, Utc};
 use futures_util::{StreamExt, stream};
 use mycorrhiza_common::tasks::ExecuteUserTask;
+use rand::{SeedableRng, rngs::SmallRng, seq::SliceRandom};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -28,15 +29,17 @@ pub struct ReprocessJurisdictionInfo {
     #[serde(default = "default_true")]
     pub only_process_missing: bool,
 }
-
 pub async fn reprocess_dockets(
     Json(payload): Json<ReprocessJurisdictionInfo>,
 ) -> Result<String, String> {
     let s3_client = make_s3_client().await;
-    let processed_caselist =
+    let mut processed_caselist =
         list_processed_cases_for_jurisdiction(&s3_client, &payload.jurisdiction)
             .await
             .map_err(|e| e.to_string())?;
+    // Randomizing the list just to insure that the processing difficulty is uniform.
+    let mut rng = SmallRng::from_os_rng();
+    processed_caselist.shuffle(&mut rng);
     let boxed_tasks = processed_caselist.into_iter().map(|docket_govid| {
         let task_info = ReprocessDocketInfo {
             docket_govid,
@@ -59,9 +62,12 @@ pub async fn download_all_missing_hashes(
     Json(payload): Json<JurisdictionInfo>,
 ) -> Result<String, String> {
     let s3_client = make_s3_client().await;
-    let processed_caselist = list_processed_cases_for_jurisdiction(&s3_client, &payload)
+    let mut processed_caselist = list_processed_cases_for_jurisdiction(&s3_client, &payload)
         .await
         .map_err(|e| e.to_string())?;
+    // Randomizing the list just to insure that the processing difficulty is uniform.
+    let mut rng = SmallRng::from_os_rng();
+    processed_caselist.shuffle(&mut rng);
     let extra_info = (s3_client.clone(), payload.clone());
     let _tasks = stream::iter(processed_caselist.into_iter())
         .map(|docket_govid| async {
