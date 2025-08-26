@@ -7,8 +7,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     processing::ReprocessDocketInfo,
-    s3_stuff::{list_processed_cases_for_jurisdiction, make_s3_client},
-    types::jurisdictions::JurisdictionInfo,
+    s3_stuff::{
+        DocketAddress, download_openscrapers_object, list_processed_cases_for_jurisdiction,
+        make_s3_client, upload_object,
+    },
+    types::{
+        data_processing_traits::DownloadIncomplete, jurisdictions::JurisdictionInfo,
+        processed::ProcessedGenericDocket,
+    },
 };
 
 const fn default_true() -> bool {
@@ -16,14 +22,14 @@ const fn default_true() -> bool {
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
-struct ReprocessJurisdictionInfo {
-    jurisdiction: JurisdictionInfo,
-    ignore_cached_older_than: Option<DateTime<Utc>>,
+pub struct ReprocessJurisdictionInfo {
+    pub jurisdiction: JurisdictionInfo,
+    pub ignore_cached_older_than: Option<DateTime<Utc>>,
     #[serde(default = "default_true")]
-    only_process_missing: bool,
+    pub only_process_missing: bool,
 }
 
-async fn reprocess_dockets(
+pub async fn reprocess_dockets(
     Json(payload): Json<ReprocessJurisdictionInfo>,
 ) -> Result<String, String> {
     let s3_client = make_s3_client().await;
@@ -42,9 +48,39 @@ async fn reprocess_dockets(
     });
     let _results = stream::iter(boxed_tasks)
         .map(ExecuteUserTask::execute_task)
-        .buffer_unordered(3)
+        .buffer_unordered(10)
         .collect::<Vec<_>>()
         .await;
 
     Ok("Successfully added processing tasks to queue".to_string())
+}
+
+pub async fn download_all_missing_hashes(
+    Json(payload): Json<JurisdictionInfo>,
+) -> Result<String, String> {
+    let s3_client = make_s3_client().await;
+    let processed_caselist = list_processed_cases_for_jurisdiction(&s3_client, &payload)
+        .await
+        .map_err(|e| e.to_string())?;
+    let extra_info = (s3_client.clone(), payload.clone());
+    let _tasks = stream::iter(processed_caselist.into_iter())
+        .map(|docket_govid| async {
+            let docket_address = DocketAddress {
+                jurisdiction: payload.clone(),
+                docket_govid,
+            };
+            if let Ok(mut proc_docket) =
+                download_openscrapers_object::<ProcessedGenericDocket>(&s3_client, &docket_address)
+                    .await
+            {
+                let res = proc_docket.download_incomplete(&extra_info).await;
+                if res.is_ok() {
+                    let _ = upload_object(&s3_client, &docket_address, &proc_docket).await;
+                }
+            };
+        })
+        .buffer_unordered(4)
+        .collect::<Vec<_>>()
+        .await;
+    Ok("Completed Successfully".into())
 }

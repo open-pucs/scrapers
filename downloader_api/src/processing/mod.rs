@@ -148,6 +148,7 @@ impl ExecuteUserTask for ReprocessDocketInfo {
             return Ok("Found cached case, skipping".into());
         };
         let Ok(processed_case) = ProcessFrom::process_from(raw_case, cached_docket, ()).await;
+        tracing::info!(docket_govid=%processed_case.case_govid,"Successfully processed case");
         let upload_res = upload_object(&s3_client, &docket_address, &processed_case).await;
         map_err_as_json(upload_res)?;
         Ok("Successfully processed task".into())

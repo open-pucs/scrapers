@@ -13,6 +13,7 @@ use std::sync::LazyLock;
 use tracing::info;
 
 use crate::server::{
+    reprocess_all_handlers::{download_all_missing_hashes, reprocess_dockets},
     scraper_check_completed::get_completed_casedata_differential,
     temporary_routes::define_temporary_routes,
 };
@@ -84,11 +85,12 @@ pub fn define_routes() -> ApiRouter {
                 ),
             )
             .api_route(
-                "/admin/cases/submit_and_download",
-                post_with(
-                    queue_routes::submit_case_to_queue_without_download,
-                    queue_routes::submit_case_to_queue_docs,
-                ),
+                "/admin/cases/reprocess_dockets_for_all",
+                post(reprocess_dockets),
+            )
+            .api_route(
+                "/admin/cases/download_missing_hashes_for_all",
+                post(download_all_missing_hashes),
             )
             .api_route(
                 "/admin/write_s3_string",
