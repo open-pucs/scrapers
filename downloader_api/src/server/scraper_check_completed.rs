@@ -41,7 +41,8 @@ pub async fn get_completed_casedata_differential(
         country,
         jurisdiction: jurisdiction_name,
     };
-    let result = crate::s3_stuff::list_cases_for_jurisdiction(&s3_client, &jur_info).await;
+    let result =
+        crate::s3_stuff::list_processed_cases_for_jurisdiction(&s3_client, &jur_info).await;
     let s3_caselist = match result {
         Ok(val) => val,
         Err(err) => return Err(err.to_string()),

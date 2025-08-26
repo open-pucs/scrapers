@@ -19,6 +19,7 @@ use crate::server::{
 
 pub mod direct_file_fetch;
 pub mod queue_routes;
+pub mod reprocess_all_handlers;
 pub mod s3_routes;
 pub mod scraper_check_completed;
 pub mod temporary_routes;

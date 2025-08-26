@@ -1,6 +1,6 @@
 use std::{collections::HashMap, convert::Infallible};
 
-use chrono::NaiveDate;
+use chrono::{NaiveDate, Utc};
 use futures_util::{StreamExt, stream};
 use rand::random;
 use tracing::warn;
@@ -92,6 +92,7 @@ impl ProcessFrom<RawGenericDocket> for ProcessedGenericDocket {
             proc_filling_map.insert(filling.openscrapers_filling_id, filling);
         }
         let final_processed_docket = ProcessedGenericDocket {
+            processed_at: Utc::now(),
             case_govid: input.case_govid.clone(),
             filings: proc_filling_map,
             opened_date: opened_date_from_fillings,
