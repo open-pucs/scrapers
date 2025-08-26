@@ -7,7 +7,7 @@ use crate::types::raw::RawGenericDocket;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures_util::{StreamExt, stream};
-use mycorrhiza_common::tasks::{ExecuteUserTask, map_err_to_json};
+use mycorrhiza_common::tasks::{ExecuteUserTask, map_err_as_json};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -101,7 +101,7 @@ pub async fn process_case(
     let processed_case =
         ProcessedGenericDocket::process_from(raw_case, processed_case_cache, ()).await?;
 
-    upload_object(&s3_client, &docket_address, &processed_case).await?;
+    upload_object(s3_client, &docket_address, &processed_case).await?;
 
     tracing::info!(
         case_num=%processed_case.case_govid,
@@ -148,8 +148,8 @@ impl ExecuteUserTask for ReprocessDocketInfo {
             return Ok("Found cached case, skipping".into());
         };
         let Ok(processed_case) = ProcessFrom::process_from(raw_case, cached_docket, ()).await;
-        let upload_res = upload_object(&s3_client, &docket_address, processed_case).await;
-        map_err_to_json(upload_res)?;
+        let upload_res = upload_object(&s3_client, &docket_address, &processed_case).await;
+        map_err_as_json(upload_res)?;
         Ok("Successfully processed task".into())
     }
     fn get_task_label_static() -> &'static str

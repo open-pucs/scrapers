@@ -160,24 +160,20 @@ impl ProcessFrom<RawGenericFiling> for ProcessedGenericFiling {
         let organization_authors = {
             if let Some(org_authors) = cached_orgauthorlist {
                 org_authors
+            } else if input.organization_authors.is_empty() {
+                split_and_fix_author_blob(&input.organization_authors_blob).await
             } else {
-                if input.organization_authors.is_empty() {
-                    split_and_fix_author_blob(&input.organization_authors_blob).await
-                } else {
-                    clean_up_author_list(input.organization_authors)
-                }
+                clean_up_author_list(input.organization_authors)
             }
         };
 
         let individual_authors = {
             if let Some(individual_authors) = cached_individualauthorllist {
                 individual_authors
+            } else if input.individual_authors.is_empty() {
+                split_and_fix_author_blob(&input.individual_authors_blob).await
             } else {
-                if input.individual_authors.is_empty() {
-                    split_and_fix_author_blob(&input.individual_authors_blob).await
-                } else {
-                    clean_up_author_list(input.individual_authors)
-                }
+                clean_up_author_list(input.individual_authors)
             }
         };
 

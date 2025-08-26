@@ -43,8 +43,13 @@ Response:
 }
 
 pub async fn split_and_fix_author_blob(auth_blob: &str) -> Vec<OrgName> {
+    if auth_blob.is_empty() {
+        return Vec::new();
+    }
     let Ok(llm_parsed_names) = org_split_from_dump(auth_blob).await else {
-        return vec![clean_organization_name(auth_blob.to_string())];
+        return clean_organization_name(auth_blob.to_string())
+            .as_slice()
+            .to_owned();
     };
     tracing::info!(previous_name=%auth_blob, new_list =?llm_parsed_names,"Parsed list into a bunch of llm names.");
     clean_up_author_list(llm_parsed_names)
