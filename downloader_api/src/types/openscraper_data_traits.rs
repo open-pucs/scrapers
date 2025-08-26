@@ -5,7 +5,7 @@ use futures_util::{StreamExt, stream};
 use rand::random;
 use tracing::warn;
 
-use crate::processing::llm_prompts::split_and_fix_author_list;
+use crate::processing::llm_prompts::{clean_up_author_list, split_and_fix_author_blob};
 use crate::processing::match_raw_processed::{
     match_raw_attaches_to_processed_attaches, match_raw_fillings_to_processed_fillings,
 };
@@ -161,7 +161,11 @@ impl ProcessFrom<RawGenericFiling> for ProcessedGenericFiling {
             if let Some(org_authors) = cached_orgauthorlist {
                 org_authors
             } else {
-                split_and_fix_author_list(&input.organization_authors).await
+                if input.organization_authors.is_empty() {
+                    split_and_fix_author_blob(&input.organization_authors_blob).await
+                } else {
+                    clean_up_author_list(input.organization_authors)
+                }
             }
         };
 
@@ -169,7 +173,11 @@ impl ProcessFrom<RawGenericFiling> for ProcessedGenericFiling {
             if let Some(individual_authors) = cached_individualauthorllist {
                 individual_authors
             } else {
-                split_and_fix_author_list(&input.individual_authors).await
+                if input.individual_authors.is_empty() {
+                    split_and_fix_author_blob(&input.individual_authors_blob).await
+                } else {
+                    clean_up_author_list(input.individual_authors)
+                }
             }
         };
 

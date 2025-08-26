@@ -42,27 +42,15 @@ Response:
     json_res.map_err(anyhow::Error::from)
 }
 
-pub async fn split_and_fix_author_list(auth_list: &[String]) -> Vec<OrgName> {
-    let backup_list = auth_list
-        .iter()
-        .cloned()
-        .filter_map(clean_organization_name)
-        .collect();
-
-    if auth_list.len() == 1
-        && let Some(first_el) = auth_list.first()
-    {
-        let Ok(llm_parsed_names) = org_split_from_dump(first_el).await else {
-            return backup_list;
-        };
-        tracing::info!(previous_name=%first_el, new_list =?llm_parsed_names,"Parsed list into a bunch of llm names.");
-        clean_up_author_list(llm_parsed_names)
-    } else {
-        backup_list
-    }
+pub async fn split_and_fix_author_blob(auth_blob: &str) -> Vec<OrgName> {
+    let Ok(llm_parsed_names) = org_split_from_dump(auth_blob).await else {
+        return vec![clean_organization_name(auth_blob.to_string())];
+    };
+    tracing::info!(previous_name=%auth_blob, new_list =?llm_parsed_names,"Parsed list into a bunch of llm names.");
+    clean_up_author_list(llm_parsed_names)
 }
 
-fn clean_up_author_list(raw_llmed_list: Vec<String>) -> Vec<OrgName> {
+pub fn clean_up_author_list(raw_llmed_list: Vec<String>) -> Vec<OrgName> {
     raw_llmed_list
         .into_iter()
         .filter_map(clean_organization_name)
