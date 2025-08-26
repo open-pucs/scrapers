@@ -18,7 +18,7 @@ use tracing::{error, info};
 use crate::{
     s3_stuff::{
         DocketAddress, delete_openscrapers_s3_object, download_openscrapers_object,
-        get_jurisdiction_prefix, list_cases_for_jurisdiction,
+        get_jurisdiction_prefix, list_processed_cases_for_jurisdiction,
     },
     types::{
         env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
@@ -123,16 +123,16 @@ pub async fn handle_processed_case_filing_from_s3(
     let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
     let addr_info = DocketAddress {
         jurisdiction: jurisdiction_info,
-        name: case_name,
+        docket_govid: case_name,
     };
     let result = download_openscrapers_object(&s3_client, &addr_info).await;
     match result {
         Ok(case) => {
-            info!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.name, "Successfully fetched case filing");
+            info!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.docket_govid, "Successfully fetched case filing");
             Ok(Json(case))
         }
         Err(e) => {
-            error!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.name, error = %e, "Error fetching case filing");
+            error!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.docket_govid, error = %e, "Error fetching case filing");
             Err(e.to_string())
         }
     }
@@ -151,17 +151,17 @@ pub async fn delete_case_filing_from_s3(
 
     let addr_info = DocketAddress {
         jurisdiction: jurisdiction_info,
-        name: case_name,
+        docket_govid: case_name,
     };
     let result =
         delete_openscrapers_s3_object::<ProcessedGenericDocket>(&s3_client, &addr_info).await;
     match result {
         Ok(_) => {
-            info!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.name, "Successfully deleted case filing");
+            info!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.docket_govid, "Successfully deleted case filing");
             StatusCode::NO_CONTENT.into_response()
         }
         Err(e) => {
-            error!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.name, error = %e, "Error deleting case filing");
+            error!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.docket_govid, error = %e, "Error deleting case filing");
             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
         }
     }
@@ -218,7 +218,7 @@ pub async fn handle_caselist_jurisdiction_fetch_all(
         country,
         jurisdiction: jurisdiction_name,
     };
-    let result = list_cases_for_jurisdiction(&s3_client, &jur_info).await;
+    let result = list_processed_cases_for_jurisdiction(&s3_client, &jur_info).await;
     info!("Completed call to s3 to get jurisdiction list.");
     let pagination = PaginationData { limit, offset };
     match result {

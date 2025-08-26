@@ -69,7 +69,7 @@ impl DownloadIncomplete for ProcessedGenericAttachment {
             date_updated: Utc::now(),
             extra_metadata: metadata,
         };
-        shipout_attachment_to_s3(file_contents, raw_attachment, true, s3_client).await?;
+        shipout_attachment_to_s3(file_contents, raw_attachment, s3_client).await?;
         self.hash = Some(hash);
         Ok(())
     }
@@ -78,37 +78,12 @@ impl DownloadIncomplete for ProcessedGenericAttachment {
 async fn shipout_attachment_to_s3(
     file_contents: Vec<u8>,
     mut raw_attachment: RawAttachment,
-    should_process_text: bool,
     s3_client: &S3Client,
 ) -> anyhow::Result<RawAttachment> {
     let hash = raw_attachment.hash;
     push_raw_attach_file_to_s3(s3_client, &raw_attachment, file_contents).await?;
     info!(%hash, "Pushed raw file to s3.");
 
-    if should_process_text
-        && matches!(
-            raw_attachment.extension,
-            FileExtension::Static(StaticExtension::Pdf)
-        )
-    {
-        info!(%hash,"Sending request to crimson to process pdf.");
-        let text_result = process_pdf_text_using_crimson(raw_attachment.hash).await;
-        match text_result {
-            Ok(text) => {
-                info!(%hash,"Completed text processing.");
-                let text_obj = RawAttachmentText {
-                    quality: AttachmentTextQuality::Low,
-                    language: non_empty_string!("en"),
-                    text,
-                    timestamp: Utc::now(),
-                };
-                raw_attachment.text_objects.push(text_obj);
-            }
-            Err(err) => {
-                tracing::error!(%err,%hash,"Encountered error processing text for pdf.")
-            }
-        }
-    }
     upload_object(s3_client, &hash, &raw_attachment).await?;
 
     Ok(raw_attachment)
@@ -121,7 +96,6 @@ pub struct DirectAttachmentProcessInfo {
     pub fetch_info: AdvancedFetchData,
     pub jurisdiction_info: JurisdictionInfo,
     pub wait_for_s3_upload: bool,
-    pub process_text_before_upload: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, Debug)]
@@ -187,16 +161,9 @@ pub async fn process_attachment_with_direct_request(
         object_s3_uri: get_s3_json_uri::<RawAttachment>(&hash),
     };
     let mut return_info_clone = return_info.clone();
-    let should_process_text = direct_info.process_text_before_upload;
     let s3_process_future = async move || {
         let s3_client = &s3_client_owned;
-        let new_attach = shipout_attachment_to_s3(
-            file_contents,
-            raw_attachment,
-            should_process_text,
-            s3_client,
-        )
-        .await?;
+        let new_attach = shipout_attachment_to_s3(file_contents, raw_attachment, s3_client).await?;
         return_info_clone.attachment = new_attach;
         Ok(return_info_clone)
     };

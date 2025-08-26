@@ -90,4 +90,6 @@ pub struct ProcessedGenericDocket {
     pub extra_metadata: HashMap<String, serde_json::Value>,
     #[serde(default = "Utc::now")]
     pub indexed_at: DateTime<Utc>,
+    #[serde(default = "Utc::now")]
+    pub processed_at: DateTime<Utc>,
 }

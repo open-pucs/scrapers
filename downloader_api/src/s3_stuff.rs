@@ -1,4 +1,3 @@
-
 use anyhow::anyhow;
 use futures_util::join;
 use mycorrhiza_common::s3_generic::fetchers_and_getters::{S3Addr, S3DirectoryAddr};
@@ -27,7 +26,7 @@ impl CannonicalS3ObjectLocation for RawAttachment {
 }
 
 pub struct DocketAddress {
-    pub name: String,
+    pub docket_govid: String,
     pub jurisdiction: JurisdictionInfo,
 }
 
@@ -38,7 +37,7 @@ impl CannonicalS3ObjectLocation for RawGenericDocket {
         let country = &*addr.jurisdiction.country;
         let state = &*addr.jurisdiction.state;
         let jurisdiction = &*addr.jurisdiction.jurisdiction;
-        let case_name = &*addr.name;
+        let case_name = &*addr.docket_govid;
         format!("objects_raw/{country}/{state}/{jurisdiction}/{case_name}")
     }
 }
@@ -49,7 +48,7 @@ impl CannonicalS3ObjectLocation for ProcessedGenericDocket {
         let country = &*addr.jurisdiction.country;
         let state = &*addr.jurisdiction.state;
         let jurisdiction = &*addr.jurisdiction.jurisdiction;
-        let case_name = &*addr.name;
+        let case_name = &*addr.docket_govid;
         format!("objects/{country}/{state}/{jurisdiction}/{case_name}")
     }
 }
@@ -184,7 +183,7 @@ pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blak
     result
 }
 
-pub async fn list_cases_for_jurisdiction(
+pub async fn list_processed_cases_for_jurisdiction(
     s3_client: &S3Client,
     JurisdictionInfo {
         jurisdiction,
@@ -202,7 +201,36 @@ pub async fn list_cases_for_jurisdiction(
         .list_all()
         .await?;
     for val in matches.iter_mut() {
-        if let Some(stripped) = val.strip_suffix(".json") {
+        if let Some(stripped_json) = val.strip_suffix(".json")
+            && let Some(stripped) = stripped_json.strip_prefix(&prefix)
+        {
+            *val = stripped.to_string();
+        };
+    }
+    Ok(matches)
+}
+
+pub async fn list_raw_cases_for_jurisdiction(
+    s3_client: &S3Client,
+    JurisdictionInfo {
+        jurisdiction,
+        state,
+        country,
+    }: &JurisdictionInfo,
+) -> anyhow::Result<Vec<String>> {
+    info!(
+        jurisdiction,
+        state, country, "Listing cases for jurisdiction"
+    );
+    let prefix = format!("objects_raw/{country}/{state}/{jurisdiction}/");
+    info!("Listing cases with prefix: {}", prefix);
+    let mut matches = S3DirectoryAddr::new(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &prefix)
+        .list_all()
+        .await?;
+    for val in matches.iter_mut() {
+        if let Some(stripped_json) = val.strip_suffix(".json")
+            && let Some(stripped) = stripped_json.strip_prefix(&prefix)
+        {
             *val = stripped.to_string();
         };
     }

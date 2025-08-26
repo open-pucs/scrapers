@@ -43,6 +43,10 @@ pub struct RawGenericFiling {
     #[serde(default)]
     pub individual_authors: Vec<String>,
     #[serde(default)]
+    pub organization_authors_blob: String,
+    #[serde(default)]
+    pub individual_authors_blob: String,
+    #[serde(default)]
     pub filing_type: String,
     #[serde(default)]
     pub description: String,

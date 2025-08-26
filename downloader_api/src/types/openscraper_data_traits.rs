@@ -1,11 +1,11 @@
 use std::{collections::HashMap, convert::Infallible};
 
-use chrono::NaiveDate;
+use chrono::{NaiveDate, Utc};
 use futures_util::{StreamExt, stream};
 use rand::random;
 use tracing::warn;
 
-use crate::processing::llm_prompts::split_and_fix_author_list;
+use crate::processing::llm_prompts::{clean_up_author_list, split_and_fix_author_blob};
 use crate::processing::match_raw_processed::{
     match_raw_attaches_to_processed_attaches, match_raw_fillings_to_processed_fillings,
 };
@@ -44,33 +44,11 @@ impl ProcessFrom<RawGenericDocket> for ProcessedGenericDocket {
     type ParseError = Infallible;
     type ExtraData = ();
     async fn process_from(
-        input: &RawGenericDocket,
-        cached: Option<&Self>,
+        input: RawGenericDocket,
+        cached: Option<Self>,
         _: Self::ExtraData,
     ) -> Result<Self, Self::ParseError> {
-        let cached_fillings = cached.map(|d| &d.filings);
-        let matched_fillings =
-            match_raw_fillings_to_processed_fillings(&input.filings, cached_fillings);
-        let processed_fillings = stream::iter(matched_fillings.into_iter())
-            .enumerate()
-            .map(|(index, (f_raw, f_cached))| {
-                let filling_index_data = IndexExtraData {
-                    index: index as u64,
-                };
-                ProcessedGenericFiling::process_from(f_raw, f_cached, filling_index_data)
-            })
-            .buffer_unordered(5)
-            .collect::<Vec<_>>()
-            .await;
-        let mut proc_filling_map = HashMap::new();
-        for filling in processed_fillings {
-            // Destructure here is fine since the filling process cannot error out.
-            let Ok(filling) = filling;
-            proc_filling_map.insert(filling.openscrapers_filling_id, filling);
-        }
         let opened_date_from_fillings = {
-            // TODO: Add logging here when a filling is found sooner then the opened date from the
-            // input.
             let original_date = input.opened_date;
             let mut min_date = original_date;
             for filling_date in input
@@ -91,7 +69,30 @@ impl ProcessFrom<RawGenericDocket> for ProcessedGenericDocket {
             // docket date, and all the filling dates are very small.
             min_date.unwrap_or(NaiveDate::MAX)
         };
+        let cached_fillings = cached.map(|d| d.filings);
+        let matched_fillings =
+            match_raw_fillings_to_processed_fillings(input.filings, cached_fillings);
+        let processed_fillings = stream::iter(matched_fillings.into_iter())
+            .enumerate()
+            .map(|(index, (f_raw, f_cached))| {
+                let filling_index_data = IndexExtraData {
+                    index: index as u64,
+                };
+                async {
+                    ProcessedGenericFiling::process_from(f_raw, f_cached, filling_index_data).await
+                }
+            })
+            .buffer_unordered(5)
+            .collect::<Vec<_>>()
+            .await;
+        let mut proc_filling_map = HashMap::new();
+        for filling in processed_fillings {
+            // Destructure here is fine since the filling process cannot error out.
+            let Ok(filling) = filling;
+            proc_filling_map.insert(filling.openscrapers_filling_id, filling);
+        }
         let final_processed_docket = ProcessedGenericDocket {
+            processed_at: Utc::now(),
             case_govid: input.case_govid.clone(),
             filings: proc_filling_map,
             opened_date: opened_date_from_fillings,
@@ -115,26 +116,37 @@ impl ProcessFrom<RawGenericFiling> for ProcessedGenericFiling {
     type ParseError = Infallible;
     type ExtraData = IndexExtraData;
     async fn process_from(
-        input: &RawGenericFiling,
-        cached: Option<&Self>,
+        input: RawGenericFiling,
+        cached: Option<Self>,
         index_data: Self::ExtraData,
     ) -> Result<Self, Self::ParseError> {
-        let processed_attach_map = cached.map(|filling| &filling.attachments);
+        let (processed_attach_map, cached_orgauthorlist, cached_individualauthorllist) =
+            match cached {
+                Some(filling) => (
+                    Some(filling.attachments),
+                    Some(filling.organization_authors),
+                    Some(filling.individual_authors),
+                ),
+                None => (None, None, None),
+            };
         let matched_attach_list =
-            match_raw_attaches_to_processed_attaches(&input.attachments, processed_attach_map);
+            match_raw_attaches_to_processed_attaches(input.attachments, processed_attach_map);
         // Async match the raw attachments with the cached versions, and process them async 5 at a
         // time.
-        let processed_attachments = stream::iter(matched_attach_list.iter())
+        let processed_attachments = stream::iter(matched_attach_list.into_iter())
             .enumerate()
             .map(|(attach_index, (raw_attach, cached_attach))| {
                 let attach_index_data = IndexExtraData {
                     index: attach_index as u64,
                 };
-                ProcessedGenericAttachment::process_from(
-                    raw_attach,
-                    *cached_attach,
-                    attach_index_data,
-                )
+                async {
+                    ProcessedGenericAttachment::process_from(
+                        raw_attach,
+                        cached_attach,
+                        attach_index_data,
+                    )
+                    .await
+                }
             })
             .buffer_unordered(5)
             .collect::<Vec<_>>()
@@ -146,18 +158,22 @@ impl ProcessFrom<RawGenericFiling> for ProcessedGenericFiling {
         }
         // Process org and individual author names.
         let organization_authors = {
-            if let Some(cached) = cached {
-                cached.organization_authors.clone()
+            if let Some(org_authors) = cached_orgauthorlist {
+                org_authors
+            } else if input.organization_authors.is_empty() {
+                split_and_fix_author_blob(&input.organization_authors_blob).await
             } else {
-                split_and_fix_author_list(&input.organization_authors).await
+                clean_up_author_list(input.organization_authors)
             }
         };
 
         let individual_authors = {
-            if let Some(cached) = cached {
-                cached.individual_authors.clone()
+            if let Some(individual_authors) = cached_individualauthorllist {
+                individual_authors
+            } else if input.individual_authors.is_empty() {
+                split_and_fix_author_blob(&input.individual_authors_blob).await
             } else {
-                split_and_fix_author_list(&input.individual_authors).await
+                clean_up_author_list(input.individual_authors)
             }
         };
 
@@ -185,11 +201,12 @@ impl ProcessFrom<RawGenericAttachment> for ProcessedGenericAttachment {
     type ParseError = Infallible;
     type ExtraData = IndexExtraData;
     async fn process_from(
-        input: &RawGenericAttachment,
-        cached: Option<&Self>,
+        input: RawGenericAttachment,
+        cached: Option<Self>,
         index_data: Self::ExtraData,
     ) -> Result<Self, Self::ParseError> {
         let id = cached
+            .as_ref()
             .map(|val| val.openscrapers_attachment_id)
             .unwrap_or(random());
         let hash = (input.hash).or_else(|| cached.and_then(|v| v.hash));
