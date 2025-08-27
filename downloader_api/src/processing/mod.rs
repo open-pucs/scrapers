@@ -10,6 +10,7 @@ use futures_util::{StreamExt, stream};
 use mycorrhiza_common::tasks::{ExecuteUserTask, map_err_as_json};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 pub mod attachments;
 pub mod file_fetching;
@@ -35,13 +36,15 @@ struct CrimsonStatusResponse {
     error: Option<String>,
 }
 
-pub fn make_reflist_of_attachments(
+pub fn make_reflist_of_attachments_without_hash(
     case: &mut ProcessedGenericDocket,
 ) -> Vec<&mut ProcessedGenericAttachment> {
     let mut case_refs = Vec::with_capacity(case.filings.len());
     for (_, filling) in case.filings.iter_mut() {
         for (_, attachment) in filling.attachments.iter_mut() {
-            case_refs.push(attachment);
+            if attachment.hash.is_none() {
+                case_refs.push(attachment);
+            }
         }
     }
     case_refs
@@ -54,7 +57,7 @@ impl DownloadIncomplete for ProcessedGenericDocket {
         &mut self,
         extra: &Self::ExtraData,
     ) -> anyhow::Result<Self::SucessData> {
-        let attachment_refs = make_reflist_of_attachments(self);
+        let attachment_refs = make_reflist_of_attachments_without_hash(self);
         let wraped_download = async |val: &mut ProcessedGenericAttachment| {
             DownloadIncomplete::download_incomplete(val, extra).await
         };
@@ -64,6 +67,7 @@ impl DownloadIncomplete for ProcessedGenericDocket {
             .buffer_unordered(CONCURRENT_ATTACHMENTS)
             .count()
             .await;
+        info!(govid=%self.case_govid, jurisdiction=%extra.1.jurisdiction,"Successfully downloaded all attachments for docket");
         Ok(())
     }
 }

@@ -179,7 +179,7 @@ pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blak
         .await;
 
     let result = obj_exists.is_ok() && file_exists.is_ok();
-    info!("Attachment exists: {}", result);
+    debug!("Attachment exists: {}", result);
     result
 }
 
@@ -248,7 +248,7 @@ pub async fn push_raw_attach_file_to_s3(
     S3Addr::new(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &file_key)
         .upload_bytes(file_contents)
         .await?;
-    info!("Successfully pushed file to S3");
+    debug!("Successfully pushed file to S3");
 
     Ok(())
 }

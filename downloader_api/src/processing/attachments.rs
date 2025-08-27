@@ -7,14 +7,11 @@ use crate::s3_stuff::{
 use crate::types::data_processing_traits::DownloadIncomplete;
 use crate::types::env_vars::CRIMSON_URL;
 use crate::types::processed::ProcessedGenericAttachment;
-use crate::types::{
-    jurisdictions::JurisdictionInfo,
-    raw::{AttachmentTextQuality, RawAttachment, RawAttachmentText},
-};
+use crate::types::{jurisdictions::JurisdictionInfo, raw::RawAttachment};
 use anyhow::{anyhow, bail};
 use aws_sdk_s3::Client as S3Client;
 use chrono::Utc;
-use mycorrhiza_common::file_extension::{FileExtension, StaticExtension};
+use mycorrhiza_common::file_extension::FileExtension;
 use mycorrhiza_common::hash::Blake2bHash;
 use non_empty_string::{NonEmptyString, non_empty_string};
 use schemars::JsonSchema;
@@ -23,7 +20,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::sleep;
-use tracing::info;
+use tracing::{debug, info};
 
 use super::file_fetching::{AdvancedFetchData, FileDownloadResult, InternetFileFetch};
 
@@ -43,7 +40,7 @@ impl DownloadIncomplete for ProcessedGenericAttachment {
         if self.hash.is_some() {
             return Err(anyhow!("File already has hash"));
         }
-        info!(url=%self.url,"Trying to download attachment file.");
+        debug!(url=%self.url,"Trying to download attachment file.");
         let extension = &self.document_extension;
 
         let FileDownloadResult {
@@ -51,7 +48,7 @@ impl DownloadIncomplete for ProcessedGenericAttachment {
             filename: server_filename,
         } = download_file_content_validated_with_retries(&self.url, extension).await?;
         let hash = Blake2bHash::from_bytes(&file_contents);
-        info!(%hash, url=%self.url,"Successfully downloaded file.");
+        debug!(%hash, url=%self.url,"Successfully downloaded file.");
 
         let metadata = server_filename
             .map(|exant_filename| HashMap::from([("server_filename".to_string(), exant_filename)]))
@@ -71,6 +68,7 @@ impl DownloadIncomplete for ProcessedGenericAttachment {
         };
         shipout_attachment_to_s3(file_contents, raw_attachment, s3_client).await?;
         self.hash = Some(hash);
+        debug!(%hash, url = %self.url,"Successfully downloaded attachment and saved everything to s3.");
         Ok(())
     }
 }
@@ -82,7 +80,8 @@ async fn shipout_attachment_to_s3(
 ) -> anyhow::Result<RawAttachment> {
     let hash = raw_attachment.hash;
     push_raw_attach_file_to_s3(s3_client, &raw_attachment, file_contents).await?;
-    info!(%hash, "Pushed raw file to s3.");
+
+    raw_attachment.date_updated = Utc::now();
 
     upload_object(s3_client, &hash, &raw_attachment).await?;
 
