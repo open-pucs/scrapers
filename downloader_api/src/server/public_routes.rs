@@ -1,19 +1,16 @@
 use aide::axum::{
-    routing::{get_with, post},
     ApiRouter,
+    routing::{get, get_with, post},
 };
 
-use crate::server::scraper_check_completed::get_completed_casedata_differential;
 use crate::server::s3_routes;
+use crate::server::scraper_check_completed::get_completed_casedata_differential;
 
 pub fn create_public_router() -> ApiRouter {
     ApiRouter::new()
         .api_route(
             "/cases/{state}/{jurisdiction_name}/{case_name}",
-            get_with(
-                s3_routes::handle_processed_case_filing_from_s3,
-                s3_routes::handle_processed_case_filing_from_s3_docs,
-            ),
+            get(s3_routes::handle_processed_case_filing_from_s3),
         )
         .api_route(
             "/caselist/{state}/{jurisdiction_name}/all",
