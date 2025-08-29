@@ -32,6 +32,8 @@ LS Power Grid New York Corporation I, Niagara Mohawk Power Corporation d/b/a Nat
 Response 5:
 ["LS Power Grid New York Corporation I", "Niagara Mohawk Power Corporation"]
 
+HERE IS THE FINAL MESSAGE, DO NOT THINK AND RETURN YOUR RESPONSE IMMEDIATELY:
+
 Final:
 {org_dump}
 Response:
@@ -64,11 +66,15 @@ pub fn clean_up_author_list(raw_llmed_list: Vec<String>) -> Vec<OrgName> {
 
 // The suffix should be a standardized lowercase string like ["llc", "co", "corp", "inc", "company", "ltd", "lp", "llp"]
 fn clean_organization_name(name: String) -> Option<OrgName> {
-    let mut cleaned = name.trim().to_string();
+    let trim_punctuation = &['\'', '.', ',', ' ', '"'];
+    let mut cleaned = name.trim().trim_matches(trim_punctuation).to_string();
 
     // Remove d/b/a patterns and everything after
     if let Some(dba_pos) = cleaned.to_lowercase().find(" d/b/a ") {
-        cleaned = cleaned[..dba_pos].trim().to_string();
+        cleaned = cleaned[..dba_pos]
+            .trim()
+            .trim_matches(trim_punctuation)
+            .to_string();
     }
 
     // Canonical suffixes (case insensitive matching → canonical lowercase form)
@@ -88,7 +94,6 @@ fn clean_organization_name(name: String) -> Option<OrgName> {
         (" LLP", "llp"),
         (" L.L.P", "llp"),
     ];
-    let trim_punctuation = &['\'', '.', ',', ' '];
 
     let mut found_suffix: Option<String> = None;
 

@@ -18,14 +18,15 @@ use tracing::{error, info};
 use crate::{
     s3_stuff::{
         DocketAddress, delete_openscrapers_s3_object, download_openscrapers_object,
-        get_jurisdiction_prefix, list_processed_cases_for_jurisdiction,
+        get_jurisdiction_prefix, list_processed_cases_for_jurisdiction, upload_object,
     },
     types::{
+        attachments::RawAttachment,
+        data_processing_traits::Revalidate,
         env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
         jurisdictions::JurisdictionInfo,
         pagination::{PaginationData, make_paginated_subslice},
         processed::ProcessedGenericDocket,
-        raw::RawAttachment,
     },
 };
 
@@ -125,10 +126,15 @@ pub async fn handle_processed_case_filing_from_s3(
         jurisdiction: jurisdiction_info,
         docket_govid: case_name,
     };
-    let result = download_openscrapers_object(&s3_client, &addr_info).await;
+    let result =
+        download_openscrapers_object::<ProcessedGenericDocket>(&s3_client, &addr_info).await;
     match result {
-        Ok(case) => {
+        Ok(mut case) => {
             info!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.docket_govid, "Successfully fetched case filing");
+            let did_change_with_validation = case.revalidate().await;
+            if did_change_with_validation.did_change() {
+                let _ = upload_object(&s3_client, &addr_info, &case).await;
+            }
             Ok(Json(case))
         }
         Err(e) => {

@@ -1,5 +1,5 @@
 use aide::axum::{
-    routing::{delete, get_with},
+    routing::delete,
     ApiRouter,
 };
 use mycorrhiza_common::misc::is_env_var_true;

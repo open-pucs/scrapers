@@ -1,6 +1,35 @@
 use std::error::Error;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum RevalidationOutcome {
+    NoChanges,
+    DidChange,
+    Invalid,
+}
+
+impl RevalidationOutcome {
+    pub fn or(&self, other: &Self) -> Self {
+        match self {
+            Self::NoChanges => *other,
+            Self::Invalid => Self::Invalid,
+            Self::DidChange => {
+                if *other == Self::Invalid {
+                    Self::Invalid
+                } else {
+                    Self::DidChange
+                }
+            }
+        }
+    }
+    pub fn did_change(&self) -> bool {
+        match self {
+            Self::NoChanges => false,
+            _ => true,
+        }
+    }
+}
 pub trait Revalidate {
-    fn revalidate(&mut self) {}
+    async fn revalidate(&mut self) -> RevalidationOutcome;
 }
 
 pub trait ProcessFrom<T> {
