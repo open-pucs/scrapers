@@ -2046,6 +2046,7 @@ dependencies = [
 [[package]]
 name = "mycorrhiza_common"
 version = "0.1.0"
+source = "git+https://github.com/mycorrhiza-inc/common-rs.git#19adaf3fa8ad2048af772b37498276cbdc96dacb"
 dependencies = [
  "aide",
  "anyhow",
