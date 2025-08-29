@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 use mycorrhiza_common::file_extension::FileValidationError;
 

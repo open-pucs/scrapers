@@ -70,6 +70,8 @@ async fn test_process_case() {
         description: "The plaintiff filed the initial complaint.".to_string(),
         organization_authors: vec![non_empty_string!("Acme Corp").into()],
         individual_authors: vec![non_empty_string!("John Doe").into()],
+        organization_authors_blob: Default::default(),
+        individual_authors_blob: Default::default(),
         extra_metadata: filing_meta.clone(),
         filing_type: Default::default(),
     };
@@ -83,6 +85,8 @@ async fn test_process_case() {
         description: "An additional exhibit submitted by the defence.".to_string(),
         organization_authors: Default::default(),
         individual_authors: Default::default(),
+        organization_authors_blob: Default::default(),
+        individual_authors_blob: Default::default(),
         extra_metadata: filing_meta,
         filing_type: Default::default(),
     };

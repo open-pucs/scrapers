@@ -1,3 +1,4 @@
+pub mod attachments;
 pub mod data_processing_traits;
 pub mod deduplication;
 pub mod env_vars;

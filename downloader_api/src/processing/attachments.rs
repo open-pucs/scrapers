@@ -7,7 +7,7 @@ use crate::s3_stuff::{
 use crate::types::data_processing_traits::DownloadIncomplete;
 use crate::types::env_vars::CRIMSON_URL;
 use crate::types::processed::ProcessedGenericAttachment;
-use crate::types::{jurisdictions::JurisdictionInfo, raw::RawAttachment};
+use crate::types::{attachments::RawAttachment, jurisdictions::JurisdictionInfo};
 use anyhow::{anyhow, bail};
 use aws_sdk_s3::Client as S3Client;
 use chrono::Utc;

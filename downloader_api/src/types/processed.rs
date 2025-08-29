@@ -6,8 +6,6 @@ use non_empty_string::NonEmptyString;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::types::raw::GenericParty;
-
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct ProcessedGenericAttachment {
     pub name: String,
@@ -58,6 +56,12 @@ pub struct ProcessedGenericFiling {
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+pub struct ProcessedGenericParty {
+    name: NonEmptyString,
+    is_corperate_entity: bool,
+    is_human: bool,
+}
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct ProcessedGenericDocket {
     pub case_govid: NonEmptyString,
     // This shouldnt be an optional field in the final submission, since it can be calculated from
@@ -77,6 +81,9 @@ pub struct ProcessedGenericDocket {
     #[serde(default)]
     pub industry: String,
     #[serde(default)]
+    pub petitioner_list: Vec<OrgName>,
+    // Depricated field, use petitioner_list instead
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub petitioner: String,
     #[serde(default)]
     pub hearing_officer: String,
@@ -85,7 +92,7 @@ pub struct ProcessedGenericDocket {
     #[serde(default)]
     pub filings: HashMap<u64, ProcessedGenericFiling>,
     #[serde(default)]
-    pub case_parties: Vec<GenericParty>,
+    pub case_parties: Vec<ProcessedGenericParty>,
     #[serde(default)]
     pub extra_metadata: HashMap<String, serde_json::Value>,
     #[serde(default = "Utc::now")]

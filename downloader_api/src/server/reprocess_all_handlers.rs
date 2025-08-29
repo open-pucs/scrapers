@@ -1,3 +1,6 @@
+use std::collections::{HashMap, HashSet};
+
+use aws_sdk_s3::Client;
 use axum::Json;
 use chrono::{DateTime, Utc};
 use futures_util::{StreamExt, stream};
@@ -10,7 +13,7 @@ use crate::{
     processing::ReprocessDocketInfo,
     s3_stuff::{
         DocketAddress, download_openscrapers_object, list_processed_cases_for_jurisdiction,
-        make_s3_client, upload_object,
+        list_raw_cases_for_jurisdiction, make_s3_client, upload_object,
     },
     types::{
         data_processing_traits::DownloadIncomplete, jurisdictions::JurisdictionInfo,
@@ -33,14 +36,19 @@ pub async fn reprocess_dockets(
     Json(payload): Json<ReprocessJurisdictionInfo>,
 ) -> Result<String, String> {
     let s3_client = make_s3_client().await;
-    let mut processed_caselist =
-        list_processed_cases_for_jurisdiction(&s3_client, &payload.jurisdiction)
-            .await
-            .map_err(|e| e.to_string())?;
+
+    let mut initial_caselist_to_process = get_initial_govid_list_to_process(
+        &s3_client,
+        &payload.jurisdiction,
+        payload.only_process_missing,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
     // Randomizing the list just to insure that the processing difficulty is uniform.
     let mut rng = SmallRng::from_os_rng();
-    processed_caselist.shuffle(&mut rng);
-    let boxed_tasks = processed_caselist.into_iter().map(|docket_govid| {
+    initial_caselist_to_process.shuffle(&mut rng);
+    let boxed_tasks = initial_caselist_to_process.into_iter().map(|docket_govid| {
         let task_info = ReprocessDocketInfo {
             docket_govid,
             jurisdiction: payload.jurisdiction.clone(),
@@ -56,6 +64,23 @@ pub async fn reprocess_dockets(
         .await;
 
     Ok("Successfully added processing tasks to queue".to_string())
+}
+
+async fn get_initial_govid_list_to_process(
+    s3_client: &Client,
+    jur_info: &JurisdictionInfo,
+    only_process_missing: bool,
+) -> anyhow::Result<Vec<String>> {
+    let mut raw_caselist = list_raw_cases_for_jurisdiction(s3_client, jur_info).await?;
+    if !only_process_missing {
+        return Ok(raw_caselist);
+    }
+    let processed_govid_list = list_processed_cases_for_jurisdiction(s3_client, jur_info).await?;
+    let mut raw_govid_map = raw_caselist.into_iter().collect::<HashSet<_>>();
+    for processed_govid in processed_govid_list.iter() {
+        raw_govid_map.remove(processed_govid);
+    }
+    Ok(raw_govid_map.into_iter().collect())
 }
 
 pub async fn download_all_missing_hashes(
