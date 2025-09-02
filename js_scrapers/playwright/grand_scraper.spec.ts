@@ -66,90 +66,97 @@ async function scrapeFilings(
   permitID: string,
 ): Promise<any[]> {
   const page = await browser.newPage();
-  const permitURL = `https://utahdnr.my.site.com/s/coal-document-display?tabType=Specific%20Project&selectedRowId=a0B8z000000iHHiEAM&selectedPermitName=${permitID}`;
-
-  await page.goto(permitURL);
-  await page.waitForLoadState("networkidle");
-
   const filings = [];
+  try {
+    const permitURL = `https://utahdnr.my.site.com/s/coal-document-display?tabType=Specific%20Project&selectedRowId=a0B8z000000iHHiEAM&selectedPermitName=${permitID}`;
 
-  console.log(
-    `Beginning the process of scraping filings for permit ${permitID}...`,
-  );
-  let total_pages_so_far = 0;
-  while (true) {
+    await page.goto(permitURL);
     await page.waitForLoadState("networkidle");
-    const rows = await page
-      .locator(".slds-table > tbody:nth-child(2) tr")
-      .all();
+
     console.log(
-      `Found ${rows.length} filings on the ${total_pages_so_far} page of fillings for ${permitID}`,
+      `Beginning the process of scraping filings for permit ${permitID}...`,
     );
+    let total_pages_so_far = 0;
+    while (true) {
+      await page.waitForLoadState("networkidle");
+      const rows = await page
+        .locator(".slds-table > tbody:nth-child(2) tr")
+        .all();
+      console.log(
+        `Found ${rows.length} filings on the ${total_pages_so_far} page of fillings for ${permitID}`,
+      );
 
-    for (const row of rows) {
-      const docDate = await row
-        .locator('td[data-label="Document Date"]')
-        .innerText();
-      const docFrom = await row
-        .locator('td[data-label="Doc From"]')
-        .innerText();
-      const docTo = await row.locator('td[data-label="Doc To"]').innerText();
-      const docRegarding = await row
-        .locator('td[data-label="Doc Regarding"]')
-        .innerText();
-      // These dont work, ignoring.
-      // const docLocation = await row
-      //   .locator('td[data-label="Doc Location"]')
-      //   .innerText();
-      // const viewLink = await row.locator("a").first().getAttribute("href");
-      const docLocation = "Incoming";
-      const viewLink = "unknown";
+      for (const row of rows) {
+        const docDate = await row
+          .locator('td[data-label="Document Date"]')
+          .innerText();
+        const docFrom = await row
+          .locator('td[data-label="Doc From"]')
+          .innerText();
+        const docTo = await row.locator('td[data-label="Doc To"]').innerText();
+        const docRegarding = await row
+          .locator('td[data-label="Doc Regarding"]')
+          .innerText();
+        // These dont work, ignoring.
+        // const docLocation = await row
+        //   .locator('td[data-label="Doc Location"]')
+        //   .innerText();
+        // const viewLink = await row.locator("a").first().getAttribute("href");
+        const docLocation = "Incoming";
+        const viewLink = "unknown";
 
-      const filing = {
-        filed_date: docDate,
-        filling_govid: "",
-        name: docRegarding,
-        organization_author_blob: [docTo],
-        individual_author_blob: [docFrom],
-        filing_type: "",
-        description: "",
-        attachments: [
-          {
-            name: docRegarding,
-            document_extension: "pdf",
-            attachment_govid: "",
-            url: viewLink,
-            attachment_type: docLocation,
-            attachment_subtype: "",
-            extra_metadata: {
-              permitID: permitID,
+        const filing = {
+          filed_date: docDate,
+          filling_govid: "",
+          name: docRegarding,
+          organization_author_blob: [docTo],
+          individual_author_blob: [docFrom],
+          filing_type: "",
+          description: "",
+          attachments: [
+            {
+              name: docRegarding,
+              document_extension: "pdf",
+              attachment_govid: "",
+              url: viewLink,
+              attachment_type: docLocation,
+              attachment_subtype: "",
+              extra_metadata: {
+                permitID: permitID,
+              },
+              hash: null,
             },
-            hash: null,
+          ],
+          extra_metadata: {
+            doc_location: docLocation,
+            permitID: permitID,
           },
-        ],
-        extra_metadata: {
-          doc_location: docLocation,
-          permitID: permitID,
-        },
-      };
+        };
 
-      filings.push(filing);
-    }
+        filings.push(filing);
+      }
 
-    try {
-      await page
-        .locator("lightning-button.slds-p-horizontal_x-small:nth-child(4)")
-        .first()
-        .click({ timeout: 5000 });
-    } catch (e) {
-      console.log(`No more filings pages for permit ${permitID}.`);
-      break;
+      try {
+        await page
+          .locator("lightning-button.slds-p-horizontal_x-small:nth-child(4)")
+          .first()
+          .click({ timeout: 5000 });
+      } catch (e) {
+        console.log(`No more filings pages for permit ${permitID}.`);
+        break;
+      }
+      total_pages_so_far += 1;
     }
-    total_pages_so_far += 1;
+  } catch (error) {
+    console.error(
+      `An error occurred while scraping filings for permit ${permitID}:`,
+      error,
+    );
+  } finally {
+    console.log(`Finally finished processing fillings for ${permitID}`);
+    await page.close();
+    return filings;
   }
-  console.log(`Finally finished processing fillings for ${permitID}`);
-  await page.close();
-  return filings;
 }
 
 test("Grand Utah Coal Scraper", async ({ page }) => {
@@ -163,19 +170,27 @@ test("Grand Utah Coal Scraper", async ({ page }) => {
   console.log("Step 2: Scraping filings for each mine concurrently...");
 
   const browser = await chromium.launch();
-  const concurrencyLimit = 5;
+  const concurrencyLimit = 10;
   const mineQueue = [...allMines];
 
   async function worker() {
     while (mineQueue.length > 0) {
       const mine = mineQueue.shift();
       if (mine) {
-        console.log(`Worker starting on permit ${mine.case_govid}`);
-        const filings = await scrapeFilings(browser, mine.case_govid);
-        mine.filings = filings;
-        console.log(
-          `Finished scraping for permit ${mine.case_govid}. Found ${filings.length} filings.`,
-        );
+        try {
+          console.log(`Worker starting on permit ${mine.case_govid}`);
+          const filings = await scrapeFilings(browser, mine.case_govid);
+          mine.filings = filings;
+          console.log(
+            `Finished scraping for permit ${mine.case_govid}. Found ${filings.length} filings.`,
+          );
+        } catch (error) {
+          console.error(
+            `Error scraping filings for permit ${mine.case_govid}:`,
+            error,
+          );
+          mine.filings = [];
+        }
       }
     }
   }
