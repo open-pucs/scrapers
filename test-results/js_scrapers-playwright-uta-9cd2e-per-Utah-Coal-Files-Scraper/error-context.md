@@ -1,0 +1,295 @@
+# Page snapshot
+
+```yaml
+- banner:
+  - link "Skip to main content":
+    - /url: "#main-content"
+- main:
+  - article:
+    - heading "Coal Permit Files" [level=1]
+    - paragraph: Below are the electronically scanned files of the documents that are available in the Division's Public Information Center (PIC Room). Please note-Not all of the files available in the PIC Room are available electronically. As documents are scanned they will be made available through these file services.
+    - button "Generate Search Result"
+    - tablist "Tabs":
+      - tab "Permit Files" [selected]
+      - tab "General Files"
+      - tab "MRP"
+      - tab "CHIA"
+      - tab "Annual Evals"
+    - tabpanel:
+      - textbox
+      - text: Doc Location
+      - combobox "Doc Location": Select The Document Location
+      - status
+      - text: Doc Regarding
+      - textbox "Doc Regarding"
+      - button "Search"
+      - button "Reset"
+      - text: Permit Files >C0070001 Navigation Mode
+      - grid:
+        - rowgroup:
+          - row "View Permit Doc Year Document Date Doc Location Doc To Doc From Doc Regarding Task Id":
+            - columnheader "View":
+              - text: View
+              - slider "View column width": "75"
+            - columnheader "Permit":
+              - 'button "Sort by: Permit"'
+              - text: "Sorted: None"
+              - slider "Permit column width": "140"
+            - columnheader "Doc Year":
+              - 'button "Sort by: Doc Year"'
+              - text: "Sorted: None"
+              - slider "Doc Year column width": "140"
+            - columnheader "Document Date":
+              - 'button "Sort by: Document Date"'
+              - text: "Sorted: None"
+              - slider "Document Date column width": "140"
+            - columnheader "Doc Location":
+              - 'button "Sort by: Doc Location"'
+              - text: "Sorted: None"
+              - slider "Doc Location column width": "140"
+            - columnheader "Doc To":
+              - 'button "Sort by: Doc To"'
+              - text: "Sorted: None"
+              - slider "Doc To column width": "140"
+            - columnheader "Doc From":
+              - 'button "Sort by: Doc From"'
+              - text: "Sorted: None"
+              - slider "Doc From column width": "140"
+            - columnheader "Doc Regarding":
+              - 'button "Sort by: Doc Regarding"'
+              - text: "Sorted: None"
+              - slider "Doc Regarding column width": "140"
+            - columnheader "Task Id":
+              - 'button "Sort by: Task Id"'
+              - text: "Sorted: None"
+              - slider "Task Id column width": "140"
+        - rowgroup:
+          - row "C0070001 1998 1998-03-26 Incoming Oil, Gas & Mining Vicki Bailey Submittal of 1st Qtr water data":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-03-26"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "Vicki Bailey"
+            - gridcell "Submittal of 1st Qtr water data"
+            - gridcell
+          - row "C0070001 1998 1998-03-31 Incoming Oil, Gas & Mining Vicki Bailey Revision to White Oak permit concerning Pond 004 sediment removal":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-03-31"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "Vicki Bailey"
+            - gridcell "Revision to White Oak permit concerning Pond 004 sediment removal"
+            - gridcell
+          - row "C0070001 1998 1998-05-08 Incoming Pam Grubaugh-Littig Chris Merritt Copy of White Oak Lease modification of federal coal lease":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-05-08"
+            - gridcell "Incoming"
+            - gridcell "Pam Grubaugh-Littig"
+            - gridcell "Chris Merritt"
+            - gridcell "Copy of White Oak Lease modification of federal coal lease"
+            - gridcell
+          - row "C0070001 1998 1998-05-12 Incoming Oil, Gas & Mining White Oak Mine Royalty Rate Reduction":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-05-12"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "White Oak Mine"
+            - gridcell "Royalty Rate Reduction"
+            - gridcell
+          - row "C0070001 1998 1998-05-19 Incoming Denise Dragoo William Lamb Logical Mining Unit Application Rejected":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-05-19"
+            - gridcell "Incoming"
+            - gridcell "Denise Dragoo"
+            - gridcell "William Lamb"
+            - gridcell "Logical Mining Unit Application Rejected"
+            - gridcell
+          - row "C0070001 1998 1998-05-22 Incoming Oil, Gas & Mining White Oak Mine Decision of May 19, 1998, Amended Request for Thirty Day Extension Denied":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-05-22"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "White Oak Mine"
+            - gridcell "Decision of May 19, 1998, Amended Request for Thirty Day Extension Denied"
+            - gridcell
+          - row "C0070001 1998 1998-05-27 Incoming File White Oak Mine CRR":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-05-27"
+            - gridcell "Incoming"
+            - gridcell "File"
+            - gridcell "White Oak Mine"
+            - gridcell "CRR"
+            - gridcell
+          - row "C0070001 1998 1998-06-17 Incoming Joe Helfrich Vicki Bailey Rain Gauges":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-06-17"
+            - gridcell "Incoming"
+            - gridcell "Joe Helfrich"
+            - gridcell "Vicki Bailey"
+            - gridcell "Rain Gauges"
+            - gridcell
+          - row "C0070001 1998 1998-06-27 Incoming Steve Demczak Vicki Bailey Extension of Abatement":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-06-27"
+            - gridcell "Incoming"
+            - gridcell "Steve Demczak"
+            - gridcell "Vicki Bailey"
+            - gridcell "Extension of Abatement"
+            - gridcell
+          - 'row "C0070001 1998 1998-07-27 Incoming Oil, Gas & Mining White Oak Mine Check #12523"':
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-07-27"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "White Oak Mine"
+            - 'gridcell "Check #12523"'
+            - gridcell
+          - row "C0070001 1998 1998-07-27 Incoming Pam Grubaugh-Littig Denise Dragoo Replacement surety bonds":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-07-27"
+            - gridcell "Incoming"
+            - gridcell "Pam Grubaugh-Littig"
+            - gridcell "Denise Dragoo"
+            - gridcell "Replacement surety bonds"
+            - gridcell
+          - row "C0070001 1998 1998-07-27 Incoming Oil, Gas & Mining Vicky Miller Submittal of 2nd Qtr Water Data":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-07-27"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "Vicky Miller"
+            - gridcell "Submittal of 2nd Qtr Water Data"
+            - gridcell
+          - row "C0070001 1998 1998-07-30 Incoming Oil, Gas & Mining Vicky Miller Removal of Culvert C-23-24":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-07-30"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "Vicky Miller"
+            - gridcell "Removal of Culvert C-23-24"
+            - gridcell
+          - row "C0070001 1998 1998-07-31 Incoming Denise Dragoo William Lamb Royalty Rate Recertification Accepted":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-07-31"
+            - gridcell "Incoming"
+            - gridcell "Denise Dragoo"
+            - gridcell "William Lamb"
+            - gridcell "Royalty Rate Recertification Accepted"
+            - gridcell
+          - row "C0070001 1998 1998-08-07 Incoming Mark Wayment Donald Hilden UPDES General Coal Mining Permit":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-08-07"
+            - gridcell "Incoming"
+            - gridcell "Mark Wayment"
+            - gridcell "Donald Hilden"
+            - gridcell "UPDES General Coal Mining Permit"
+            - gridcell
+          - row "C0070001 1998 1998-09-17 Incoming File ACORD Certificate of Insurance":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-09-17"
+            - gridcell "Incoming"
+            - gridcell "File"
+            - gridcell "ACORD"
+            - gridcell "Certificate of Insurance"
+            - gridcell
+          - row "C0070001 1998 1998-09-22 Incoming Oil, Gas & Mining ACORD Certificate of Insurance":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-09-22"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "ACORD"
+            - gridcell "Certificate of Insurance"
+            - gridcell
+          - row "C0070001 1998 1998-09-22 Incoming Oil, Gas & Mining ACORD Certificate of Insurance":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-09-22"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "ACORD"
+            - gridcell "Certificate of Insurance"
+            - gridcell
+          - row "C0070001 1998 1998-09-25 Incoming Oil, Gas & Mining White Oak Mine pH sample":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-09-25"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "White Oak Mine"
+            - gridcell "pH sample"
+            - gridcell
+          - row "C0070001 1998 1998-09-28 Incoming Denise Dragoo BLM Readjustment of Coal Lease":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1998"
+            - gridcell "1998-09-28"
+            - gridcell "Incoming"
+            - gridcell "Denise Dragoo"
+            - gridcell "BLM"
+            - gridcell "Readjustment of Coal Lease"
+            - gridcell
+      - button "First"
+      - button "Previous"
+      - text: Showing 119 of 190
+      - button "Next"
+      - button "Last"
+- contentinfo
+- status
+- text: Coal Document Display
+```
