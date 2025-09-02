@@ -1,0 +1,295 @@
+# Page snapshot
+
+```yaml
+- banner:
+  - link "Skip to main content":
+    - /url: "#main-content"
+- main:
+  - article:
+    - heading "Coal Permit Files" [level=1]
+    - paragraph: Below are the electronically scanned files of the documents that are available in the Division's Public Information Center (PIC Room). Please note-Not all of the files available in the PIC Room are available electronically. As documents are scanned they will be made available through these file services.
+    - button "Generate Search Result"
+    - tablist "Tabs":
+      - tab "Permit Files" [selected]
+      - tab "General Files"
+      - tab "MRP"
+      - tab "CHIA"
+      - tab "Annual Evals"
+    - tabpanel:
+      - textbox
+      - text: Doc Location
+      - combobox "Doc Location": Select The Document Location
+      - status
+      - text: Doc Regarding
+      - textbox "Doc Regarding"
+      - button "Search"
+      - button "Reset"
+      - text: Permit Files >C0070001 Navigation Mode
+      - grid:
+        - rowgroup:
+          - row "View Permit Doc Year Document Date Doc Location Doc To Doc From Doc Regarding Task Id":
+            - columnheader "View":
+              - text: View
+              - slider "View column width": "75"
+            - columnheader "Permit":
+              - 'button "Sort by: Permit"'
+              - text: "Sorted: None"
+              - slider "Permit column width": "140"
+            - columnheader "Doc Year":
+              - 'button "Sort by: Doc Year"'
+              - text: "Sorted: None"
+              - slider "Doc Year column width": "140"
+            - columnheader "Document Date":
+              - 'button "Sort by: Document Date"'
+              - text: "Sorted: None"
+              - slider "Document Date column width": "140"
+            - columnheader "Doc Location":
+              - 'button "Sort by: Doc Location"'
+              - text: "Sorted: None"
+              - slider "Doc Location column width": "140"
+            - columnheader "Doc To":
+              - 'button "Sort by: Doc To"'
+              - text: "Sorted: None"
+              - slider "Doc To column width": "140"
+            - columnheader "Doc From":
+              - 'button "Sort by: Doc From"'
+              - text: "Sorted: None"
+              - slider "Doc From column width": "140"
+            - columnheader "Doc Regarding":
+              - 'button "Sort by: Doc Regarding"'
+              - text: "Sorted: None"
+              - slider "Doc Regarding column width": "140"
+            - columnheader "Task Id":
+              - 'button "Sort by: Task Id"'
+              - text: "Sorted: None"
+              - slider "Task Id column width": "140"
+        - rowgroup:
+          - row "C0070001 1975 1975-10-24 Incoming Gordon Harmston James Travis Plan submittal":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1975"
+            - gridcell "1975-10-24"
+            - gridcell "Incoming"
+            - gridcell "Gordon Harmston"
+            - gridcell "James Travis"
+            - gridcell "Plan submittal"
+            - gridcell
+          - row "C0070001 1975 1975-12-08 Incoming Cleon Feight James Travis Proposal submittal":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1975"
+            - gridcell "1975-12-08"
+            - gridcell "Incoming"
+            - gridcell "Cleon Feight"
+            - gridcell "James Travis"
+            - gridcell "Proposal submittal"
+            - gridcell
+          - row "C0070001 1975 1975-12-11 Incoming Oil, Gas & Mining Donald Alvord Assessment of geologic impact":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1975"
+            - gridcell "1975-12-11"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "Donald Alvord"
+            - gridcell "Assessment of geologic impact"
+            - gridcell
+          - row "C0070001 1975 1975-07-01 Incoming Oil, Gas & Mining Map":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1975"
+            - gridcell "1975-07-01"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell
+            - gridcell "Map"
+            - gridcell
+          - row "C0070001 1975 1975-12-19 Internal File Ronald Daniels General mine information":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1975"
+            - gridcell "1975-12-19"
+            - gridcell "Internal"
+            - gridcell "File"
+            - gridcell "Ronald Daniels"
+            - gridcell "General mine information"
+            - gridcell
+          - row "C0070001 1975 1975-11-25 Outgoing James Travis Ronald Daniels Proposed Mine":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1975"
+            - gridcell "1975-11-25"
+            - gridcell "Outgoing"
+            - gridcell "James Travis"
+            - gridcell "Ronald Daniels"
+            - gridcell "Proposed Mine"
+            - gridcell
+          - row "C0070001 1976 1976-01-26 Incoming Oil, Gas & Mining John Vreeland Seismic Program":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1976"
+            - gridcell "1976-01-26"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "John Vreeland"
+            - gridcell "Seismic Program"
+            - gridcell
+          - row "C0070001 1976 1976-01-09 Incoming Oil, Gas & Mining BLM Competitive Lease Sale":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1976"
+            - gridcell "1976-01-09"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "BLM"
+            - gridcell "Competitive Lease Sale"
+            - gridcell
+          - row "C0070001 1979 1979-08-14 Incoming Michael Thompson John Nelson Proposed drilling operations":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1979"
+            - gridcell "1979-08-14"
+            - gridcell "Incoming"
+            - gridcell "Michael Thompson"
+            - gridcell "John Nelson"
+            - gridcell "Proposed drilling operations"
+            - gridcell
+          - row "C0070001 1976 1976-03-03 Incoming Ronald Daniels Robert Steele Application for mining permit":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1976"
+            - gridcell "1976-03-03"
+            - gridcell "Incoming"
+            - gridcell "Ronald Daniels"
+            - gridcell "Robert Steele"
+            - gridcell "Application for mining permit"
+            - gridcell
+          - row "C0070001 1976 1976-01-15 Incoming James Carter John Vreeland Shooting seismic line":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1976"
+            - gridcell "1976-01-15"
+            - gridcell "Incoming"
+            - gridcell "James Carter"
+            - gridcell "John Vreeland"
+            - gridcell "Shooting seismic line"
+            - gridcell
+          - row "C0070001 1979 1979-08-08 Incoming Oil, Gas & Mining John Nelson Proposed coal test drilling":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1979"
+            - gridcell "1979-08-08"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "John Nelson"
+            - gridcell "Proposed coal test drilling"
+            - gridcell
+          - row "C0070001 1976 1976-03-16 Incoming Ronald Daniels Robert Steele Proposed Mining & Reclamation Plan":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1976"
+            - gridcell "1976-03-16"
+            - gridcell "Incoming"
+            - gridcell "Ronald Daniels"
+            - gridcell "Robert Steele"
+            - gridcell "Proposed Mining & Reclamation Plan"
+            - gridcell
+          - row "C0070001 1976 1976-01-13 Incoming Oil, Gas & Mining James Carter Seismic survey":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1976"
+            - gridcell "1976-01-13"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "James Carter"
+            - gridcell "Seismic survey"
+            - gridcell
+          - row "C0070001 1976 1976-06-24 Incoming Ronald Daniels Robert Steele Addendum":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1976"
+            - gridcell "1976-06-24"
+            - gridcell "Incoming"
+            - gridcell "Ronald Daniels"
+            - gridcell "Robert Steele"
+            - gridcell "Addendum"
+            - gridcell
+          - row "C0070001 1976 1976-01-01 Incoming Oil, Gas & Mining Southwest Oil & Gas News":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1976"
+            - gridcell "1976-01-01"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell
+            - gridcell "Southwest Oil & Gas News"
+            - gridcell
+          - row "C0070001 1976 1976-07-01 Incoming Oil, Gas & Mining Affidavit of Publication":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1976"
+            - gridcell "1976-07-01"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell
+            - gridcell "Affidavit of Publication"
+            - gridcell
+          - row "C0070001 1976 1976-07-16 Incoming Oil, Gas & Mining Affidavit of Publication":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1976"
+            - gridcell "1976-07-16"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell
+            - gridcell "Affidavit of Publication"
+            - gridcell
+          - row "C0070001 1976 1976-09-22 Incoming Oil, Gas & Mining Guy Cordon Board Mined Lands Reclamation Contract":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1976"
+            - gridcell "1976-09-22"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "Guy Cordon"
+            - gridcell "Board Mined Lands Reclamation Contract"
+            - gridcell
+          - row "C0070001 1976 1976-10-08 Incoming Oil, Gas & Mining Valley Camp Operations and Progress Report":
+            - rowheader:
+              - button
+            - gridcell "C0070001"
+            - gridcell "1976"
+            - gridcell "1976-10-08"
+            - gridcell "Incoming"
+            - gridcell "Oil, Gas & Mining"
+            - gridcell "Valley Camp"
+            - gridcell "Operations and Progress Report"
+            - gridcell
+      - button "First" [disabled]
+      - button "Previous" [disabled]
+      - text: Showing 1 of 190
+      - button "Next"
+      - button "Last"
+- contentinfo
+- status
+- text: Coal Document Display
+```
