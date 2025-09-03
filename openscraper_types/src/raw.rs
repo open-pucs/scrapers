@@ -1,16 +1,30 @@
-use std::collections::HashMap;
-
+#![warn(unused_extern_crates)]
 use chrono::{DateTime, NaiveDate, Utc};
-use mycorrhiza_common::{file_extension::FileExtension, hash::Blake2bHash};
 use non_empty_string::NonEmptyString;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+use crate::jurisdictions::JurisdictionInfo;
+
+use mycorrhiza_common::{file_extension::FileExtension, hash::Blake2bHash};
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct ProcessedGenericAttachment {
+pub struct RawDocketWithJurisdiction {
+    pub docket: RawGenericDocket,
+    pub jurisdiction: JurisdictionInfo,
+}
+
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+pub struct RawGenericParty {
     pub name: String,
-    pub openscrapers_attachment_id: u64,
-    pub index_in_filling: u64,
+    pub western_human_first_name: String,
+    pub western_human_last_name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+pub struct RawGenericAttachment {
+    pub name: String,
     pub document_extension: FileExtension,
     #[serde(default)]
     pub attachment_govid: String,
@@ -27,47 +41,37 @@ pub struct ProcessedGenericAttachment {
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct OrgName {
-    pub name: NonEmptyString,
-    pub suffix: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct ProcessedGenericFiling {
+pub struct RawGenericFiling {
     pub filed_date: Option<NaiveDate>,
-    pub openscrapers_filling_id: u64,
-    pub index_in_docket: u64,
     #[serde(default)]
     pub filling_govid: String,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
-    pub organization_authors: Vec<OrgName>,
+    pub organization_authors: Vec<String>,
     #[serde(default)]
-    pub individual_authors: Vec<OrgName>,
+    pub individual_authors: Vec<String>,
+    #[serde(default)]
+    pub organization_authors_blob: String,
+    #[serde(default)]
+    pub individual_authors_blob: String,
     #[serde(default)]
     pub filing_type: String,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
-    pub attachments: HashMap<u64, ProcessedGenericAttachment>,
+    pub attachments: Vec<RawGenericAttachment>,
     #[serde(default)]
     pub extra_metadata: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct ProcessedGenericParty {
-    name: NonEmptyString,
-    is_corperate_entity: bool,
-    is_human: bool,
-}
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
-pub struct ProcessedGenericDocket {
+pub struct RawGenericDocket {
     pub case_govid: NonEmptyString,
     // This shouldnt be an optional field in the final submission, since it can be calculated from
     // the minimum of the fillings, and the scraper should calculate it.
     #[serde(default)]
-    pub opened_date: NaiveDate,
+    pub opened_date: Option<NaiveDate>,
     #[serde(default)]
     pub case_name: String,
     #[serde(default)]
@@ -81,22 +85,17 @@ pub struct ProcessedGenericDocket {
     #[serde(default)]
     pub industry: String,
     #[serde(default)]
-    pub petitioner_list: Vec<OrgName>,
-    // Depricated field, use petitioner_list instead
-    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub petitioner: String,
     #[serde(default)]
     pub hearing_officer: String,
     #[serde(default)]
     pub closed_date: Option<NaiveDate>,
     #[serde(default)]
-    pub filings: HashMap<u64, ProcessedGenericFiling>,
+    pub filings: Vec<RawGenericFiling>,
     #[serde(default)]
-    pub case_parties: Vec<ProcessedGenericParty>,
+    pub case_parties: Vec<RawGenericParty>,
     #[serde(default)]
     pub extra_metadata: HashMap<String, serde_json::Value>,
     #[serde(default = "Utc::now")]
     pub indexed_at: DateTime<Utc>,
-    #[serde(default = "Utc::now")]
-    pub processed_at: DateTime<Utc>,
 }

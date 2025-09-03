@@ -4,10 +4,14 @@ use axum::{
     http::HeaderValue,
     response::{IntoResponse, Json},
 };
+use dokito_types::{raw::RawGenericDocket, s3_stuff::DocketAddress};
 use hyper::{StatusCode, body::Bytes, header};
 use mycorrhiza_common::{
     hash::Blake2bHash,
-    s3_generic::fetchers_and_getters::{S3Addr, S3DirectoryAddr},
+    s3_generic::{
+        cannonical_location::download_openscrapers_object,
+        fetchers_and_getters::{S3Addr, S3DirectoryAddr},
+    },
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -16,17 +20,12 @@ use std::str::FromStr;
 use tracing::{error, info};
 
 use crate::{
-    s3_stuff::{
-        DocketAddress, delete_openscrapers_s3_object, download_openscrapers_object,
-        get_jurisdiction_prefix, list_processed_cases_for_jurisdiction, upload_object,
-    },
+    s3_stuff::{get_jurisdiction_prefix, list_processed_cases_for_jurisdiction},
     types::{
         attachments::RawAttachment,
-        data_processing_traits::Revalidate,
         env_vars::OPENSCRAPERS_S3_OBJECT_BUCKET,
         jurisdictions::JurisdictionInfo,
         pagination::{PaginationData, make_paginated_subslice},
-        processed::ProcessedGenericDocket,
     },
 };
 
@@ -112,13 +111,13 @@ pub struct CasePath {
     case_name: String,
 }
 
-pub async fn handle_processed_case_filing_from_s3(
+pub async fn handle_raw_case_filing_from_s3(
     Path(CasePath {
         state,
         jurisdiction_name,
         case_name,
     }): Path<CasePath>,
-) -> Result<Json<ProcessedGenericDocket>, String> {
+) -> Result<Json<RawGenericDocket>, String> {
     info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Request received for case filing");
     let s3_client = crate::s3_stuff::make_s3_client().await;
     let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
@@ -126,15 +125,10 @@ pub async fn handle_processed_case_filing_from_s3(
         jurisdiction: jurisdiction_info,
         docket_govid: case_name,
     };
-    let result =
-        download_openscrapers_object::<ProcessedGenericDocket>(&s3_client, &addr_info).await;
+    let result = download_openscrapers_object::<RawGenericDocket>(&s3_client, &addr_info).await;
     match result {
-        Ok(mut case) => {
+        Ok(case) => {
             info!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.docket_govid, "Successfully fetched case filing");
-            let did_change_with_validation = case.revalidate().await;
-            if did_change_with_validation.did_change() {
-                let _ = upload_object(&s3_client, &addr_info, &case).await;
-            }
             Ok(Json(case))
         }
         Err(e) => {
@@ -144,34 +138,34 @@ pub async fn handle_processed_case_filing_from_s3(
     }
 }
 
-pub async fn delete_case_filing_from_s3(
-    Path(CasePath {
-        state,
-        jurisdiction_name,
-        case_name,
-    }): Path<CasePath>,
-) -> impl IntoApiResponse {
-    info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Request received to delete case filing");
-    let s3_client = crate::s3_stuff::make_s3_client().await;
-    let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
-
-    let addr_info = DocketAddress {
-        jurisdiction: jurisdiction_info,
-        docket_govid: case_name,
-    };
-    let result =
-        delete_openscrapers_s3_object::<ProcessedGenericDocket>(&s3_client, &addr_info).await;
-    match result {
-        Ok(_) => {
-            info!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.docket_govid, "Successfully deleted case filing");
-            StatusCode::NO_CONTENT.into_response()
-        }
-        Err(e) => {
-            error!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.docket_govid, error = %e, "Error deleting case filing");
-            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
-        }
-    }
-}
+// pub async fn delete_case_filing_from_s3(
+//     Path(CasePath {
+//         state,
+//         jurisdiction_name,
+//         case_name,
+//     }): Path<CasePath>,
+// ) -> impl IntoApiResponse {
+//     info!(state = %state, jurisdiction = %jurisdiction_name, case = %case_name, "Request received to delete case filing");
+//     let s3_client = crate::s3_stuff::make_s3_client().await;
+//     let jurisdiction_info = JurisdictionInfo::new_usa(&jurisdiction_name, &state);
+//
+//     let addr_info = DocketAddress {
+//         jurisdiction: jurisdiction_info,
+//         docket_govid: case_name,
+//     };
+//     let result =
+//         delete_openscrapers_s3_object::<ProcessedGenericDocket>(&s3_client, &addr_info).await;
+//     match result {
+//         Ok(_) => {
+//             info!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.docket_govid, "Successfully deleted case filing");
+//             StatusCode::NO_CONTENT.into_response()
+//         }
+//         Err(e) => {
+//             error!(state = %state, jurisdiction = %jurisdiction_name, case = %addr_info.docket_govid, error = %e, "Error deleting case filing");
+//             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+//         }
+//     }
+// }
 
 pub async fn recursive_delete_all_jurisdiction_data(
     Path(JurisdictionPath {
@@ -263,7 +257,8 @@ pub async fn handle_attachment_data_from_s3(
             return (axum::http::StatusCode::BAD_REQUEST, e.to_string()).into_response();
         }
     };
-    let result = download_openscrapers_object::<RawAttachment>(&s3_client, &hash).await;
+    let result: Result<RawAttachment, _> =
+        download_openscrapers_object::<RawAttachment>(&s3_client, &hash).await;
     match result {
         Ok(attachment) => {
             info!(hash = %blake2b_hash, "Successfully fetched attachment data");
@@ -283,67 +278,67 @@ pub fn handle_attachment_data_from_s3_docs(op: TransformOperation) -> TransformO
         .response_with::<500, String, _>(|res| res.description("Error fetching attachment data."))
 }
 
-pub async fn handle_attachment_file_from_s3(
-    Path(AttachmentPath { blake2b_hash }): Path<AttachmentPath>,
-) -> impl IntoApiResponse {
-    info!(hash = %blake2b_hash, "Request received for attachment file");
-    let s3_client = crate::s3_stuff::make_s3_client().await;
-    let hash = match Blake2bHash::from_str(&blake2b_hash) {
-        Ok(hash) => hash,
-        Err(e) => {
-            error!(hash = %blake2b_hash, error = %e, "Invalid hash format for attachment file request");
-            return (axum::http::StatusCode::BAD_REQUEST, e.to_string()).into_response();
-        }
-    };
-    let result =
-        crate::s3_stuff::fetch_attachment_file_from_s3_with_filename(&s3_client, hash).await;
-    match result {
-        Ok((filename, contents)) => {
-            // Content‑Type – generic binary stream
-            let ct = HeaderValue::from_static("application/octet-stream");
-
-            // Content‑Disposition – attachment; filename="<sanitized>"
-            let escaped_name = urlencoding::encode(&filename);
-            let cd = format!(
-                "attachment; filename=\"{}\"; filename*=UTF-8''{}",
-                // Legacy (ASCII‑only) fallback – we keep the original name but
-                // escape any double‑quotes or backslashes.
-                filename.replace('\\', "\\\\").replace('\"', "\\\""),
-                escaped_name
-            );
-            let cd = HeaderValue::from_str(&cd).expect("valid header value");
-
-            // Optional: Content‑Length – helps the client know the exact size
-            let cl = HeaderValue::from_str(&contents.len().to_string())
-                .expect("content length is a valid integer");
-
-            // ---------------------------------------------------------------
-            //   3b️⃣ Return the tuple that Axum knows how to turn into a response
-            // ---------------------------------------------------------------
-            (
-                StatusCode::OK,
-                // An array of header‑name / header‑value pairs.
-                // You can add more if you need (Cache‑Control, ETag, …)
-                [
-                    (header::CONTENT_TYPE, ct),
-                    (header::CONTENT_DISPOSITION, cd),
-                    (header::CONTENT_LENGTH, cl),
-                ],
-                // The body – we turn the Vec<u8> (or whatever `contents` is) into Bytes.
-                Bytes::from(contents),
-            )
-                .into_response()
-        }
-        Err(e) => {
-            error!(hash = %blake2b_hash,error = %e, "Error reading attachment file from disk");
-            (axum::http::StatusCode::NOT_FOUND, e.to_string()).into_response()
-        }
-    }
-}
-
-pub fn handle_attachment_file_from_s3_docs(op: TransformOperation) -> TransformOperation {
-    op.description("Fetch an attachment file from S3.")
-        .response::<200, Bytes>()
-        .response_with::<400, String, _>(|res| res.description("Invalid hash format."))
-        .response_with::<500, String, _>(|res| res.description("Error fetching attachment file."))
-}
+// pub async fn handle_attachment_file_from_s3(
+//     Path(AttachmentPath { blake2b_hash }): Path<AttachmentPath>,
+// ) -> impl IntoApiResponse {
+//     info!(hash = %blake2b_hash, "Request received for attachment file");
+//     let s3_client = crate::s3_stuff::make_s3_client().await;
+//     let hash = match Blake2bHash::from_str(&blake2b_hash) {
+//         Ok(hash) => hash,
+//         Err(e) => {
+//             error!(hash = %blake2b_hash, error = %e, "Invalid hash format for attachment file request");
+//             return (axum::http::StatusCode::BAD_REQUEST, e.to_string()).into_response();
+//         }
+//     };
+//     let result =
+//         crate::s3_stuff::fetch_attachment_file_from_s3_with_filename(&s3_client, hash).await;
+//     match result {
+//         Ok((filename, contents)) => {
+//             // Content‑Type – generic binary stream
+//             let ct = HeaderValue::from_static("application/octet-stream");
+//
+//             // Content‑Disposition – attachment; filename="<sanitized>"
+//             let escaped_name = urlencoding::encode(&filename);
+//             let cd = format!(
+//                 "attachment; filename=\"{}\"; filename*=UTF-8''{}",
+//                 // Legacy (ASCII‑only) fallback – we keep the original name but
+//                 // escape any double‑quotes or backslashes.
+//                 filename.replace('\\', "\\\\").replace('\"', "\\\""),
+//                 escaped_name
+//             );
+//             let cd = HeaderValue::from_str(&cd).expect("valid header value");
+//
+//             // Optional: Content‑Length – helps the client know the exact size
+//             let cl = HeaderValue::from_str(&contents.len().to_string())
+//                 .expect("content length is a valid integer");
+//
+//             // ---------------------------------------------------------------
+//             //   3b️⃣ Return the tuple that Axum knows how to turn into a response
+//             // ---------------------------------------------------------------
+//             (
+//                 StatusCode::OK,
+//                 // An array of header‑name / header‑value pairs.
+//                 // You can add more if you need (Cache‑Control, ETag, …)
+//                 [
+//                     (header::CONTENT_TYPE, ct),
+//                     (header::CONTENT_DISPOSITION, cd),
+//                     (header::CONTENT_LENGTH, cl),
+//                 ],
+//                 // The body – we turn the Vec<u8> (or whatever `contents` is) into Bytes.
+//                 Bytes::from(contents),
+//             )
+//                 .into_response()
+//         }
+//         Err(e) => {
+//             error!(hash = %blake2b_hash,error = %e, "Error reading attachment file from disk");
+//             (axum::http::StatusCode::NOT_FOUND, e.to_string()).into_response()
+//         }
+//     }
+// }
+//
+// pub fn handle_attachment_file_from_s3_docs(op: TransformOperation) -> TransformOperation {
+//     op.description("Fetch an attachment file from S3.")
+//         .response::<200, Bytes>()
+//         .response_with::<400, String, _>(|res| res.description("Invalid hash format."))
+//         .response_with::<500, String, _>(|res| res.description("Error fetching attachment file."))
+// }

@@ -8,8 +8,6 @@ use tracing::{debug, info};
 use crate::types::attachments::RawAttachment;
 use crate::types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET};
 use crate::types::jurisdictions::JurisdictionInfo;
-use crate::types::processed::ProcessedGenericDocket;
-use crate::types::raw::RawGenericDocket;
 use aws_sdk_s3::Client as S3Client;
 use mycorrhiza_common::hash::Blake2bHash;
 
@@ -17,88 +15,6 @@ pub fn get_raw_attach_file_key(hash: Blake2bHash) -> String {
     let key = format!("raw/file/{hash}");
     debug!(%hash, "Generated raw attachment file key: {}", key);
     key
-}
-
-impl CannonicalS3ObjectLocation for RawAttachment {
-    type AddressInfo = Blake2bHash;
-    fn generate_object_key(hash: &Self::AddressInfo) -> String {
-        format!("raw/metadata/{hash}.json")
-    }
-}
-
-pub struct DocketAddress {
-    pub docket_govid: String,
-    pub jurisdiction: JurisdictionInfo,
-}
-
-impl CannonicalS3ObjectLocation for RawGenericDocket {
-    type AddressInfo = DocketAddress;
-
-    fn generate_object_key(addr: &Self::AddressInfo) -> String {
-        let country = &*addr.jurisdiction.country;
-        let state = &*addr.jurisdiction.state;
-        let jurisdiction = &*addr.jurisdiction.jurisdiction;
-        let case_name = &*addr.docket_govid;
-        format!("objects_raw/{country}/{state}/{jurisdiction}/{case_name}")
-    }
-}
-impl CannonicalS3ObjectLocation for ProcessedGenericDocket {
-    type AddressInfo = DocketAddress;
-
-    fn generate_object_key(addr: &Self::AddressInfo) -> String {
-        let country = &*addr.jurisdiction.country;
-        let state = &*addr.jurisdiction.state;
-        let jurisdiction = &*addr.jurisdiction.jurisdiction;
-        let case_name = &*addr.docket_govid;
-        format!("objects/{country}/{state}/{jurisdiction}/{case_name}")
-    }
-}
-
-pub trait CannonicalS3ObjectLocation: serde::Serialize + serde::de::DeserializeOwned {
-    type AddressInfo;
-    fn generate_object_key(addr: &Self::AddressInfo) -> String;
-}
-
-pub fn get_openscrapers_json_key<T: CannonicalS3ObjectLocation>(addr: &T::AddressInfo) -> String {
-    T::generate_object_key(addr) + ".json"
-}
-
-pub fn get_s3_json_uri<T: CannonicalS3ObjectLocation>(addr: &T::AddressInfo) -> String {
-    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
-    let key = get_openscrapers_json_key::<T>(addr);
-    let credentials = &*OPENSCRAPERS_S3;
-    S3LocationWithCredentials::from_key_bucket_and_credentials(&key, bucket, credentials)
-        .to_string()
-}
-
-pub async fn download_openscrapers_object<T: CannonicalS3ObjectLocation>(
-    s3_client: &S3Client,
-    addr: &T::AddressInfo,
-) -> anyhow::Result<T> {
-    let key = get_openscrapers_json_key::<T>(addr);
-    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
-    S3Addr::new(s3_client, bucket, &key).download_json().await
-}
-
-pub async fn upload_object<T: CannonicalS3ObjectLocation>(
-    s3_client: &S3Client,
-    addr: &T::AddressInfo,
-    object: &T,
-) -> anyhow::Result<()> {
-    let key = get_openscrapers_json_key::<T>(addr);
-    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
-    S3Addr::new(s3_client, bucket, &key)
-        .upload_json(&object)
-        .await
-}
-
-pub async fn delete_openscrapers_s3_object<T: CannonicalS3ObjectLocation>(
-    s3_client: &S3Client,
-    addr: &T::AddressInfo,
-) -> anyhow::Result<()> {
-    let key = get_openscrapers_json_key::<T>(addr);
-    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
-    S3Addr::new(s3_client, bucket, &key).delete_file().await
 }
 
 pub fn generate_s3_object_uri_from_key(key: &str) -> String {
@@ -126,61 +42,12 @@ pub async fn fetch_attachment_file_from_s3(
         .await
 }
 
-pub async fn fetch_attachment_file_from_s3_with_filename(
-    s3_client: &S3Client,
-    hash: Blake2bHash,
-) -> anyhow::Result<(String, Vec<u8>)> {
-    info!(%hash, "Fetching attachment file from S3");
-    let key = get_raw_attach_file_key(hash);
-    let location = S3Addr::new(s3_client, &OPENSCRAPERS_S3_OBJECT_BUCKET, &key);
-    let bytes_future = location.download_bytes();
-    let metadata_future = download_openscrapers_object::<RawAttachment>(s3_client, &hash);
-    let (Ok(bytes), metadata) = join!(bytes_future, metadata_future) else {
-        return Err(anyhow!("fetching bytes failed."));
-    };
-
-    let filename = metadata
-        .ok()
-        .map(|v| v.name + "." + &v.extension.to_string())
-        .unwrap_or_else(|| non_empty_string!("unknown_filename.pdf"));
-    Ok((filename.to_string(), bytes))
-}
-
 pub fn get_jurisdiction_prefix(jurisdiction: &JurisdictionInfo) -> String {
     let country = &*jurisdiction.country;
     let state = &*jurisdiction.state;
     let jurisdiction_name = &*jurisdiction.jurisdiction;
     let key = format!("objects/{country}/{state}/{jurisdiction_name}");
     key
-}
-
-pub async fn does_openscrapers_attachment_exist(s3_client: &S3Client, hash: Blake2bHash) -> bool {
-    info!(%hash, "Checking if attachment exists in S3");
-    let obj_key = get_openscrapers_json_key::<RawAttachment>(&hash);
-    let file_key = get_raw_attach_file_key(hash);
-    let bucket = &**OPENSCRAPERS_S3_OBJECT_BUCKET;
-    debug!(
-        "Checking for attachment with object key: {} and file key: {}",
-        obj_key, file_key
-    );
-
-    let obj_exists = s3_client
-        .head_object()
-        .bucket(bucket)
-        .key(obj_key)
-        .send()
-        .await;
-
-    let file_exists = s3_client
-        .head_object()
-        .bucket(bucket)
-        .key(file_key)
-        .send()
-        .await;
-
-    let result = obj_exists.is_ok() && file_exists.is_ok();
-    debug!("Attachment exists: {}", result);
-    result
 }
 
 pub async fn list_processed_cases_for_jurisdiction(

@@ -10,7 +10,7 @@ pub fn create_public_router() -> ApiRouter {
     ApiRouter::new()
         .api_route(
             "/cases/{state}/{jurisdiction_name}/{case_name}",
-            get(s3_routes::handle_processed_case_filing_from_s3),
+            get(s3_routes::handle_raw_case_filing_from_s3),
         )
         .api_route(
             "/caselist/{state}/{jurisdiction_name}/all",
@@ -28,13 +28,6 @@ pub fn create_public_router() -> ApiRouter {
             get_with(
                 s3_routes::handle_attachment_data_from_s3,
                 s3_routes::handle_attachment_data_from_s3_docs,
-            ),
-        )
-        .api_route(
-            "/raw_attachments/{blake2b_hash}/raw",
-            get_with(
-                s3_routes::handle_attachment_file_from_s3,
-                s3_routes::handle_attachment_file_from_s3_docs,
             ),
         )
         .api_route(

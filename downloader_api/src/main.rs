@@ -21,7 +21,6 @@ use std::{
 };
 
 mod case_worker;
-mod processing;
 mod s3_stuff;
 mod server;
 mod types;
