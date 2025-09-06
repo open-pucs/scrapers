@@ -1,11 +1,10 @@
 use aide::{self, axum::IntoApiResponse, transform::TransformOperation};
 use axum::{
     extract::{Path, Query},
-    http::HeaderValue,
     response::{IntoResponse, Json},
 };
 use dokito_types::{raw::RawGenericDocket, s3_stuff::DocketAddress};
-use hyper::{StatusCode, body::Bytes, header};
+use hyper::{StatusCode, body::Bytes};
 use mycorrhiza_common::{
     hash::Blake2bHash,
     s3_generic::{

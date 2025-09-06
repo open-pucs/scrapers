@@ -1,5 +1,5 @@
 [package]
-name = "dokito-types"
+name = "openscraper_types"
 version = "0.1.0"
 edition = "2024"
 

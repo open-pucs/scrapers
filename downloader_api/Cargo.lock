@@ -1065,7 +1065,7 @@ dependencies = [
  "hostname",
  "hyper 1.7.0",
  "init-tracing-opentelemetry",
- "mycorrhiza_common 0.1.0",
+ "mycorrhiza_common",
  "non-empty-string",
  "opentelemetry",
  "opentelemetry-otlp",
@@ -2135,48 +2135,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mycorrhiza_common"
-version = "0.1.0"
-source = "git+https://github.com/mycorrhiza-inc/common-rs.git#cf6e9e8543a26f74c071342f0301413337d14512"
-dependencies = [
- "aide",
- "anyhow",
- "async-trait",
- "aws-config",
- "aws-sdk-s3",
- "axum",
- "axum-tracing-opentelemetry",
- "base64 0.22.1",
- "blake2",
- "chrono",
- "futures-util",
- "hex",
- "hostname",
- "hyper 1.7.0",
- "init-tracing-opentelemetry",
- "opentelemetry",
- "opentelemetry-otlp",
- "opentelemetry-stdout",
- "opentelemetry_sdk",
- "rand",
- "rand_core 0.9.3",
- "reqwest",
- "rkyv",
- "schemars 0.9.0",
- "serde",
- "serde_json",
- "serde_with",
- "thiserror",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-opentelemetry",
- "tracing-subscriber",
- "url",
- "urlencoding",
-]
-
-[[package]]
 name = "native-tls"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2281,7 +2239,7 @@ dependencies = [
  "hostname",
  "hyper 1.7.0",
  "init-tracing-opentelemetry",
- "mycorrhiza_common 0.1.0 (git+https://github.com/mycorrhiza-inc/common-rs.git)",
+ "mycorrhiza_common",
  "non-empty-string",
  "opentelemetry",
  "opentelemetry-otlp",

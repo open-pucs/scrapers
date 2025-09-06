@@ -1,6 +1,6 @@
 use aide::axum::{
     ApiRouter,
-    routing::{delete, post, post_with},
+    routing::{delete, post_with},
 };
 
 use crate::server::queue_routes;

@@ -1,5 +1,10 @@
 use chrono::{DateTime, Utc};
-use mycorrhiza_common::{file_extension::FileExtension, hash::Blake2bHash};
+use dokito_types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET};
+use mycorrhiza_common::{
+    file_extension::FileExtension,
+    hash::Blake2bHash,
+    s3_generic::{S3Credentials, cannonical_location::CannonicalS3ObjectLocation},
+};
 use non_empty_string::NonEmptyString;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -37,4 +42,18 @@ pub struct RawAttachment {
     pub extra_metadata: HashMap<String, String>,
     #[serde(default)]
     pub file_size_bytes: u64,
+}
+
+impl CannonicalS3ObjectLocation for RawAttachment {
+    type AddressInfo = Blake2bHash;
+
+    fn generate_object_key(addr: &Self::AddressInfo) -> String {
+        format!("raw/metadata/{addr}")
+    }
+    fn generate_bucket(_: &Self::AddressInfo) -> &'static str {
+        &OPENSCRAPERS_S3_OBJECT_BUCKET
+    }
+    fn get_credentials(_: &Self::AddressInfo) -> &'static S3Credentials {
+        &OPENSCRAPERS_S3
+    }
 }

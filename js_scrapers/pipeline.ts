@@ -1,16 +1,21 @@
-import * as path from 'path';
-import { GenericCase, CaseWithJurisdiction } from './types';
+import * as path from "path";
+import { GenericCase, CaseWithJurisdiction } from "./types";
 
-const OPENSCRAPERS_INTERNAL_API_URL = process.env.OPENSCRAPERS_INTERNAL_API_URL || "http://localhost:33399";
+// Rust API used for the downloader.
+const OPENSCRAPERS_INTERNAL_API_URL =
+  process.env.OPENSCRAPERS_INTERNAL_API_URL || "http://localhost:33399";
 
 /**
  * Defines the contract for a scraper.
  */
 export interface Scraper {
-    state: string;
-    jurisdiction_name: string;
-    getCaseList: () => Promise<Partial<GenericCase>[]>;
-    getCaseDetails: (caseData: Partial<GenericCase>) => Promise<GenericCase>;
+  state: string;
+  jurisdiction_name: string;
+  getCaseList: () => Promise<Partial<GenericCase>[]>;
+  getCaseDetails: (
+    caseData: Partial<GenericCase>,
+    savepath_generator: (input: string) => string,
+  ) => Promise<GenericCase>;
 }
 
 /**
@@ -19,18 +24,18 @@ export interface Scraper {
  * @param data The JSON data to save.
  */
 async function saveJsonToS3(key: string, data: any) {
-    const url = `${OPENSCRAPERS_INTERNAL_API_URL}/admin/write_s3_json`;
-    console.log(`Saving to S3 at key: ${key}`);
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, contents: data }),
-    });
+  const url = `${OPENSCRAPERS_INTERNAL_API_URL}/admin/write_s3_json`;
+  console.log(`Saving to S3 at key: ${key}`);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key, contents: data }),
+  });
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to save to S3: ${response.status} ${errorText}`);
-    }
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to save to S3: ${response.status} ${errorText}`);
+  }
 }
 
 /**
@@ -38,70 +43,86 @@ async function saveJsonToS3(key: string, data: any) {
  * @param scraper The scraper to run.
  */
 export async function runScraper(scraper: Scraper) {
-    console.log(`Running scraper for ${scraper.jurisdiction_name}`);
+  console.log(`Running scraper for ${scraper.jurisdiction_name}`);
 
-    const timeNow = new Date().toISOString();
-    const basePath = path.join('intermediates', scraper.state, scraper.jurisdiction_name, timeNow);
-    console.log(`Base path for intermediate files in S3: ${basePath}`);
+  const timeNow = new Date().toISOString();
+  const basePath = path.join(
+    "intermediates",
+    scraper.state,
+    scraper.jurisdiction_name,
+  );
+  const makeS3JsonSavePath = (path_loc: string) =>
+    path.join(basePath, path_loc, `${timeNow}.json`);
+  console.log(`Base path for intermediate files in S3: ${basePath}`);
 
-    // 1. Get the list of all cases from the scraper
-    const allCases = await scraper.getCaseList();
-    console.log(`Found ${allCases.length} total cases from scraper.`);
-    await saveJsonToS3(path.join(basePath, 'caselist-all.json'), allCases);
+  // 1. Get the list of all cases from the scraper
+  const allCases = await scraper.getCaseList();
+  console.log(`Found ${allCases.length} total cases from scraper.`);
+  await saveJsonToS3(makeS3JsonSavePath("caselist_all"), allCases);
 
-    // 2. Get the list of cases that need to be processed
-    const diffUrl = `${OPENSCRAPERS_INTERNAL_API_URL}/public/caselist/${scraper.state}/${scraper.jurisdiction_name}/casedata_differential`;
-    const diffResponse = await fetch(diffUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(allCases),
-    });
+  // 2. Get the list of cases that need to be processed
+  const diffUrl = `${OPENSCRAPERS_INTERNAL_API_URL}/public/caselist/${scraper.state}/${scraper.jurisdiction_name}/casedata_differential`;
+  const diffResponse = await fetch(diffUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(allCases),
+  });
 
-    if (!diffResponse.ok) {
-        const errorText = await diffResponse.text();
-        throw new Error(`Failed to get case differential: ${diffResponse.status} ${errorText}`);
+  if (!diffResponse.ok) {
+    const errorText = await diffResponse.text();
+    throw new Error(
+      `Failed to get case differential: ${diffResponse.status} ${errorText}`,
+    );
+  }
+
+  const diffResult = await diffResponse.json();
+  const casesToProcess: Partial<GenericCase>[] = diffResult.to_process || [];
+  console.log(
+    `Found ${casesToProcess.length} cases to process after differential check.`,
+  );
+  await saveJsonToS3(makeS3JsonSavePath("caselist_differential"), diffResult);
+
+  // 3. Process each case and submit it to the API
+  for (const basicCaseData of casesToProcess) {
+    try {
+      console.log(`Fetching details for case: ${basicCaseData.case_govid}`);
+      const fullCaseData = await scraper.getCaseDetails(
+        basicCaseData,
+        makeS3JsonSavePath,
+      );
+
+      const payload: CaseWithJurisdiction = {
+        case: fullCaseData,
+        jurisdiction: {
+          country: "usa",
+          state: scraper.state,
+          jurisdiction: scraper.jurisdiction_name,
+        },
+      };
+
+      // Submit the final object to the API
+      const submitUrl = `${OPENSCRAPERS_INTERNAL_API_URL}/admin/cases/submit`;
+      const submitResponse = await fetch(submitUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!submitResponse.ok) {
+        const errorText = await submitResponse.text();
+        throw new Error(
+          `Failed to submit case: ${submitResponse.status} ${errorText}`,
+        );
+      }
+
+      console.log(`Successfully submitted case: ${fullCaseData.case_govid}`);
+    } catch (error) {
+      console.error(
+        `Error processing case: ${basicCaseData.case_govid}`,
+        error,
+      );
     }
+  }
 
-    const diffResult = await diffResponse.json();
-    const casesToProcess: Partial<GenericCase>[] = diffResult.to_process || [];
-    console.log(`Found ${casesToProcess.length} cases to process after differential check.`);
-    await saveJsonToS3(path.join(basePath, 'caselist-differential.json'), diffResult);
-
-
-    // 3. Process each case and submit it to the API
-    for (const basicCaseData of casesToProcess) {
-        try {
-            console.log(`Fetching details for case: ${basicCaseData.case_govid}`);
-            const fullCaseData = await scraper.getCaseDetails(basicCaseData);
-
-            const payload: CaseWithJurisdiction = {
-                case: fullCaseData,
-                jurisdiction: {
-                    country: 'usa',
-                    state: scraper.state,
-                    jurisdiction: scraper.jurisdiction_name,
-                },
-            };
-
-            // Submit the final object to the API
-            const submitUrl = `${OPENSCRAPERS_INTERNAL_API_URL}/admin/cases/submit`;
-            const submitResponse = await fetch(submitUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-
-            if (!submitResponse.ok) {
-                const errorText = await submitResponse.text();
-                throw new Error(`Failed to submit case: ${submitResponse.status} ${errorText}`);
-            }
-
-            console.log(`Successfully submitted case: ${fullCaseData.case_govid}`);
-
-        } catch (error) {
-            console.error(`Error processing case: ${basicCaseData.case_govid}`, error);
-        }
-    }
-
-    console.log('Scraper run finished.');
+  console.log("Scraper run finished.");
 }

@@ -1,8 +1,5 @@
-use anyhow::anyhow;
-use futures_util::join;
 use mycorrhiza_common::s3_generic::fetchers_and_getters::{S3Addr, S3DirectoryAddr};
 use mycorrhiza_common::s3_generic::s3_uri::S3LocationWithCredentials;
-use non_empty_string::non_empty_string;
 use tracing::{debug, info};
 
 use crate::types::attachments::RawAttachment;

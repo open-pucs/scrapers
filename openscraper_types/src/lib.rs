@@ -1,4 +1,5 @@
 #![warn(unused_extern_crates)]
+pub mod deduplication;
 pub mod env_vars;
 pub mod raw;
 pub mod s3_stuff;
@@ -35,3 +36,4 @@ pub mod jurisdictions {
         }
     }
 }
+

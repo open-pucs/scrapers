@@ -1,6 +1,7 @@
 use crate::s3_stuff::make_s3_client;
 use crate::types::raw::RawDocketWithJurisdiction;
 use async_trait::async_trait;
+use dokito_types::raw::RawGenericDocket;
 use dokito_types::s3_stuff::DocketAddress;
 use mycorrhiza_common::s3_generic::cannonical_location::upload_object;
 use mycorrhiza_common::tasks::ExecuteUserTask;
@@ -18,9 +19,9 @@ impl ExecuteUserTask for ProcessCaseWithoutDownload {
         } = self.0;
         let docket_address = DocketAddress {
             docket_govid: docket.case_govid.clone().to_string(),
-            jurisdiction: jurisdiction,
+            jurisdiction,
         };
-        let res = upload_object(&s3_client, &docket_address, &docket).await;
+        let res = upload_object::<RawGenericDocket>(&s3_client, &docket_address, &docket).await;
 
         match res {
             Ok(()) => Ok("Task Completed Successfully".into()),

@@ -1,4 +1,4 @@
-use aide::axum::{ApiRouter, routing::delete};
+use aide::axum::ApiRouter;
 use mycorrhiza_common::misc::is_env_var_true;
 use std::sync::LazyLock;
 use tracing::info;
