@@ -5,5 +5,5 @@ pub mod pagination;
 pub mod raw;
 
 pub mod jurisdictions {
-    pub use dokito_types::jurisdictions::*;
+    pub use openscraper_types::jurisdictions::*;
 }

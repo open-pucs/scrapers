@@ -1,6 +1,6 @@
 use aide::{self, axum::IntoApiResponse, transform::TransformOperation};
 use axum::response::{IntoResponse, Json};
-use dokito_types::raw::RawDocketWithJurisdiction;
+use openscraper_types::raw::RawDocketWithJurisdiction;
 use tracing::info;
 
 use crate::case_worker::ProcessCaseWithoutDownload;

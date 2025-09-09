@@ -1,2 +1,2 @@
 // Re-export types from the openscraper_types crate
-pub use dokito_types::raw::*;
+pub use openscraper_types::raw::*;

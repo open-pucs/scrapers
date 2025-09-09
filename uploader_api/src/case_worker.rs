@@ -1,8 +1,8 @@
 use crate::s3_stuff::make_s3_client;
 use crate::types::raw::RawDocketWithJurisdiction;
 use async_trait::async_trait;
-use dokito_types::raw::RawGenericDocket;
-use dokito_types::s3_stuff::DocketAddress;
+use openscraper_types::raw::RawGenericDocket;
+use openscraper_types::s3_stuff::DocketAddress;
 use mycorrhiza_common::s3_generic::cannonical_location::upload_object;
 use mycorrhiza_common::tasks::ExecuteUserTask;
 

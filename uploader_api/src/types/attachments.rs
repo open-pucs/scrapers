@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use dokito_types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET};
+use openscraper_types::env_vars::{OPENSCRAPERS_S3, OPENSCRAPERS_S3_OBJECT_BUCKET};
 use mycorrhiza_common::{
     file_extension::FileExtension,
     hash::Blake2bHash,

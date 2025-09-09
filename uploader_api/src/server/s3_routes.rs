@@ -3,7 +3,7 @@ use axum::{
     extract::{Path, Query},
     response::{IntoResponse, Json},
 };
-use dokito_types::{raw::RawGenericDocket, s3_stuff::DocketAddress};
+use openscraper_types::{raw::RawGenericDocket, s3_stuff::DocketAddress};
 use hyper::{StatusCode, body::Bytes};
 use mycorrhiza_common::{
     hash::Blake2bHash,

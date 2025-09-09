@@ -1,1 +1,1 @@
-pub use dokito_types::deduplication::*;
+pub use openscraper_types::deduplication::*;
