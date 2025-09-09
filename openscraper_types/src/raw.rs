@@ -15,11 +15,25 @@ pub struct RawDocketWithJurisdiction {
     pub jurisdiction: JurisdictionInfo,
 }
 
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Copy, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum RawArtificalPersonType {
+    #[default]
+    Unknown,
+    Human,
+    Organization,
+}
+
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct RawGenericParty {
     pub name: String,
+    pub artifical_person_type: RawArtificalPersonType,
     pub western_human_first_name: String,
     pub western_human_last_name: String,
+    pub human_title: String,
+    pub human_associated_company: String,
+    pub contact_email: String,
+    pub contact_phone: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
