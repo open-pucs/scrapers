@@ -1,5 +1,5 @@
 import * as path from "path";
-import { GenericCase, CaseWithJurisdiction } from "./types";
+import { RawGenericDocket, RawDocketWithJurisdiction } from "./types";
 
 // Rust API used for the downloader.
 const OPENSCRAPERS_INTERNAL_API_URL =
@@ -11,11 +11,11 @@ const OPENSCRAPERS_INTERNAL_API_URL =
 export interface Scraper {
   state: string;
   jurisdiction_name: string;
-  getCaseList: () => Promise<Partial<GenericCase>[]>;
+  getCaseList: () => Promise<Partial<RawGenericDocket>[]>;
   getCaseDetails: (
-    caseData: Partial<GenericCase>,
+    caseData: Partial<RawGenericDocket>,
     savepath_generator: (input: string) => string,
-  ) => Promise<GenericCase>;
+  ) => Promise<RawGenericDocket>;
 }
 
 /**
@@ -76,7 +76,8 @@ export async function runScraper(scraper: Scraper) {
   }
 
   const diffResult = await diffResponse.json();
-  const casesToProcess: Partial<GenericCase>[] = diffResult.to_process || [];
+  const casesToProcess: Partial<RawGenericDocket>[] =
+    diffResult.to_process || [];
   console.log(
     `Found ${casesToProcess.length} cases to process after differential check.`,
   );
@@ -91,8 +92,8 @@ export async function runScraper(scraper: Scraper) {
         makeS3JsonSavePath,
       );
 
-      const payload: CaseWithJurisdiction = {
-        case: fullCaseData,
+      const payload: RawDocketWithJurisdiction = {
+        docket: fullCaseData,
         jurisdiction: {
           country: "usa",
           state: scraper.state,

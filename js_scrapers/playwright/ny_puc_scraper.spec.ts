@@ -1,4 +1,3 @@
-import { test, Page } from "@playwright/test";
 import { Scraper, runScraper } from "../pipeline";
 import {
   RawGenericDocket,
@@ -8,6 +7,9 @@ import {
   RawDocketWithJurisdiction,
   JurisdictionInfo,
 } from "../types";
+import { Page } from "playwright";
+import { Browser, chromium } from "playwright";
+import { runCli } from "../cli_runner";
 
 class NyPucScraper implements Scraper {
   state = "ny";
@@ -125,35 +127,45 @@ class NyPucScraper implements Scraper {
     await this.page.waitForLoadState("networkidle");
 
     const parties: RawGenericParty[] = [];
-    const rows = await this.page.locator("#grdParty tr.gridrow, #grdParty tr.gridaltrow").all();
+    const rows = await this.page
+      .locator("#grdParty tr.gridrow, #grdParty tr.gridaltrow")
+      .all();
 
     for (const row of rows) {
-        const cells = await row.locator("td").all();
-        const nameCell = await cells[1].innerText();
-        const emailPhoneCell = await cells[4].innerText();
+      const cells = await row.locator("td").all();
+      const nameCell = await cells[1].innerText();
+      const emailPhoneCell = await cells[4].innerText();
 
-        const nameParts = nameCell.split("\n");
-        const fullName = nameParts[0];
-        const title = nameParts.length > 1 ? nameParts[1] : "";
-        const company = nameParts.length > 2 ? nameParts[2] : "";
+      const nameParts = nameCell.split("\n");
+      const fullName = nameParts[0];
+      const title = nameParts.length > 1 ? nameParts[1] : "";
+      const company = nameParts.length > 2 ? nameParts[2] : "";
 
-        const emailPhoneParts = emailPhoneCell.split("\n");
-        const email = emailPhoneParts.find(part => part.includes("@")) || "";
-        const phone = emailPhoneParts.find(part => part.startsWith("Ph:")) || "";
+      const emailPhoneParts = emailPhoneCell.split("\n");
+      const email = emailPhoneParts.find((part) => part.includes("@")) || "";
+      const phone =
+        emailPhoneParts.find((part) => part.startsWith("Ph:")) || "";
 
-        const isOrganization = company.includes("Inc.") || company.includes("LLC") || company.includes("Corp.");
+      const isOrganization =
+        company.includes("Inc.") ||
+        company.includes("LLC") ||
+        company.includes("Corp.");
 
-        const party: RawGenericParty = {
-            name: fullName,
-            artifical_person_type: isOrganization ? RawArtificalPersonType.Organization : RawArtificalPersonType.Human,
-            western_human_first_name: !isOrganization ? fullName.split(" ")[0] : "",
-            western_human_last_name: !isOrganization ? fullName.split(" ").slice(1).join(" ") : "",
-            human_title: title,
-            human_associated_company: company,
-            contact_email: email,
-            contact_phone: phone,
-        };
-        parties.push(party);
+      const party: RawGenericParty = {
+        name: fullName,
+        artifical_person_type: isOrganization
+          ? RawArtificalPersonType.Organization
+          : RawArtificalPersonType.Human,
+        western_human_first_name: !isOrganization ? fullName.split(" ")[0] : "",
+        western_human_last_name: !isOrganization
+          ? fullName.split(" ").slice(1).join(" ")
+          : "",
+        human_title: title,
+        human_associated_company: company,
+        contact_email: email,
+        contact_phone: phone,
+      };
+      parties.push(party);
     }
 
     return parties;
@@ -207,7 +219,7 @@ class NyPucScraper implements Scraper {
       for (const docRow of docRows) {
         const docCells = await docRow.locator("td").all();
         if (docCells.length > 3) {
-          const documentTitle = await docCells[3].locator('a').innerText();
+          const documentTitle = await docCells[3].locator("a").innerText();
           const documentType = await docCells[2].innerText();
           const dateFiled = await docCells[1].innerText();
           const attachmentUrl = await docCells[3]
@@ -263,7 +275,21 @@ class NyPucScraper implements Scraper {
   }
 }
 
-test("Run New York PUC Scraper", async ({ page }) => {
-  const scraper = new NyPucScraper(page);
-  await runScraper(scraper);
-});
+async function main() {
+  let browser: Browser | null = null;
+  try {
+    browser = await chromium.launch();
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const scraper = new NyPucScraper(page);
+    await runCli(scraper);
+  } catch (error) {
+    console.error("Scraper failed:", error);
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
+}
+
+main();
