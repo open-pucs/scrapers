@@ -27,10 +27,14 @@ pub async fn get_completed_casedata_differential(
     Json(caselist): Json<Vec<Value>>,
 ) -> impl IntoApiResponse {
     type ValueIdList = Vec<(String, Value)>;
+
     let user_caselist_values = caselist
         .into_iter()
         .filter_map(|value| {
-            let govid = value.get("docket_govid").and_then(|v| v.as_str())?;
+            let govid = value
+                .get("docket_govid")
+                .and_then(|v| v.as_str())
+                .or_else(|| value.get("case_govid").and_then(|v| v.as_str()))?;
             Some((govid.to_string(), value))
         })
         .collect::<Vec<_>>();
