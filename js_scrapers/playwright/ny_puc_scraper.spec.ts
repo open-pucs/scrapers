@@ -8,6 +8,7 @@ import {
 import { Page } from "playwright";
 import { Browser, chromium } from "playwright";
 import { runCli } from "../cli_runner";
+import * as cheerio from "cheerio";
 
 class NyPucScraper implements Scraper {
   state = "ny";
@@ -27,31 +28,31 @@ class NyPucScraper implements Scraper {
       await this.page.goto(industry_url);
       await this.page.waitForLoadState("networkidle");
 
+      console.log("Getting page content...");
+      const html = await this.page.content();
+      const $ = cheerio.load(html);
+
       console.log("Extracting industry affected...");
-      const industry_affected = (
-        await this.page
-          .locator("#GridPlaceHolder_lblSearchCriteriaValue")
-          .innerText()
-      ).replace("Industry Affected:", "");
+      const industry_affected = $("#GridPlaceHolder_lblSearchCriteriaValue")
+        .text()
+        .replace("Industry Affected:", "");
       console.log(`Industry affected: ${industry_affected}`);
 
       console.log("Extracting rows from the table...");
-      const rows = await this.page
-        .locator("#tblSearchedMatterExternal > tbody tr")
-        .all();
+      const rows = $("#tblSearchedMatterExternal > tbody tr");
       console.log(`Found ${rows.length} rows.`);
 
-      for (const row of rows) {
-        const cells = await row.locator("td").all();
+      rows.each((i, row) => {
+        const cells = $(row).find("td");
         if (cells.length >= 6) {
-          // console.log("Extracting case data from row...");
-          const case_govid = await cells[0].locator("a").innerText();
+          console.log("Extracting case data from row...");
+          const case_govid = $(cells[0]).find("a").text();
           const case_url = `https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo=${case_govid}`;
-          const matter_type = await cells[1].innerText();
-          const matter_subtype = await cells[2].innerText();
-          const opened_date = await cells[3].innerText();
-          const case_name = await cells[4].innerText();
-          const petitioner = await cells[5].innerText();
+          const matter_type = $(cells[1]).text();
+          const matter_subtype = $(cells[2]).text();
+          const opened_date = $(cells[3]).text();
+          const case_name = $(cells[4]).text();
+          const petitioner = $(cells[5]).text();
 
           const caseData: Partial<RawGenericDocket> = {
             case_govid,
@@ -63,9 +64,9 @@ class NyPucScraper implements Scraper {
             industry: industry_affected,
           };
           cases.push(caseData);
-          // console.log(`Successfully extracted case: ${case_govid}`);
+          console.log(`Successfully extracted case: ${case_govid}`);
         }
-      }
+      });
     }
     return cases;
   }
