@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as path from "path";
 import { RawGenericDocket, RawDocketWithJurisdiction } from "./types";
 
@@ -103,10 +104,26 @@ export async function runScraper(scraper: Scraper) {
 
       // Submit the final object to the API
       const submitUrl = `${OPENSCRAPERS_INTERNAL_API_URL}/admin/cases/submit`;
+      console.log("Building submission payload");
+      const payloadStr = JSON.stringify(payload, null, 2);
+      // B
+
+      // Write a .sh file with an equivalent curl command
+      const curlScript = `#!/bin/bash
+curl -X POST \\
+  -H "Content-Type: application/json" \\
+  -d '${payloadStr.replace(/'/g, "'\\''")}' \\
+  "${submitUrl}"
+`;
+      console.log("Wrote backup curl script.");
+
+      fs.writeFileSync("debug_submit.sh", curlScript, { mode: 0o755 });
+
+      // Actually do the fetch call
       const submitResponse = await fetch(submitUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: payloadStr,
       });
 
       if (!submitResponse.ok) {

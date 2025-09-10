@@ -51,14 +51,16 @@ class NyPucScraper implements Scraper {
           const matter_type = $(cells[1]).text();
           const matter_subtype = $(cells[2]).text();
           const opened_date_str = $(cells[3]).text().trim();
-          const [month, day, year] = opened_date_str.split('/').map(Number);
+          const [month, day, year] = opened_date_str.split("/").map(Number);
           const opened_date = new Date(Date.UTC(year, month - 1, day));
+          const case_name = $(cells[4]).text().trim();
+          const petitioner = $(cells[5]).text().trim();
 
           const caseData: Partial<RawGenericDocket> = {
             case_govid,
             case_url,
             case_name,
-            opened_date: opened_date.toISOString().split('T')[0],
+            opened_date: opened_date.toISOString().split("T")[0],
             case_type: `${matter_type} - ${matter_subtype}`,
             petitioner,
             industry: industry_affected,
