@@ -19,58 +19,52 @@ class NyPucScraper implements Scraper {
   }
 
   async getCaseList(): Promise<Partial<RawGenericDocket>[]> {
-    await this.page.goto(
-      "https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx",
-    );
-    await this.page.waitForLoadState("networkidle");
-
-    // Click search to get all cases
-    await this.page.locator('input[name="btnSearch"]').click();
-    await this.page.waitForLoadState("networkidle");
-
     const cases: Partial<RawGenericDocket>[] = [];
-    let caseListPage = 1;
-
-    while (true) {
-      console.log(`Scraping case list page ${caseListPage}`);
+    for (const industry_number of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+      console.log(`Processing industry index: ${industry_number}`);
+      const industry_url = `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA=${industry_number}`;
+      console.log(`Navigating to ${industry_url}`);
+      await this.page.goto(industry_url);
       await this.page.waitForLoadState("networkidle");
+
+      console.log("Extracting industry affected...");
+      const industry_affected = (
+        await this.page
+          .locator("#GridPlaceHolder_lblSearchCriteriaValue")
+          .innerText()
+      ).replace("Industry Affected:", "");
+      console.log(`Industry affected: ${industry_affected}`);
+
+      console.log("Extracting rows from the table...");
       const rows = await this.page
-        .locator("#grdCaseMaster tr.gridrow, #grdCaseMaster tr.gridaltrow")
+        .locator("#tblSearchedMatterExternal > tbody tr")
         .all();
-      console.log(`Found ${rows.length} rows on the page`);
+      console.log(`Found ${rows.length} rows.`);
 
       for (const row of rows) {
         const cells = await row.locator("td").all();
-        const caseNumber = await cells[1].innerText();
-        const caseTitle = await cells[2].innerText();
-        const dateFiled = await cells[3].innerText();
+        if (cells.length >= 6) {
+          // console.log("Extracting case data from row...");
+          const case_govid = await cells[0].locator("a").innerText();
+          const case_url = `https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo=${case_govid}`;
+          const matter_type = await cells[1].innerText();
+          const matter_subtype = await cells[2].innerText();
+          const opened_date = await cells[3].innerText();
+          const case_name = await cells[4].innerText();
+          const petitioner = await cells[5].innerText();
 
-        const caseData: Partial<RawGenericDocket> = {
-          case_govid: caseNumber,
-          opened_date: new Date(dateFiled).toISOString(),
-          case_name: caseTitle,
-          case_url: `https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?CaseNumber=${caseNumber}`,
-        };
-        cases.push(caseData);
-      }
-
-      const pagerButtons = await this.page
-        .locator("#grdCaseMaster_pg td a")
-        .all();
-      if (pagerButtons.length > 1) {
-        const nextButton = pagerButtons[pagerButtons.length - 1];
-        const nextButtonText = await nextButton.innerText();
-        if (nextButtonText === ">") {
-          console.log("Clicking next button for case list");
-          await nextButton.click({ timeout: 5000 });
-          caseListPage++;
-        } else {
-          console.log("No next button found, assuming last page of cases.");
-          break;
+          const caseData: Partial<RawGenericDocket> = {
+            case_govid,
+            case_url,
+            case_name,
+            opened_date: new Date(opened_date).toISOString(),
+            case_type: `${matter_type} - ${matter_subtype}`,
+            petitioner,
+            industry: industry_affected,
+          };
+          cases.push(caseData);
+          // console.log(`Successfully extracted case: ${case_govid}`);
         }
-      } else {
-        console.log("No pagination for cases found.");
-        break;
       }
     }
     return cases;
