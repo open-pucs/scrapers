@@ -19,6 +19,7 @@ export interface RawGenericParty {
   human_associated_company: string;
   contact_email: string;
   contact_phone: string;
+  contact_address: string;
 }
 
 export interface RawGenericAttachment {
@@ -68,4 +69,3 @@ export interface RawDocketWithJurisdiction {
   docket: RawGenericDocket;
   jurisdiction: JurisdictionInfo;
 }
-

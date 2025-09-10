@@ -95,6 +95,10 @@ class NyPucScraper implements Scraper {
       docsTableSelector,
     );
 
+    const partiesButtonSelector = "#GridPlaceHolder_lbtContact";
+    await this.page.click(partiesButtonSelector);
+    await this.page.waitForLoadState("networkidle");
+
     const partiesTableSelector = 'select[name="tblActiveParty_length"]';
     await this.page.selectOption(partiesTableSelector, "-1");
     await this.page.waitForLoadState("networkidle");
@@ -126,40 +130,34 @@ class NyPucScraper implements Scraper {
     const $ = cheerio.load(html);
     const parties: RawGenericParty[] = [];
     const rows = $("#grdParty tr.gridrow, #grdParty tr.gridaltrow");
+    console.log(`Found ${rows.length} party rows.`);
 
     rows.each((i, row) => {
       const cells = $(row).find("td");
       const nameCell = $(cells[1]).text();
       const emailPhoneCell = $(cells[4]).text();
+      const addressCell = $(cells[3]).text();
+      const companyCell = $(cells[2]).text();
 
       const nameParts = nameCell.split("\n");
       const fullName = nameParts[0];
       const title = nameParts.length > 1 ? nameParts[1] : "";
-      const company = nameParts.length > 2 ? nameParts[2] : "";
 
       const emailPhoneParts = emailPhoneCell.split("\n");
       const email = emailPhoneParts.find((part) => part.includes("@")) || "";
       const phone =
         emailPhoneParts.find((part) => part.startsWith("Ph:")) || "";
 
-      const isOrganization =
-        company.includes("Inc.") ||
-        company.includes("LLC") ||
-        company.includes("Corp.");
-
       const party: RawGenericParty = {
         name: fullName,
-        artifical_person_type: isOrganization
-          ? RawArtificalPersonType.Organization
-          : RawArtificalPersonType.Human,
-        western_human_first_name: !isOrganization ? fullName.split(" ")[0] : "",
-        western_human_last_name: !isOrganization
-          ? fullName.split(" ").slice(1).join(" ")
-          : "",
+        artifical_person_type: RawArtificalPersonType.Human,
+        western_human_last_name: fullName.split(" ")[0] || "",
+        western_human_first_name: fullName.split(" ").slice(1).join(" ") || "",
         human_title: title,
-        human_associated_company: company,
+        human_associated_company: companyCell,
         contact_email: email,
         contact_phone: phone,
+        contact_address: addressCell,
       };
       parties.push(party);
     });
@@ -214,7 +212,10 @@ class NyPucScraper implements Scraper {
             name: documentTitle,
             document_extension: fileName.split(".").pop() || "",
             url: new URL(
-              attachmentUrl.replace("../", "https://documents.dps.ny.gov/public/"),
+              attachmentUrl.replace(
+                "../",
+                "https://documents.dps.ny.gov/public/",
+              ),
               this.page.url(),
             ).toString(),
             attachment_type: "primary",

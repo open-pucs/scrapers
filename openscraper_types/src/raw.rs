@@ -3,6 +3,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use non_empty_string::NonEmptyString;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_with::{DefaultOnError, serde_as};
 use std::collections::HashMap;
 
 use crate::jurisdictions::JurisdictionInfo;
@@ -26,14 +27,26 @@ pub enum RawArtificalPersonType {
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct RawGenericParty {
+    #[serde(default)]
     pub name: String,
+    #[serde(default)]
     pub artifical_person_type: RawArtificalPersonType,
+    #[serde(default)]
     pub western_human_first_name: String,
+    #[serde(default)]
     pub western_human_last_name: String,
+    #[serde(default)]
     pub human_title: String,
+    #[serde(default)]
     pub human_associated_company: String,
+    #[serde(default)]
     pub contact_email: String,
+    #[serde(default)]
     pub contact_phone: String,
+    #[serde(default)]
+    pub contact_address: String,
+    #[serde(default)]
+    pub extra_metadata: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
@@ -53,9 +66,10 @@ pub struct RawGenericAttachment {
     #[serde(default)]
     pub hash: Option<Blake2bHash>,
 }
-
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct RawGenericFiling {
+    #[serde_as(deserialize_as = "DefaultOnError")]
     pub filed_date: Option<NaiveDate>,
     #[serde(default)]
     pub filling_govid: String,
