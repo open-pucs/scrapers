@@ -13,11 +13,11 @@ import * as fs from "fs";
 
 enum ScrapingMode {
   FULL = "full",
-  METADATA = "meta", 
+  METADATA = "meta",
   DOCUMENTS = "docs",
   PARTIES = "parties",
   DATES = "dates",
-  FULL_EXTRACTION = "full-extraction"
+  FULL_EXTRACTION = "full-extraction",
 }
 
 interface ScrapingOptions {
@@ -63,7 +63,7 @@ class NyPucScraper implements Scraper {
   async processTasksWithQueue<T, R>(
     tasks: T[],
     taskProcessor: (task: T) => Promise<R>,
-    maxConcurrent: number = this.max_concurrent_browsers
+    maxConcurrent: number = this.max_concurrent_browsers,
   ): Promise<R[]> {
     return new Promise((resolve, reject) => {
       const results: R[] = [];
@@ -80,7 +80,9 @@ class NyPucScraper implements Scraper {
         const task = tasks[taskIndex];
         running++;
 
-        console.log(`Starting task ${taskIndex + 1}/${tasks.length} (${running} running, max: ${maxConcurrent})`);
+        console.log(
+          `Starting task ${taskIndex + 1}/${tasks.length} (${running} running, max: ${maxConcurrent})`,
+        );
 
         try {
           const result = await taskProcessor(task);
@@ -92,13 +94,17 @@ class NyPucScraper implements Scraper {
         } finally {
           running--;
           completed++;
-          console.log(`Completed task ${taskIndex + 1}/${tasks.length} (${running} still running)`);
-          
+          console.log(
+            `Completed task ${taskIndex + 1}/${tasks.length} (${running} still running)`,
+          );
+
           if (completed === tasks.length) {
             if (errors.length > 0) {
-              console.warn(`${errors.length} tasks failed, but continuing with successful results`);
+              console.warn(
+                `${errors.length} tasks failed, but continuing with successful results`,
+              );
             }
-            resolve(results.filter(r => r !== null));
+            resolve(results.filter((r) => r !== null));
           } else {
             // Start more tasks
             while (running < maxConcurrent && currentIndex < tasks.length) {
@@ -161,7 +167,7 @@ class NyPucScraper implements Scraper {
     return cases;
   }
   async getDateCaseDocuments(
-    dateString: string
+    dateString: string,
   ): Promise<Partial<RawGenericDocket>[]> {
     // this would actually get both the new case and its openning documents in
     // one swoop
@@ -233,7 +239,7 @@ class NyPucScraper implements Scraper {
 
   async getCaseMeta(
     gov_id: string,
-    $?: any
+    $?: any,
   ): Promise<Partial<RawGenericDocket>> {
     // get main page
     const url = `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA=&MT=&MST=&CN=&MNO=${gov_id}&CO=0&C=&M=&CO=0`;
@@ -243,7 +249,7 @@ class NyPucScraper implements Scraper {
   }
 
   async getCaseDetails(
-    caseData: Partial<RawGenericDocket>
+    caseData: Partial<RawGenericDocket>,
   ): Promise<RawGenericDocket> {
     if (!caseData.case_url) {
       throw new Error("Case URL is missing");
@@ -269,7 +275,7 @@ class NyPucScraper implements Scraper {
       const caseDocuments = await this.scrapeDocumentsFromHtml(
         documentsHtml,
         docsTableSelector,
-        url
+        url,
       );
 
       // get parties
@@ -310,7 +316,7 @@ class NyPucScraper implements Scraper {
   }
 
   private async scrapePartiesFromHtml(
-    html: string
+    html: string,
   ): Promise<RawGenericParty[]> {
     const $ = cheerio.load(html);
     const parties: RawGenericParty[] = [];
@@ -353,7 +359,7 @@ class NyPucScraper implements Scraper {
   private async scrapeDocumentsFromHtml(
     html: string,
     tableSelector: string,
-    url: string
+    url: string,
   ): Promise<RawGenericFiling[]> {
     console.log("Starting document extraction from HTML...");
     const $ = cheerio.load(html);
@@ -400,9 +406,9 @@ class NyPucScraper implements Scraper {
             url: new URL(
               attachmentUrl.replace(
                 "../",
-                "https://documents.dps.ny.gov/public/"
+                "https://documents.dps.ny.gov/public/",
               ),
-              url
+              url,
             ).toString(),
             attachment_type: "primary",
             attachment_subtype: "",
@@ -418,16 +424,20 @@ class NyPucScraper implements Scraper {
   }
 
   async scrapeDocumentsOnly(govIds: string[]): Promise<RawGenericFiling[]> {
-    console.log(`Scraping documents for ${govIds.length} cases with max ${this.max_concurrent_browsers} concurrent browsers`);
-    
-    const scrapeDocumentsForId = async (govId: string): Promise<RawGenericFiling[]> => {
+    console.log(
+      `Scraping documents for ${govIds.length} cases with max ${this.max_concurrent_browsers} concurrent browsers`,
+    );
+
+    const scrapeDocumentsForId = async (
+      govId: string,
+    ): Promise<RawGenericFiling[]> => {
       let windowContext = null;
       try {
         console.log(`Scraping documents for case: ${govId} (new window)`);
         const caseUrl = `https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo=${govId}`;
         const { context, page } = await this.newWindow();
         windowContext = context;
-        
+
         await page.goto(caseUrl);
         await page.waitForLoadState("networkidle");
 
@@ -440,7 +450,7 @@ class NyPucScraper implements Scraper {
         const documents = await this.scrapeDocumentsFromHtml(
           documentsHtml,
           docsTableSelector,
-          page.url()
+          page.url(),
         );
         await windowContext.close();
         return documents;
@@ -453,21 +463,28 @@ class NyPucScraper implements Scraper {
       }
     };
 
-    const documentsArrays = await this.processTasksWithQueue(govIds, scrapeDocumentsForId);
+    const documentsArrays = await this.processTasksWithQueue(
+      govIds,
+      scrapeDocumentsForId,
+    );
     return documentsArrays.flat();
   }
 
   async scrapePartiesOnly(govIds: string[]): Promise<RawGenericParty[]> {
-    console.log(`Scraping parties for ${govIds.length} cases with max ${this.max_concurrent_browsers} concurrent browsers`);
-    
-    const scrapePartiesForId = async (govId: string): Promise<RawGenericParty[]> => {
+    console.log(
+      `Scraping parties for ${govIds.length} cases with max ${this.max_concurrent_browsers} concurrent browsers`,
+    );
+
+    const scrapePartiesForId = async (
+      govId: string,
+    ): Promise<RawGenericParty[]> => {
       let windowContext = null;
       try {
         console.log(`Scraping parties for case: ${govId} (new window)`);
         const caseUrl = `https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo=${govId}`;
         const { context, page } = await this.newWindow();
         windowContext = context;
-        
+
         await page.goto(caseUrl);
         await page.waitForLoadState("networkidle");
 
@@ -492,14 +509,23 @@ class NyPucScraper implements Scraper {
       }
     };
 
-    const partiesArrays = await this.processTasksWithQueue(govIds, scrapePartiesForId);
+    const partiesArrays = await this.processTasksWithQueue(
+      govIds,
+      scrapePartiesForId,
+    );
     return partiesArrays.flat();
   }
 
-  async scrapeMetadataOnly(govIds: string[]): Promise<Partial<RawGenericDocket>[]> {
-    console.log(`Scraping metadata for ${govIds.length} cases with max ${this.max_concurrent_browsers} concurrent browsers`);
-    
-    const scrapeMetadataForId = async (govId: string): Promise<Partial<RawGenericDocket> | null> => {
+  async scrapeMetadataOnly(
+    govIds: string[],
+  ): Promise<Partial<RawGenericDocket>[]> {
+    console.log(
+      `Scraping metadata for ${govIds.length} cases with max ${this.max_concurrent_browsers} concurrent browsers`,
+    );
+
+    const scrapeMetadataForId = async (
+      govId: string,
+    ): Promise<Partial<RawGenericDocket> | null> => {
       try {
         console.log(`Scraping metadata for case: ${govId}`);
         const metadata = await this.getCaseMeta(govId);
@@ -510,16 +536,25 @@ class NyPucScraper implements Scraper {
       }
     };
 
-    const metadataResults = await this.processTasksWithQueue(govIds, scrapeMetadataForId);
-    return metadataResults.filter((metadata): metadata is Partial<RawGenericDocket> => metadata !== null);
+    const metadataResults = await this.processTasksWithQueue(
+      govIds,
+      scrapeMetadataForId,
+    );
+    return metadataResults.filter(
+      (metadata): metadata is Partial<RawGenericDocket> => metadata !== null,
+    );
   }
 
   async scrapeByGovIds(govIds: string[], mode: ScrapingMode): Promise<any[]> {
-    console.log(`Scraping ${govIds.length} cases in ${mode} mode (parallel processing)`);
-    
+    console.log(
+      `Scraping ${govIds.length} cases in ${mode} mode (parallel processing)`,
+    );
+
     switch (mode) {
       case ScrapingMode.FULL:
-        console.log(`Running full scraping for ${govIds.length} cases with max ${this.max_concurrent_browsers} concurrent browsers`);
+        console.log(
+          `Running full scraping for ${govIds.length} cases with max ${this.max_concurrent_browsers} concurrent browsers`,
+        );
         const scrapeFullForId = async (govId: string) => {
           try {
             const metadata = await this.getCaseMeta(govId);
@@ -533,9 +568,12 @@ class NyPucScraper implements Scraper {
             return null;
           }
         };
-        
-        const fullResults = await this.processTasksWithQueue(govIds, scrapeFullForId);
-        return fullResults.filter(result => result !== null);
+
+        const fullResults = await this.processTasksWithQueue(
+          govIds,
+          scrapeFullForId,
+        );
+        return fullResults.filter((result) => result !== null);
 
       case ScrapingMode.METADATA:
         return await this.scrapeMetadataOnly(govIds);
@@ -547,22 +585,22 @@ class NyPucScraper implements Scraper {
         return await this.scrapePartiesOnly(govIds);
 
       case ScrapingMode.FULL_EXTRACTION:
-        console.log(`Running full extraction for ${govIds.length} cases with max ${this.max_concurrent_browsers} concurrent browsers`);
+        console.log(
+          `Running full extraction for ${govIds.length} cases with max ${this.max_concurrent_browsers} concurrent browsers`,
+        );
         const scrapeExtractionForId = async (govId: string) => {
           try {
             // Run all three operations in parallel for each ID
             const [metadata, documents, parties] = await Promise.all([
               this.getCaseMeta(govId),
               this.scrapeDocumentsOnly([govId]),
-              this.scrapePartiesOnly([govId])
+              this.scrapePartiesOnly([govId]),
             ]);
-            
+
             if (metadata) {
-              return {
-                case: metadata,
-                documents,
-                parties
-              };
+              metadata.filings = documents;
+              metadata.case_parties = parties;
+              return metadata;
             }
             return null;
           } catch (error) {
@@ -571,8 +609,11 @@ class NyPucScraper implements Scraper {
           }
         };
 
-        const extractionResults = await this.processTasksWithQueue(govIds, scrapeExtractionForId);
-        return extractionResults.filter(result => result !== null);
+        const extractionResults = await this.processTasksWithQueue(
+          govIds,
+          scrapeExtractionForId,
+        );
+        return extractionResults.filter((result) => result !== null);
 
       default:
         throw new Error(`Unsupported scraping mode: ${mode}`);
@@ -582,7 +623,7 @@ class NyPucScraper implements Scraper {
 
 function parseArguments(): ScrapingOptions | null {
   const args = process.argv.slice(2);
-  
+
   if (args.length === 0) {
     return null; // Use default CLI behavior
   }
@@ -595,24 +636,29 @@ function parseArguments(): ScrapingOptions | null {
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    
-    if (arg === '--mode') {
+
+    if (arg === "--mode") {
       const modeValue = args[++i];
       if (Object.values(ScrapingMode).includes(modeValue as ScrapingMode)) {
         mode = modeValue as ScrapingMode;
       } else {
-        throw new Error(`Invalid mode: ${modeValue}. Valid modes: ${Object.values(ScrapingMode).join(', ')}`);
+        throw new Error(
+          `Invalid mode: ${modeValue}. Valid modes: ${Object.values(ScrapingMode).join(", ")}`,
+        );
       }
-    } else if (arg === '--gov-ids') {
+    } else if (arg === "--gov-ids") {
       const idsString = args[++i];
-      govIds = idsString.split(',').map(id => id.trim()).filter(id => id.length > 0);
-    } else if (arg === '--date') {
+      govIds = idsString
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0);
+    } else if (arg === "--date") {
       dateString = args[++i];
-    } else if (arg === '--from-file') {
+    } else if (arg === "--from-file") {
       fromFile = args[++i];
-    } else if (arg === '-o' || arg === '--outfile') {
+    } else if (arg === "-o" || arg === "--outfile") {
       outFile = args[++i];
-    } else if (!arg.startsWith('--')) {
+    } else if (!arg.startsWith("--")) {
       // If it doesn't start with --, treat as JSON (for backward compatibility)
       try {
         const parsed = JSON.parse(arg);
@@ -628,10 +674,11 @@ function parseArguments(): ScrapingOptions | null {
   // Load gov IDs from file if specified
   if (fromFile) {
     try {
-      const fileContent = fs.readFileSync(fromFile, 'utf-8');
-      const fileIds = fileContent.split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0 && !line.startsWith('#'));
+      const fileContent = fs.readFileSync(fromFile, "utf-8");
+      const fileIds = fileContent
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !line.startsWith("#"));
       govIds.push(...fileIds);
     } catch (error) {
       throw new Error(`Error reading file ${fromFile}: ${error}`);
@@ -641,26 +688,37 @@ function parseArguments(): ScrapingOptions | null {
   return { mode, govIds, dateString, fromFile, outFile };
 }
 
-async function saveResultsToFile(results: any[], outFile: string, mode: ScrapingMode) {
+async function saveResultsToFile(
+  results: any[],
+  outFile: string,
+  mode: ScrapingMode,
+) {
   try {
     const jsonData = JSON.stringify(results, null, 2);
-    fs.writeFileSync(outFile, jsonData, 'utf-8');
-    console.log(`✅ Successfully saved ${results.length} results to ${outFile}`);
-    console.log(`📊 Mode: ${mode}, File size: ${(jsonData.length / 1024).toFixed(2)} KB`);
+    fs.writeFileSync(outFile, jsonData, "utf-8");
+    console.log(
+      `✅ Successfully saved ${results.length} results to ${outFile}`,
+    );
+    console.log(
+      `📊 Mode: ${mode}, File size: ${(jsonData.length / 1024).toFixed(2)} KB`,
+    );
   } catch (error) {
     console.error(`❌ Error writing to file ${outFile}:`, error);
     throw error;
   }
 }
 
-async function runCustomScraping(scraper: NyPucScraper, options: ScrapingOptions) {
+async function runCustomScraping(
+  scraper: NyPucScraper,
+  options: ScrapingOptions,
+) {
   console.log(`Running custom scraping with options:`, options);
 
   if (options.mode === ScrapingMode.DATES && options.dateString) {
     console.log(`Scraping cases for date: ${options.dateString}`);
     const cases = await scraper.getDateCases(options.dateString);
     console.log(`Found ${cases.length} cases for date ${options.dateString}`);
-    
+
     if (options.outFile) {
       await saveResultsToFile(cases, options.outFile, options.mode);
     } else {
@@ -672,7 +730,7 @@ async function runCustomScraping(scraper: NyPucScraper, options: ScrapingOptions
   if (options.govIds && options.govIds.length > 0) {
     const results = await scraper.scrapeByGovIds(options.govIds, options.mode);
     console.log(`Scraped ${results.length} results in ${options.mode} mode`);
-    
+
     if (options.outFile) {
       await saveResultsToFile(results, options.outFile, options.mode);
     } else {
@@ -681,7 +739,7 @@ async function runCustomScraping(scraper: NyPucScraper, options: ScrapingOptions
     return;
   }
 
-  throw new Error('No government IDs provided for scraping');
+  throw new Error("No government IDs provided for scraping");
 }
 
 async function main() {
@@ -691,9 +749,9 @@ async function main() {
     const context = await browser.newContext();
     const rootpage = await context.newPage();
     const scraper = new NyPucScraper(rootpage, context, browser);
-    
+
     const customOptions = parseArguments();
-    
+
     if (customOptions) {
       // Use custom scraping logic
       await runCustomScraping(scraper, customOptions);

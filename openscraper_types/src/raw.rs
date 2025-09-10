@@ -66,10 +66,32 @@ pub struct RawGenericAttachment {
     #[serde(default)]
     pub hash: Option<Blake2bHash>,
 }
+
+use serde::Deserializer;
+
+fn deserialize_date_only<'de, D>(deserializer: D) -> Result<Option<NaiveDate>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: Option<String> = Option::deserialize(deserializer)?;
+    if let Some(s) = s {
+        // First, try parsing just the date
+        if let Ok(date) = NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
+            return Ok(Some(date));
+        }
+        // Next, try parsing as full datetime and truncate
+        if let Ok(dt) = DateTime::parse_from_rfc3339(&s) {
+            return Ok(Some(dt.date_naive()));
+        }
+        // return Err(serde::de::Error::custom(format!("Invalid date: {}", s)));
+        return Ok(None);
+    }
+    Ok(None)
+}
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct RawGenericFiling {
-    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[serde(default, deserialize_with = "deserialize_date_only")]
     pub filed_date: Option<NaiveDate>,
     #[serde(default)]
     pub filling_govid: String,
@@ -93,12 +115,13 @@ pub struct RawGenericFiling {
     pub extra_metadata: HashMap<String, serde_json::Value>,
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 pub struct RawGenericDocket {
     pub case_govid: NonEmptyString,
     // This shouldnt be an optional field in the final submission, since it can be calculated from
     // the minimum of the fillings, and the scraper should calculate it.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_date_only")]
     pub opened_date: Option<NaiveDate>,
     #[serde(default)]
     pub case_name: String,
