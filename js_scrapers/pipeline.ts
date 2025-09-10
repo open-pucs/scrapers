@@ -1,10 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { RawGenericDocket, RawDocketWithJurisdiction } from "./types";
-
-// Rust API used for the downloader.
-const OPENSCRAPERS_INTERNAL_API_URL =
-  process.env.OPENSCRAPERS_INTERNAL_API_URL || "http://localhost:33399";
+import { OPENSCRAPERS_INTERNAL_API_URL } from "./constants";
 
 /**
  * Defines the contract for a scraper.
@@ -36,6 +33,67 @@ async function saveJsonToS3(key: string, data: any) {
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Failed to save to S3: ${response.status} ${errorText}`);
+  }
+}
+
+export async function processDocket(
+  scraper: Scraper,
+  basicCaseData: Partial<RawGenericDocket>,
+  makeS3JsonSavePath: (path_loc: string) => string,
+) {
+  try {
+    console.log(`Fetching details for case: ${basicCaseData.case_govid}`);
+    const fullCaseData = await scraper.getCaseDetails(
+      basicCaseData,
+      makeS3JsonSavePath,
+    );
+
+    const payload: RawDocketWithJurisdiction = {
+      docket: fullCaseData,
+      jurisdiction: {
+        country: "usa",
+        state: scraper.state,
+        jurisdiction: scraper.jurisdiction_name,
+      },
+    };
+
+    // Submit the final object to the API
+    const submitUrl = `${OPENSCRAPERS_INTERNAL_API_URL}/admin/cases/submit`;
+    console.log("Building submission payload");
+    const payloadStr = JSON.stringify(payload, null, 2);
+    // B
+
+    // Write a .sh file with an equivalent curl command
+    const curlScript = `#!/bin/bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '${payloadStr.replace(/'/g, "'\\''")}' \
+  "${submitUrl}"
+`;
+    console.log("Wrote backup curl script.");
+
+    fs.writeFileSync("debug_submit.sh", curlScript, { mode: 0o755 });
+
+    // Actually do the fetch call
+    const submitResponse = await fetch(submitUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: payloadStr,
+    });
+
+    if (!submitResponse.ok) {
+      const errorText = await submitResponse.text();
+      throw new Error(
+        `Failed to submit case: ${submitResponse.status} ${errorText}`,
+      );
+    }
+
+    console.log(`Successfully submitted case: ${fullCaseData.case_govid}`);
+  } catch (error) {
+    console.error(
+      `Error processing case: ${basicCaseData.case_govid}`,
+      error,
+    );
   }
 }
 
@@ -86,60 +144,7 @@ export async function runScraper(scraper: Scraper) {
 
   // 3. Process each case and submit it to the API
   for (const basicCaseData of casesToProcess) {
-    try {
-      console.log(`Fetching details for case: ${basicCaseData.case_govid}`);
-      const fullCaseData = await scraper.getCaseDetails(
-        basicCaseData,
-        makeS3JsonSavePath,
-      );
-
-      const payload: RawDocketWithJurisdiction = {
-        docket: fullCaseData,
-        jurisdiction: {
-          country: "usa",
-          state: scraper.state,
-          jurisdiction: scraper.jurisdiction_name,
-        },
-      };
-
-      // Submit the final object to the API
-      const submitUrl = `${OPENSCRAPERS_INTERNAL_API_URL}/admin/cases/submit`;
-      console.log("Building submission payload");
-      const payloadStr = JSON.stringify(payload, null, 2);
-      // B
-
-      // Write a .sh file with an equivalent curl command
-      const curlScript = `#!/bin/bash
-curl -X POST \\
-  -H "Content-Type: application/json" \\
-  -d '${payloadStr.replace(/'/g, "'\\''")}' \\
-  "${submitUrl}"
-`;
-      console.log("Wrote backup curl script.");
-
-      fs.writeFileSync("debug_submit.sh", curlScript, { mode: 0o755 });
-
-      // Actually do the fetch call
-      const submitResponse = await fetch(submitUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: payloadStr,
-      });
-
-      if (!submitResponse.ok) {
-        const errorText = await submitResponse.text();
-        throw new Error(
-          `Failed to submit case: ${submitResponse.status} ${errorText}`,
-        );
-      }
-
-      console.log(`Successfully submitted case: ${fullCaseData.case_govid}`);
-    } catch (error) {
-      console.error(
-        `Error processing case: ${basicCaseData.case_govid}`,
-        error,
-      );
-    }
+    await processDocket(scraper, basicCaseData, makeS3JsonSavePath);
   }
 
   console.log("Scraper run finished.");
