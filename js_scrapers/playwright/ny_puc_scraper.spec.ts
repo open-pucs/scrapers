@@ -25,6 +25,7 @@ interface ScrapingOptions {
   govIds?: string[];
   dateString?: string;
   fromFile?: string;
+  outFile?: string;
 }
 
 class NyPucScraper implements Scraper {
@@ -590,6 +591,7 @@ function parseArguments(): ScrapingOptions | null {
   let govIds: string[] = [];
   let dateString: string | undefined;
   let fromFile: string | undefined;
+  let outFile: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -608,6 +610,8 @@ function parseArguments(): ScrapingOptions | null {
       dateString = args[++i];
     } else if (arg === '--from-file') {
       fromFile = args[++i];
+    } else if (arg === '-o' || arg === '--outfile') {
+      outFile = args[++i];
     } else if (!arg.startsWith('--')) {
       // If it doesn't start with --, treat as JSON (for backward compatibility)
       try {
@@ -634,7 +638,19 @@ function parseArguments(): ScrapingOptions | null {
     }
   }
 
-  return { mode, govIds, dateString, fromFile };
+  return { mode, govIds, dateString, fromFile, outFile };
+}
+
+async function saveResultsToFile(results: any[], outFile: string, mode: ScrapingMode) {
+  try {
+    const jsonData = JSON.stringify(results, null, 2);
+    fs.writeFileSync(outFile, jsonData, 'utf-8');
+    console.log(`✅ Successfully saved ${results.length} results to ${outFile}`);
+    console.log(`📊 Mode: ${mode}, File size: ${(jsonData.length / 1024).toFixed(2)} KB`);
+  } catch (error) {
+    console.error(`❌ Error writing to file ${outFile}:`, error);
+    throw error;
+  }
 }
 
 async function runCustomScraping(scraper: NyPucScraper, options: ScrapingOptions) {
@@ -644,14 +660,24 @@ async function runCustomScraping(scraper: NyPucScraper, options: ScrapingOptions
     console.log(`Scraping cases for date: ${options.dateString}`);
     const cases = await scraper.getDateCases(options.dateString);
     console.log(`Found ${cases.length} cases for date ${options.dateString}`);
-    console.log(JSON.stringify(cases, null, 2));
+    
+    if (options.outFile) {
+      await saveResultsToFile(cases, options.outFile, options.mode);
+    } else {
+      console.log(JSON.stringify(cases, null, 2));
+    }
     return;
   }
 
   if (options.govIds && options.govIds.length > 0) {
     const results = await scraper.scrapeByGovIds(options.govIds, options.mode);
     console.log(`Scraped ${results.length} results in ${options.mode} mode`);
-    console.log(JSON.stringify(results, null, 2));
+    
+    if (options.outFile) {
+      await saveResultsToFile(results, options.outFile, options.mode);
+    } else {
+      console.log(JSON.stringify(results, null, 2));
+    }
     return;
   }
 
