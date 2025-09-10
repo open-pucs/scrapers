@@ -13,17 +13,18 @@
   "dependencies": {
     "@types/sqlite3": "^5.1.0",
     "better-sqlite3": "^12.2.0",
+    "cheerio": "^1.1.2",
     "cypress": "^14.5.4",
     "fs": "0.0.1-security",
     "papaparse": "^5.5.3",
     "playwright": "1.54.1"
   },
   "devDependencies": {
-    "playwright": "1.54.1",
     "@playwright/test": "1.54.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.3.1",
     "@types/papaparse": "^5.3.16",
+    "playwright": "1.54.1",
     "typescript": "^5.9.2"
   }
 }
