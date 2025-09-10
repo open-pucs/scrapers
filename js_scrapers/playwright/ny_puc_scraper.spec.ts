@@ -81,13 +81,29 @@ class NyPucScraper implements Scraper {
     await this.page.goto(caseData.case_url);
     await this.page.waitForLoadState("networkidle");
 
+    // wait up to 10s for documents table, otherwise just continue
+    const docsTableSelector = "#tblPubDoc > tbody:nth-child(3)";
+    try {
+      await this.page.waitForSelector(docsTableSelector, {
+        timeout: 30_000,
+      });
+    } catch {}
+
     const documentsHtml = await this.page.content();
     const caseDocuments = await this.scrapeDocumentsFromHtml(
       documentsHtml,
-      "#MainContent_grdCaseDocuments",
+      docsTableSelector,
     );
 
-    await this.page.locator("#GridPlaceHolder_lbtContact").click();
+    const partiesTableSelector = "#tblActiveParty > tbody:nth-child(2)";
+    // Also before it actually grabs the html it should take this element:
+    // <select name="tblActiveParty_length" aria-controls="tblActiveParty" class="dt_form_select"><option value="-1">All</option><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option></select>
+    // with a selector
+    // #tblActiveParty_length > label:nth-child(1) > select:nth-child(1)
+    // And select the all option then wait for the network to be idle, then download the html.
+
+    // also get this to work with the stated  partiesTableSelector.
+    await this.page.locator(partiesTableSelector).click();
     await this.page.waitForLoadState("networkidle");
 
     const partiesHtml = await this.page.content();
@@ -165,7 +181,9 @@ class NyPucScraper implements Scraper {
     console.log("Starting document extraction from HTML...");
     const $ = cheerio.load(html);
     const documents: RawGenericFiling[] = [];
-    const docRows = $(`${tableSelector} tr.gridrow, ${tableSelector} tr.gridaltrow`);
+    const docRows = $(
+      `${tableSelector} tr.gridrow, ${tableSelector} tr.gridaltrow`,
+    );
     console.log(`Found ${docRows.length} document rows.`);
 
     docRows.each((i, docRow) => {
