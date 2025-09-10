@@ -3,6 +3,7 @@ use axum::{Json, extract::Path};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tracing::info;
 
 use crate::{
     server::s3_routes::JurisdictionPath,
@@ -27,6 +28,8 @@ pub async fn get_completed_casedata_differential(
     Json(caselist): Json<Vec<Value>>,
 ) -> impl IntoApiResponse {
     type ValueIdList = Vec<(String, Value)>;
+    let initial_len = caselist.len();
+    info!(length=%initial_len,"Got initial values to parse");
 
     let user_caselist_values = caselist
         .into_iter()
@@ -38,6 +41,7 @@ pub async fn get_completed_casedata_differential(
             Some((govid.to_string(), value))
         })
         .collect::<Vec<_>>();
+    info!(%initial_len, matched_govid_len= % user_caselist_values.len(),"Found a caseid or govid for this percent of inital submissions");
     let s3_client = OPENSCRAPERS_S3.make_s3_client().await;
     let country = "usa".to_string(); // Or get from somewhere else
     let jur_info = JurisdictionInfo {
