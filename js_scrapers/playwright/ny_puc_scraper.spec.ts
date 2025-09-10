@@ -18,12 +18,15 @@ enum ScrapingMode {
   PARTIES = "parties",
   DATES = "dates",
   FULL_EXTRACTION = "full-extraction",
+  FILINGS_BETWEEN_DATES = "filings-between-dates",
 }
 
 interface ScrapingOptions {
   mode: ScrapingMode;
   govIds?: string[];
   dateString?: string;
+  beginDate?: string;
+  endDate?: string;
   fromFile?: string;
   outFile?: string;
 }
@@ -266,7 +269,9 @@ class NyPucScraper implements Scraper {
         await page.waitForSelector(docsTableSelector, {
           timeout: 30_000,
         });
-      } catch {}
+      } catch {
+        console.log("Waited 30 seconds and could not find documents table.");
+      }
 
       const documentsHtml = await page.content();
       const url = page.url();
@@ -308,7 +313,7 @@ class NyPucScraper implements Scraper {
       await context.close();
       return fullCaseData;
     } finally {
-      // Ensure cleanup even if there's an error
+      //
       try {
         await context.close();
       } catch {}
@@ -444,7 +449,7 @@ class NyPucScraper implements Scraper {
         const docsTableSelector = "#tblPubDoc > tbody";
         try {
           await page.waitForSelector(docsTableSelector, { timeout: 30_000 });
-        } catch {}
+        } catch {} // Ignore timeout, just means no documents table
 
         const documentsHtml = await page.content();
         const documents = await this.scrapeDocumentsFromHtml(
@@ -619,6 +624,39 @@ class NyPucScraper implements Scraper {
         throw new Error(`Unsupported scraping mode: ${mode}`);
     }
   }
+
+  formatDate(date: Date): string {
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
+    const year = date.getFullYear();
+    return `${month}/${day}/${year}`;
+  }
+
+  createSearchUrl(beginDate: Date, endDate: Date): string {
+    const formattedBeginDate = this.formatDate(beginDate);
+    const formattedEndDate = this.formatDate(endDate);
+    return `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=0&IA=&MT=&MST=&CN=&C=&M=&CO=0&DFF=${formattedBeginDate}&DFT=${formattedEndDate}&DT=&CI=0&FC=`;
+  }
+
+  async getFilingsBetweenDates(
+    beginDate: Date,
+    endDate: Date,
+  ): Promise<string[]> {
+    const url = this.createSearchUrl(beginDate, endDate);
+    const $ = await this.getPage(url);
+    const docketGovIds: string[] = [];
+
+    $("#tblSearchedDocumentExternal > tbody:nth-child(3) tr").each((i, row) => {
+      const cells = $(row).find("td");
+      const docketGovId = $(cells[4]).find("a").text().trim();
+      if (docketGovId) {
+        docketGovIds.push(docketGovId);
+      }
+    });
+    const govid_set = new Set(docketGovIds);
+
+    return [...govid_set]; // Return unique values
+  }
 }
 
 function parseArguments(): ScrapingOptions | null {
@@ -631,6 +669,8 @@ function parseArguments(): ScrapingOptions | null {
   let mode = ScrapingMode.FULL;
   let govIds: string[] = [];
   let dateString: string | undefined;
+  let beginDate: string | undefined;
+  let endDate: string | undefined;
   let fromFile: string | undefined;
   let outFile: string | undefined;
 
@@ -643,7 +683,9 @@ function parseArguments(): ScrapingOptions | null {
         mode = modeValue as ScrapingMode;
       } else {
         throw new Error(
-          `Invalid mode: ${modeValue}. Valid modes: ${Object.values(ScrapingMode).join(", ")}`,
+          `Invalid mode: ${modeValue}. Valid modes: ${Object.values(
+            ScrapingMode,
+          ).join(", ")}`,
         );
       }
     } else if (arg === "--gov-ids") {
@@ -654,6 +696,10 @@ function parseArguments(): ScrapingOptions | null {
         .filter((id) => id.length > 0);
     } else if (arg === "--date") {
       dateString = args[++i];
+    } else if (arg === "--begin-date") {
+      beginDate = args[++i];
+    } else if (arg === "--end-date") {
+      endDate = args[++i];
     } else if (arg === "--from-file") {
       fromFile = args[++i];
     } else if (arg === "-o" || arg === "--outfile") {
@@ -685,7 +731,15 @@ function parseArguments(): ScrapingOptions | null {
     }
   }
 
-  return { mode, govIds, dateString, fromFile, outFile };
+  return {
+    mode,
+    govIds,
+    dateString,
+    beginDate,
+    endDate,
+    fromFile,
+    outFile,
+  };
 }
 
 async function saveResultsToFile(
@@ -723,6 +777,30 @@ async function runCustomScraping(
       await saveResultsToFile(cases, options.outFile, options.mode);
     } else {
       console.log(JSON.stringify(cases, null, 2));
+    }
+    return;
+  }
+
+  if (
+    options.mode === ScrapingMode.FILINGS_BETWEEN_DATES &&
+    options.beginDate &&
+    options.endDate
+  ) {
+    console.log(
+      `Scraping filings between ${options.beginDate} and ${options.endDate}`,
+    );
+    const docketGovIds = await scraper.getFilingsBetweenDates(
+      new Date(options.beginDate),
+      new Date(options.endDate),
+    );
+    console.log(
+      `Found ${docketGovIds.length} dockets between ${options.beginDate} and ${options.endDate}`,
+    );
+
+    if (options.outFile) {
+      await saveResultsToFile(docketGovIds, options.outFile, options.mode);
+    } else {
+      console.log(JSON.stringify(docketGovIds, null, 2));
     }
     return;
   }
@@ -770,3 +848,4 @@ async function main() {
 }
 
 main();
+
