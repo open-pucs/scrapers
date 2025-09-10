@@ -82,7 +82,7 @@ class NyPucScraper implements Scraper {
     await this.page.waitForLoadState("networkidle");
 
     // wait up to 10s for documents table, otherwise just continue
-    const docsTableSelector = "#tblPubDoc > tbody:nth-child(3)";
+    const docsTableSelector = "#tblPubDoc > tbody";
     try {
       await this.page.waitForSelector(docsTableSelector, {
         timeout: 30_000,
@@ -95,15 +95,8 @@ class NyPucScraper implements Scraper {
       docsTableSelector,
     );
 
-    const partiesTableSelector = "#tblActiveParty > tbody:nth-child(2)";
-    // Also before it actually grabs the html it should take this element:
-    // <select name="tblActiveParty_length" aria-controls="tblActiveParty" class="dt_form_select"><option value="-1">All</option><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option></select>
-    // with a selector
-    // #tblActiveParty_length > label:nth-child(1) > select:nth-child(1)
-    // And select the all option then wait for the network to be idle, then download the html.
-
-    // also get this to work with the stated  partiesTableSelector.
-    await this.page.locator(partiesTableSelector).click();
+    const partiesTableSelector = 'select[name="tblActiveParty_length"]';
+    await this.page.selectOption(partiesTableSelector, "-1");
     await this.page.waitForLoadState("networkidle");
 
     const partiesHtml = await this.page.content();
@@ -180,51 +173,61 @@ class NyPucScraper implements Scraper {
   ): Promise<RawGenericFiling[]> {
     console.log("Starting document extraction from HTML...");
     const $ = cheerio.load(html);
-    const documents: RawGenericFiling[] = [];
-    const docRows = $(
-      `${tableSelector} tr.gridrow, ${tableSelector} tr.gridaltrow`,
-    );
+    const filingsMap = new Map<string, RawGenericFiling>();
+    const docRows = $(`${tableSelector} tr`);
+
     console.log(`Found ${docRows.length} document rows.`);
 
     docRows.each((i, docRow) => {
       const docCells = $(docRow).find("td");
-      if (docCells.length > 3) {
-        const documentTitle = $(docCells[3]).find("a").text();
-        console.log(`Extracting document: ${documentTitle}`);
-        const documentType = $(docCells[2]).text();
-        const dateFiled = $(docCells[1]).text();
-        const attachmentUrl = $(docCells[3]).find("a").attr("href");
-        const authors = $(docCells[4]).text();
+      if (docCells.length > 6) {
+        const filingNo = $(docCells[5]).text().trim();
+        if (!filingNo) return;
 
-        documents.push({
-          name: documentTitle,
-          filed_date: new Date(dateFiled).toISOString(),
-          organization_authors: [],
-          individual_authors: [],
-          organization_authors_blob: authors,
-          individual_authors_blob: "",
-          filing_type: documentType,
-          description: "",
-          attachments: attachmentUrl
-            ? [
-                {
-                  name: documentTitle,
-                  document_extension: attachmentUrl.split(".").pop() || "",
-                  url: new URL(attachmentUrl, this.page.url()).toString(),
-                  attachment_type: "primary",
-                  attachment_subtype: "",
-                  extra_metadata: {},
-                  attachment_govid: "",
-                },
-              ]
-            : [],
-          extra_metadata: {},
-          filling_govid: "",
-        });
+        const documentTitle = $(docCells[3]).find("a").text().trim();
+        const attachmentUrl = $(docCells[3]).find("a").attr("href");
+        const fileName = $(docCells[6]).text().trim();
+
+        if (!filingsMap.has(filingNo)) {
+          const documentType = $(docCells[2]).text().trim();
+          const dateFiled = $(docCells[1]).text().trim();
+          const authors = $(docCells[4]).text().trim();
+
+          filingsMap.set(filingNo, {
+            name: documentTitle,
+            filed_date: new Date(dateFiled).toISOString(),
+            organization_authors: [],
+            individual_authors: [],
+            organization_authors_blob: authors,
+            individual_authors_blob: "",
+            filing_type: documentType,
+            description: "",
+            attachments: [],
+            extra_metadata: { fileName },
+            filling_govid: filingNo,
+          });
+        }
+
+        const filing = filingsMap.get(filingNo);
+        if (filing && attachmentUrl) {
+          filing.attachments.push({
+            name: documentTitle,
+            document_extension: fileName.split(".").pop() || "",
+            url: new URL(
+              attachmentUrl.replace("../", "https://documents.dps.ny.gov/public/"),
+              this.page.url(),
+            ).toString(),
+            attachment_type: "primary",
+            attachment_subtype: "",
+            extra_metadata: { fileName },
+            attachment_govid: "",
+          });
+        }
       }
     });
+
     console.log("Finished document extraction.");
-    return documents;
+    return Array.from(filingsMap.values());
   }
 }
 
