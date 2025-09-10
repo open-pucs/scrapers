@@ -9,14 +9,14 @@ const OPENSCRAPERS_INTERNAL_API_URL =
 /**
  * Processes a specific list of dockets for a given scraper.
  * @param scraper The scraper to use.
- * @param docketIds The list of docket IDs to process.
+ * @param dockets The list of dockets to process.
  */
 export async function runScraperForDockets(
   scraper: Scraper,
-  docketIds: string[]
+  dockets: Partial<RawGenericDocket>[]
 ) {
   console.log(
-    `Running scraper for ${scraper.jurisdiction_name} for ${docketIds.length} specific dockets.`
+    `Running scraper for ${scraper.jurisdiction_name} for ${dockets.length} specific dockets.`
   );
 
   const timeNow = new Date().toISOString();
@@ -28,13 +28,12 @@ export async function runScraperForDockets(
   const makeS3JsonSavePath = (path_loc: string) =>
     path.join(basePath, path_loc, `${timeNow}.json`);
 
-  for (const docketId of docketIds) {
+  for (const basicCaseData of dockets) {
     try {
-      console.log(`Fetching details for case: ${docketId}`);
+      console.log(
+        `Fetching details for case: ${basicCaseData.case_govid || "N/A"}`
+      );
       // The getCaseDetails function expects a Partial<RawGenericDocket>.
-      // We only have the case_govid, which should be enough for the scraper
-      // to fetch the rest of the details.
-      const basicCaseData: Partial<RawGenericDocket> = { case_govid: docketId };
 
       const fullCaseData = await scraper.getCaseDetails(
         basicCaseData,
@@ -67,7 +66,10 @@ export async function runScraperForDockets(
 
       console.log(`Successfully submitted case: ${fullCaseData.case_govid}`);
     } catch (error) {
-      console.error(`Error processing case: ${docketId}`, error);
+      console.error(
+        `Error processing case: ${basicCaseData.case_govid || "N/A"}`,
+        error
+      );
     }
   }
 
@@ -82,8 +84,25 @@ export async function runCli(scraper: Scraper) {
   const args = process.argv.slice(2);
 
   if (args.length > 0) {
-    // If there are command-line arguments, treat them as docket IDs
-    await runScraperForDockets(scraper, args);
+    // If there are command-line arguments, treat them as a JSON string
+    // of a Partial<RawGenericDocket> or a list of the same.
+    const docketsJSON = args[0];
+    try {
+      let dockets: Partial<RawGenericDocket>[];
+      const parsed = JSON.parse(docketsJSON);
+
+      if (Array.isArray(parsed)) {
+        dockets = parsed;
+      } else {
+        dockets = [parsed];
+      }
+      await runScraperForDockets(scraper, dockets);
+    } catch (e) {
+      console.error(
+        "Could not parse input as JSON, please pass in a JSON string of a Partial<RawGenericDocket> or a list of the same",
+        e
+      );
+    }
   } else {
     // If there are no arguments, run the full scraper
     await runScraper(scraper);
