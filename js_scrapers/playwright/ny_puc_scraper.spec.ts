@@ -5,7 +5,7 @@ import {
   RawGenericParty,
   RawArtificalPersonType,
 } from "../types";
-import { Page } from "playwright";
+import { Page, context } from "playwright";
 import { Browser, chromium } from "playwright";
 import { runCli } from "../cli_runner";
 import * as cheerio from "cheerio";
@@ -14,9 +14,107 @@ class NyPucScraper implements Scraper {
   state = "ny";
   jurisdiction_name = "ny_puc";
   page: Page;
+  context: any;
 
-  constructor(page: Page) {
+  constructor(page: Page, context: any ) {
     this.page = page;
+    this.context = context;
+  }
+
+  async getPage(url: string): Promise<any> {
+    await this.page.goto(url);
+    await this.page.waitForLoadState("networkidle");
+
+    console.log(`Getting page content at ${url}...`);
+    const html = await this.page.content();
+    const $ = cheerio.load(html);
+    return $;
+  }
+  async getCasePage(gov_id: string): Promise<any> {
+    const url = `https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo=${gov_id}`;
+    const page = await this.getPage(url);
+    return page;
+  }
+
+  async getCaseMeta(gov_id: string, $?: any): Promise<Partial<RawGenericDocket>> {
+    // get main page
+    // get metadata
+    if ($ !== undefined) {
+      
+    }
+  }
+
+  async GetCaseDocument(gov_id: string, sr_no: string, $?: any) {
+    if ($ === undefined) {
+      $ = await this.getCasePage(gov_id);
+      const url = `https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo=${gov_id}`;
+    }
+  }
+
+  async getDateCases(dateString: string): Promise<Partial<RawGenericDocket>[]> {
+    // eg dateString = 09/09/2025
+    const url = `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA=&MT=&MST=&CN=&SDT=${dateString}&SDF=${dateString}&C=&M=&CO=0`;
+    console.log(`getting cases for date ${dateString}`);
+    const cases: Partial<RawGenericDocket>[] = await this.getCasesAt(url);
+    return cases;
+  }
+  async getDateCaseDocuments(
+    dateString: string
+  ): Promise<Partial<RawGenericDocket>[]> {
+    // this would actually get both the new case and its openning documents in
+    // one swoop
+    // eg dateString = 09/09/2025
+    const url = `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=0&IA=&MT=&MST=&CN=&SDT=9${dateString}&SDF=9${dateString}&C=&M=&CO=0&DFF=${dateString}&DFT=${dateString}&DT=&CI=0&FC=`;
+    console.log(`getting cases for date ${dateString}`);
+    const cases: Partial<RawGenericDocket>[] = await this.getCasesAt(url);
+    return cases;
+  }
+
+  async getRows($: any) {
+    return $("#tblSearchedMatterExternal > tbody tr");
+  }
+
+  async getCasesAt(url: string): Promise<Partial<RawGenericDocket>[]> {
+    const cases: Partial<RawGenericDocket>[] = [];
+    console.log(`Navigating to ${url}`);
+    const $ = await this.getPage(url);
+
+    console.log("Extracting industry affected...");
+    const industry_affected = $("#GridPlaceHolder_lblSearchCriteriaValue")
+      .text()
+      .replace("Industry Affected:", "");
+    console.log(`Industry affected: ${industry_affected}`);
+
+    console.log("Extracting rows from the table...");
+    const rows = await this.getRows($);
+    console.log(`Found ${rows.length} rows.`);
+
+    rows.each((i, row) => {
+      const cells = $(row).find("td");
+      if (cells.length >= 6) {
+        console.log("Extracting case data from row...");
+        const case_govid = $(cells[0]).find("a").text();
+        const case_url = `https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo=${case_govid}`;
+        const matter_type = $(cells[1]).text();
+        const matter_subtype = $(cells[2]).text();
+        const opened_date = $(cells[3]).text();
+        const case_name = $(cells[4]).text();
+        const petitioner = $(cells[5]).text();
+
+        const caseData: Partial<RawGenericDocket> = {
+          case_govid,
+          case_url,
+          case_name,
+          opened_date: new Date(opened_date).toISOString(),
+          case_type: `${matter_type} - ${matter_subtype}`,
+          petitioner,
+          industry: industry_affected,
+        };
+        cases.push(caseData);
+        console.log(`Successfully extracted case: ${case_govid}`);
+      }
+    });
+    return cases;
   }
 
   async getCaseList(): Promise<Partial<RawGenericDocket>[]> {
@@ -24,55 +122,14 @@ class NyPucScraper implements Scraper {
     for (const industry_number of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
       console.log(`Processing industry index: ${industry_number}`);
       const industry_url = `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA=${industry_number}`;
-      console.log(`Navigating to ${industry_url}`);
-      await this.page.goto(industry_url);
-      await this.page.waitForLoadState("networkidle");
-
-      console.log("Getting page content...");
-      const html = await this.page.content();
-      const $ = cheerio.load(html);
-
-      console.log("Extracting industry affected...");
-      const industry_affected = $("#GridPlaceHolder_lblSearchCriteriaValue")
-        .text()
-        .replace("Industry Affected:", "");
-      console.log(`Industry affected: ${industry_affected}`);
-
-      console.log("Extracting rows from the table...");
-      const rows = $("#tblSearchedMatterExternal > tbody tr");
-      console.log(`Found ${rows.length} rows.`);
-
-      rows.each((i, row) => {
-        const cells = $(row).find("td");
-        if (cells.length >= 6) {
-          console.log("Extracting case data from row...");
-          const case_govid = $(cells[0]).find("a").text();
-          const case_url = `https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo=${case_govid}`;
-          const matter_type = $(cells[1]).text();
-          const matter_subtype = $(cells[2]).text();
-          const opened_date = $(cells[3]).text();
-          const case_name = $(cells[4]).text();
-          const petitioner = $(cells[5]).text();
-
-          const caseData: Partial<RawGenericDocket> = {
-            case_govid,
-            case_url,
-            case_name,
-            opened_date: new Date(opened_date).toISOString(),
-            case_type: `${matter_type} - ${matter_subtype}`,
-            petitioner,
-            industry: industry_affected,
-          };
-          cases.push(caseData);
-          console.log(`Successfully extracted case: ${case_govid}`);
-        }
-      });
+      const c = await this.getCasesAt(industry_url);
+      cases.push(...c);
     }
     return cases;
   }
 
   async getCaseDetails(
-    caseData: Partial<RawGenericDocket>,
+    caseData: Partial<RawGenericDocket>
   ): Promise<RawGenericDocket> {
     if (!caseData.case_url) {
       throw new Error("Case URL is missing");
@@ -92,7 +149,7 @@ class NyPucScraper implements Scraper {
     const documentsHtml = await this.page.content();
     const caseDocuments = await this.scrapeDocumentsFromHtml(
       documentsHtml,
-      docsTableSelector,
+      docsTableSelector
     );
 
     const partiesButtonSelector = "#GridPlaceHolder_lbtContact";
@@ -125,7 +182,7 @@ class NyPucScraper implements Scraper {
   }
 
   private async scrapePartiesFromHtml(
-    html: string,
+    html: string
   ): Promise<RawGenericParty[]> {
     const $ = cheerio.load(html);
     const parties: RawGenericParty[] = [];
@@ -167,7 +224,7 @@ class NyPucScraper implements Scraper {
 
   private async scrapeDocumentsFromHtml(
     html: string,
-    tableSelector: string,
+    tableSelector: string
   ): Promise<RawGenericFiling[]> {
     console.log("Starting document extraction from HTML...");
     const $ = cheerio.load(html);
@@ -214,9 +271,9 @@ class NyPucScraper implements Scraper {
             url: new URL(
               attachmentUrl.replace(
                 "../",
-                "https://documents.dps.ny.gov/public/",
+                "https://documents.dps.ny.gov/public/"
               ),
-              this.page.url(),
+              this.page.url()
             ).toString(),
             attachment_type: "primary",
             attachment_subtype: "",
@@ -237,8 +294,7 @@ async function main() {
   try {
     browser = await chromium.launch();
     const context = await browser.newContext();
-    const page = await context.newPage();
-    const scraper = new NyPucScraper(page);
+    const scraper = new NyPucScraper(context, context);
     await runCli(scraper);
   } catch (error) {
     console.error("Scraper failed:", error);
