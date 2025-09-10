@@ -50,15 +50,15 @@ class NyPucScraper implements Scraper {
           const case_url = `https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo=${case_govid}`;
           const matter_type = $(cells[1]).text();
           const matter_subtype = $(cells[2]).text();
-          const opened_date = $(cells[3]).text();
-          const case_name = $(cells[4]).text();
-          const petitioner = $(cells[5]).text();
+          const opened_date_str = $(cells[3]).text().trim();
+          const [month, day, year] = opened_date_str.split('/').map(Number);
+          const opened_date = new Date(Date.UTC(year, month - 1, day));
 
           const caseData: Partial<RawGenericDocket> = {
             case_govid,
             case_url,
             case_name,
-            opened_date: new Date(opened_date).toISOString(),
+            opened_date: opened_date.toISOString().split('T')[0],
             case_type: `${matter_type} - ${matter_subtype}`,
             petitioner,
             industry: industry_affected,
