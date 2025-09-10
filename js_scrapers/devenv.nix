@@ -4,6 +4,7 @@ let
   pkgs-playwright = import inputs.nixpkgs-playwright { system = pkgs.stdenv.system; };
   browsers = (builtins.fromJSON (builtins.readFile "${pkgs-playwright.playwright-driver}/browsers.json")).browsers;
   chromium-rev = (builtins.head (builtins.filter (x: x.name == "chromium") browsers)).revision;
+  # chromium-rev = "1181";
 in
 {
   # https://devenv.sh/basics/
@@ -13,11 +14,14 @@ in
     PLAYWRIGHT_NODEJS_PATH = "${pkgs.nodejs}/bin/node";
     PLAYWRIGHT_LAUNCH_OPTIONS_EXECUTABLE_PATH = "${pkgs-playwright.playwright.browsers}/chromium-${chromium-rev}/chrome-linux/chrome";
   };
+  dotenv.enable = true;
 
   # https://devenv.sh/packages/
   packages = with pkgs; [
     just
     nodejs
+    nodePackages.ts-node
+    typescript
   ];
 
   # https://devenv.sh/languages/
@@ -28,13 +32,16 @@ in
       install.enable = true; 
     };
   };
+  languages.typescript = {
+    enable = true;
+  };
 
   dotenv.disableHint = true;
   cachix.enable = false;
 
   # https://devenv.sh/scripts/
   scripts.intro.exec = ''
-    playwrightNpmVersion="$(npm show @playwright/test version)"
+    playwrightNpmVersion="$(node -p "require('./package.json').devDependencies['@playwright/test']")"
     echo "❄️ Playwright nix version: ${pkgs-playwright.playwright.version}"
     echo "📦 Playwright npm version: $playwrightNpmVersion"
 

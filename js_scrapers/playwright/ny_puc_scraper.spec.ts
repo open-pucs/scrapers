@@ -1,11 +1,9 @@
-import { Scraper, runScraper } from "../pipeline";
+import { Scraper } from "../pipeline";
 import {
   RawGenericDocket,
   RawGenericFiling,
   RawGenericParty,
   RawArtificalPersonType,
-  RawDocketWithJurisdiction,
-  JurisdictionInfo,
 } from "../types";
 import { Page } from "playwright";
 import { Browser, chromium } from "playwright";
@@ -80,8 +78,7 @@ class NyPucScraper implements Scraper {
 
   async getCaseDetails(
     caseData: Partial<RawGenericDocket>,
-    savepath_generator: (input: string) => string,
-  ): Promise<RawDocketWithJurisdiction> {
+  ): Promise<RawGenericDocket> {
     if (!caseData.case_url) {
       throw new Error("Case URL is missing");
     }
@@ -109,16 +106,7 @@ class NyPucScraper implements Scraper {
       indexed_at: new Date().toISOString(),
     } as RawGenericDocket;
 
-    const jurisdictionInfo: JurisdictionInfo = {
-      country: "usa",
-      state: this.state,
-      jurisdiction: this.jurisdiction_name,
-    };
-
-    return {
-      docket: fullCaseData,
-      jurisdiction: jurisdictionInfo,
-    };
+    return fullCaseData;
   }
   private async scrapeParties(): Promise<RawGenericParty[]> {
     // To begin take the page and then click on this element.
