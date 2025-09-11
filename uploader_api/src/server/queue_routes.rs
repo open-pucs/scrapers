@@ -7,17 +7,17 @@ use crate::case_worker::ProcessCaseWithoutDownload;
 
 use mycorrhiza_common::tasks::{TaskStatusDisplay, workers::add_task_to_queue};
 
-pub async fn submit_case_to_queue_without_download(
-    Json(case): Json<RawDocketWithJurisdiction>,
+pub async fn submit_cases_to_queue_without_download(
+    Json(cases): Json<Vec<RawDocketWithJurisdiction>>,
 ) -> impl IntoApiResponse {
-    let priority = 0;
-    info!(case_number = %case.docket.case_govid, %priority, "Request received to submit case to queue");
-    let res = add_task_to_queue(ProcessCaseWithoutDownload(case), priority).await;
-    (
-        axum::http::StatusCode::OK,
-        Json(TaskStatusDisplay::from(res)),
-    )
-        .into_response()
+    let mut return_results = vec![];
+    for case in cases {
+        let priority = 0;
+        info!(case_number = %case.docket.case_govid, %priority, "Request received to submit case to queue");
+        let res = add_task_to_queue(ProcessCaseWithoutDownload(case), priority).await;
+        return_results.push(TaskStatusDisplay::from(res));
+    }
+    (axum::http::StatusCode::OK, Json(return_results)).into_response()
 }
 
 pub fn submit_case_to_queue_docs(op: TransformOperation) -> TransformOperation {

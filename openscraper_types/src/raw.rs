@@ -96,6 +96,8 @@ pub struct RawGenericFiling {
     #[serde(default)]
     pub filling_govid: String,
     #[serde(default)]
+    pub filling_url: String,
+    #[serde(default)]
     pub name: String,
     #[serde(default)]
     pub organization_authors: Vec<String>,
