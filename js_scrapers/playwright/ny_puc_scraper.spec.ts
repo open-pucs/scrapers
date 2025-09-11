@@ -29,6 +29,7 @@ interface ScrapingOptions {
   endDate?: string;
   fromFile?: string;
   outFile?: string;
+  headed?: boolean;
 }
 
 // class NyPucScraper implements Scraper {
@@ -253,14 +254,14 @@ class NyPucScraper {
 
   // gets ALL cases
   async getAllCaseList(): Promise<Partial<RawGenericDocket>[]> {
-    const cases: Partial<RawGenericDocket>[] = [];
-    for (const industry_number of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+    const industry_numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const promises = industry_numbers.map((industry_number) => {
       console.log(`Processing industry index: ${industry_number}`);
       const industry_url = `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA=${industry_number}`;
-      const c = await this.getCasesAt(industry_url);
-      cases.push(...c);
-    }
-    return cases;
+      return this.getCasesAt(industry_url);
+    });
+    const results = await Promise.all(promises);
+    return results.flat();
   }
   async getAllMissingCaseList(): Promise<Partial<RawGenericDocket>[]> {
     const cases = await this.getAllCaseList();
@@ -527,26 +528,38 @@ class NyPucScraper {
 
           case ScrapingMode.PARTIES: {
             const parties = await this.scrapePartiesOnly(govId);
-            return { case_govid: govId, case_parties: parties };
+            return { case_govid: govId, case_parties: [] };
           }
 
-          case ScrapingMode.FULL_EXTRACTION: {
+          default: {
+            console.log("Party scraping disabled on a temporary basis.");
             const [metadata, documents, parties] = await Promise.all([
               this.getCaseMeta(govId),
               this.scrapeDocumentsOnly(govId),
-              this.scrapePartiesOnly(govId),
+
+              // TODO: Get this working later its to slow right now
+              // this.scrapePartiesOnly(govId),
+              [],
             ]);
-
+            let return_case: Partial<RawGenericDocket> = { case_govid: govId };
             if (metadata) {
-              metadata.filings = documents;
-              metadata.case_parties = parties;
-              return metadata;
+              return_case = metadata;
             }
-            return null;
-          }
 
-          default:
-            throw new Error(`Unsupported scraping mode: ${mode}`);
+            return_case.filings = documents;
+            return_case.case_parties = parties;
+            // TODO: Make this an optional paramater that can be set with the CLI TOOL
+            const uploadIncremental = true;
+            if (uploadIncremental) {
+              try {
+                console.log("trying to push fillings to the uploader.");
+                await pushResultsToUploader([return_case], mode);
+              } catch (e) {
+                console.log(e);
+              }
+            }
+            return return_case;
+          }
         }
       } catch (error) {
         console.error(`Error processing ${govId} in mode ${mode}:`, error);
@@ -598,7 +611,7 @@ function parseArguments(): ScrapingOptions | null {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    return null; // Use default CLI behavior
+    return null; // No arguments, will be handled in main
   }
 
   let mode = ScrapingMode.FULL_ALL_MISSING;
@@ -608,6 +621,7 @@ function parseArguments(): ScrapingOptions | null {
   let endDate: string | undefined;
   let fromFile: string | undefined;
   let outFile: string | undefined;
+  let headed = false; // Default to headless
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -639,12 +653,14 @@ function parseArguments(): ScrapingOptions | null {
       fromFile = args[++i];
     } else if (arg === "-o" || arg === "--outfile") {
       outFile = args[++i];
+    } else if (arg === "--headed") {
+      headed = true;
     } else if (!arg.startsWith("--")) {
-      // If it doesn't start with --, treat as JSON (for backward compatibility)
+      // Backward compatibility for JSON array
       try {
         const parsed = JSON.parse(arg);
         if (Array.isArray(parsed)) {
-          return null; // Let runCli handle this
+          return null; // Let old runCli handle this
         }
       } catch {
         // Not JSON, ignore
@@ -674,6 +690,7 @@ function parseArguments(): ScrapingOptions | null {
     endDate,
     fromFile,
     outFile,
+    headed,
   };
 }
 
@@ -799,7 +816,6 @@ async function runCustomScraping(
   if (options.govIds && options.govIds.length > 0) {
     const results = await scraper.scrapeByGovIds(options.govIds, options.mode);
 
-    await pushResultsToUploader(results, options.mode);
     console.log(`Scraped ${results.length} results in ${options.mode} mode`);
 
     if (options.outFile) {
@@ -816,12 +832,21 @@ async function runCustomScraping(
 async function main() {
   let browser: Browser | null = null;
   try {
-    browser = await chromium.launch({ headless: false });
+    const customOptions = parseArguments();
+
+    if (!customOptions) {
+      console.error("Error: No scraping arguments provided. Exiting.");
+      console.log(
+        "Please provide arguments to run the scraper, e.g. --mode full-all-missing",
+      );
+      process.exit(1);
+    }
+
+    // Launch the browser based on the 'headed' option
+    browser = await chromium.launch({ headless: !customOptions.headed });
     const context = await browser.newContext();
     const rootpage = await context.newPage();
     const scraper = new NyPucScraper(rootpage, context, browser);
-
-    const customOptions = parseArguments();
 
     // Use custom scraping logic
     await runCustomScraping(scraper, customOptions);
