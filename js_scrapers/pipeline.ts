@@ -14,6 +14,11 @@ export interface Scraper {
     caseData: Partial<RawGenericDocket>,
     savepath_generator: (input: string) => string,
   ) => Promise<RawGenericDocket>;
+  processTasksWithQueue?: <T, R>(
+    tasks: T[],
+    taskProcessor: (task: T) => Promise<R>,
+    maxConcurrent?: number,
+  ) => Promise<R[]>;
 }
 
 /**
@@ -143,8 +148,18 @@ export async function runScraper(scraper: Scraper) {
   await saveJsonToS3(makeS3JsonSavePath("caselist_differential"), diffResult);
 
   // 3. Process each case and submit it to the API
-  for (const basicCaseData of casesToProcess) {
-    await processDocket(scraper, basicCaseData, makeS3JsonSavePath);
+  if (scraper.processTasksWithQueue && casesToProcess.length > 1) {
+    console.log(`Processing ${casesToProcess.length} cases in parallel`);
+    await scraper.processTasksWithQueue(
+      casesToProcess,
+      (basicCaseData) => processDocket(scraper, basicCaseData, makeS3JsonSavePath),
+      4 // Default max concurrent
+    );
+  } else {
+    // Fallback to sequential processing
+    for (const basicCaseData of casesToProcess) {
+      await processDocket(scraper, basicCaseData, makeS3JsonSavePath);
+    }
   }
 
   console.log("Scraper run finished.");

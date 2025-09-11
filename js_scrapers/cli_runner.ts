@@ -24,8 +24,18 @@ export async function runScraperForDockets(
   const makeS3JsonSavePath = (path_loc: string) =>
     path.join(basePath, path_loc, `${timeNow}.json`);
 
-  for (const basicCaseData of dockets) {
-    await processDocket(scraper, basicCaseData, makeS3JsonSavePath);
+  if (scraper.processTasksWithQueue && dockets.length > 1) {
+    console.log(`Processing ${dockets.length} dockets in parallel`);
+    await scraper.processTasksWithQueue(
+      dockets,
+      (basicCaseData) => processDocket(scraper, basicCaseData, makeS3JsonSavePath),
+      4 // Default max concurrent
+    );
+  } else {
+    // Fallback to sequential processing
+    for (const basicCaseData of dockets) {
+      await processDocket(scraper, basicCaseData, makeS3JsonSavePath);
+    }
   }
 
   console.log("Scraper run finished for specific dockets.");
