@@ -12,12 +12,12 @@ import * as cheerio from "cheerio";
 import * as fs from "fs";
 
 enum ScrapingMode {
-  FULL = "full",
   METADATA = "meta",
   DOCUMENTS = "docs",
   PARTIES = "parties",
   DATES = "dates",
   FULL_EXTRACTION = "full-extraction",
+  FULL_ALL_MISSING = "full-all-missing",
   FILINGS_BETWEEN_DATES = "filings-between-dates",
 }
 
@@ -144,37 +144,26 @@ class NyPucScraper {
     await context.close();
     return $;
   }
-  async getCaseTitle(matter_seq: string): Promise<string> {
-    const url = `https://documents.dps.ny.gov/public/MatterManagement/ExpandTitle.aspx?MatterSeq=${matter_seq}`;
-    const $ = await this.getPage(url);
-    return $("$txtTitle");
-  }
-
-  async getCasePage(gov_id: string): Promise<any> {
-    const url = `https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo=${gov_id}`;
-    const page = await this.getPage(url);
-    return page;
-  }
 
   async getDateCases(dateString: string): Promise<Partial<RawGenericDocket>[]> {
-    pan;
     // eg dateString = 09/09/2025
     const url = `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA=&MT=&MST=&CN=&SDT=${dateString}&SDF=${dateString}&C=&M=&CO=0`;
     console.log(`getting cases for date ${dateString}`);
     const cases: Partial<RawGenericDocket>[] = await this.getCasesAt(url);
     return cases;
   }
-  async getDateCaseDocuments(
-    dateString: string,
-  ): Promise<Partial<RawGenericDocket>[]> {
-    // this would actually get both the new case and its openning documents in
-    // one swoop
-    // eg dateString = 09/09/2025
-    const url = `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=0&IA=&MT=&MST=&CN=&SDT=9${dateString}&SDF=9${dateString}&C=&M=&CO=0&DFF=${dateString}&DFT=${dateString}&DT=&CI=0&FC=`;
-    console.log(`getting cases for date ${dateString}`);
-    const cases: Partial<RawGenericDocket>[] = await this.getCasesAt(url);
-    return cases;
-  }
+  // FIXME: This function is totally wrong its trying to extract caserows
+  // async getDateCaseDocuments(
+  //   dateString: string,
+  // ): Promise<Partial<RawGenericDocket>[]> {
+  //   // this would actually get both the new case and its openning documents in
+  //   // one swoop
+  //   // eg dateString = 09/09/2025
+  //   const url = `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=0&IA=&MT=&MST=&CN=&SDT=9${dateString}&SDF=9${dateString}&C=&M=&CO=0&DFF=${dateString}&DFT=${dateString}&DT=&CI=0&FC=`;
+  //   console.log(`getting cases for date ${dateString}`);
+  //   const cases: Partial<RawGenericDocket>[] = await this.getCasesAt(url);
+  //   return cases;
+  // }
 
   async getGeneralRows($: any) {
     return $("#tblSearchedMatterExternal > tbody tr");
@@ -232,8 +221,8 @@ class NyPucScraper {
   }
 
   async filterOutExisting(
-    cases: RawGenericDocket[],
-  ): Promise<RawGenericDocket[]> {
+    cases: Partial<RawGenericDocket>[],
+  ): Promise<Partial<RawGenericDocket>[]> {
     const caseDiffUrl =
       "http://localhost:33399/public/caselist/ny/ny_puc/casedata_differential";
 
@@ -263,7 +252,7 @@ class NyPucScraper {
   }
 
   // gets ALL cases
-  async getCaseList(): Promise<Partial<RawGenericDocket>[]> {
+  async getAllCaseList(): Promise<Partial<RawGenericDocket>[]> {
     const cases: Partial<RawGenericDocket>[] = [];
     for (const industry_number of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
       console.log(`Processing industry index: ${industry_number}`);
@@ -272,6 +261,11 @@ class NyPucScraper {
       cases.push(...c);
     }
     return cases;
+  }
+  async getAllMissingCaseList(): Promise<Partial<RawGenericDocket>[]> {
+    const cases = await this.getAllCaseList();
+    const filtered_cases = await this.filterOutExisting(cases);
+    return filtered_cases;
   }
 
   async getCaseMeta(gov_id: string): Promise<Partial<RawGenericDocket>> {
@@ -287,15 +281,22 @@ class NyPucScraper {
   ): Promise<RawGenericParty[]> {
     const $ = cheerio.load(html);
     const parties: RawGenericParty[] = [];
-    const rows = $("#grdParty tr.gridrow, #grdParty tr.gridaltrow");
+    const partiesTablebodySelector = "#tblActiveParty > tbody";
+    const rows = $(`${partiesTablebodySelector} tr`);
     console.log(`Found ${rows.length} party rows.`);
+    console.log("Parties table HTML:", $(`${partiesTablebodySelector}`).html());
 
     rows.each((i, row) => {
+      console.log(`Row ${i}:`, $(row).html());
       const cells = $(row).find("td");
       const nameCell = $(cells[1]).text();
       const emailPhoneCell = $(cells[4]).text();
       const addressCell = $(cells[3]).text();
       const companyCell = $(cells[2]).text();
+      console.log(`  Name cell: ${nameCell}`);
+      console.log(`  Company cell: ${companyCell}`);
+      console.log(`  Address cell: ${addressCell}`);
+      console.log(`  Email/Phone cell: ${emailPhoneCell}`);
 
       const nameParts = nameCell.split("\n");
       const fullName = nameParts[0];
@@ -341,8 +342,21 @@ class NyPucScraper {
         const filingNo = $(docCells[5]).text().trim();
         if (!filingNo) return;
 
+        const filingUrlRaw = $(docCells[5]).find("a").attr("href");
+        const fillingUrl = new URL(
+          filingUrlRaw.replace("../", "https://documents.dps.ny.gov/public/"),
+          url,
+        ).toString();
         const documentTitle = $(docCells[3]).find("a").text().trim();
-        const attachmentUrl = $(docCells[3]).find("a").attr("href");
+        const attachmentUrlRaw = $(docCells[3]).find("a").attr("href");
+
+        const attachmentUrl = new URL(
+          attachmentUrlRaw.replace(
+            "../",
+            "https://documents.dps.ny.gov/public/",
+          ),
+          url,
+        ).toString();
         const fileName = $(docCells[6]).text().trim();
 
         if (!filingsMap.has(filingNo)) {
@@ -353,6 +367,7 @@ class NyPucScraper {
           filingsMap.set(filingNo, {
             name: documentTitle,
             filed_date: new Date(dateFiled).toISOString(),
+            filling_url: fillingUrl,
             organization_authors: [],
             individual_authors: [],
             organization_authors_blob: authors,
@@ -370,13 +385,7 @@ class NyPucScraper {
           filing.attachments.push({
             name: documentTitle,
             document_extension: fileName.split(".").pop() || "",
-            url: new URL(
-              attachmentUrl.replace(
-                "../",
-                "https://documents.dps.ny.gov/public/",
-              ),
-              url,
-            ).toString(),
+            url: attachmentUrl,
             attachment_type: "primary",
             attachment_subtype: "",
             extra_metadata: { fileName },
@@ -439,13 +448,20 @@ class NyPucScraper {
       const partiesButtonSelector = "#GridPlaceHolder_lbtContact";
       await page.click(partiesButtonSelector);
       await page.waitForLoadState("networkidle");
-      // Click again for extra safety??
-      await page.click(partiesButtonSelector);
-      await page.waitForLoadState("networkidle");
 
       const partiesTableSelector = 'select[name="tblActiveParty_length"]';
       await page.selectOption(partiesTableSelector, "-1");
       await page.waitForLoadState("networkidle");
+
+      await page.waitForFunction(
+        () => {
+          const tableBody = document.querySelector("#tblActiveParty > tbody");
+          if (!tableBody) return false;
+          const tableHtml = tableBody.innerHTML;
+          return !tableHtml.includes("No data available in table");
+        },
+        { timeout: 10000 },
+      );
 
       const partiesHtml = await page.content();
       const parties = await this.scrapePartiesFromHtml(partiesHtml);
@@ -471,6 +487,21 @@ class NyPucScraper {
       console.error(`Error scraping metadata for ${govId}:`, error);
       return null;
     }
+  }
+
+  async scrapeByPartialDocket(
+    partialDockets: Partial<RawGenericDocket>[],
+    mode: ScrapingMode,
+  ): Promise<Partial<RawGenericDocket>[]> {
+    // Collect valid case_govid values
+    const govIds = partialDockets
+      .map((d) => d.case_govid)
+      .filter(
+        (id): id is string => typeof id === "string" && id.trim().length > 0,
+      );
+
+    // Call the existing scraper with those IDs
+    return this.scrapeByGovIds(govIds, mode);
   }
 
   async scrapeByGovIds(
@@ -570,7 +601,7 @@ function parseArguments(): ScrapingOptions | null {
     return null; // Use default CLI behavior
   }
 
-  let mode = ScrapingMode.FULL;
+  let mode = ScrapingMode.FULL_ALL_MISSING;
   let govIds: string[] = [];
   let dateString: string | undefined;
   let beginDate: string | undefined;
@@ -666,6 +697,46 @@ async function saveResultsToFile(
   }
 }
 
+async function pushResultsToUploader(
+  results: Partial<RawGenericDocket>[],
+  mode: ScrapingMode,
+) {
+  if (mode == ScrapingMode.DOCUMENTS) {
+    return null;
+  }
+  if (mode == ScrapingMode.PARTIES) {
+    return null;
+  }
+  if (mode == ScrapingMode.METADATA) {
+    return null;
+  }
+  const url = "http://localhost:33399/admin/cases/submit";
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(results),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Upload failed: ${response.status} ${response.statusText} - ${errorText}`,
+      );
+    }
+
+    return await response.json();
+  } catch (err) {
+    console.error("Error uploading results:", err);
+    // throw err;
+    return null;
+  }
+}
+
 async function runCustomScraping(
   scraper: NyPucScraper,
   options: ScrapingOptions,
@@ -708,9 +779,27 @@ async function runCustomScraping(
     }
     return;
   }
+  if (options.mode === ScrapingMode.FULL_ALL_MISSING) {
+    const missing_govid_dockets = await scraper.getAllMissingCaseList();
+    const results = await scraper.scrapeByPartialDocket(
+      missing_govid_dockets,
+      options.mode,
+    );
+    await pushResultsToUploader(results, options.mode);
+    console.log(`Scraped ${results.length} results in ${options.mode} mode`);
+
+    if (options.outFile) {
+      await saveResultsToFile(results, options.outFile, options.mode);
+    } else {
+      console.log(JSON.stringify(results, null, 2));
+    }
+    return;
+  }
 
   if (options.govIds && options.govIds.length > 0) {
     const results = await scraper.scrapeByGovIds(options.govIds, options.mode);
+
+    await pushResultsToUploader(results, options.mode);
     console.log(`Scraped ${results.length} results in ${options.mode} mode`);
 
     if (options.outFile) {
