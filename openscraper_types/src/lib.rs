@@ -8,8 +8,13 @@ pub mod jurisdictions {
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
 
+    fn default_country() -> String {
+        "usa".to_string()
+    }
+
     #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Hash, PartialEq, Eq)]
     pub struct JurisdictionInfo {
+        #[serde(default = "default_country")]
         pub country: String,
         pub state: String,
         pub jurisdiction: String,
@@ -36,4 +41,3 @@ pub mod jurisdictions {
         }
     }
 }
-

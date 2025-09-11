@@ -544,6 +544,7 @@ class NyPucScraper {
             let return_case: Partial<RawGenericDocket> = { case_govid: govId };
             if (metadata) {
               return_case = metadata;
+              return_case.case_govid = govId;
             }
 
             return_case.filings = documents;
@@ -730,13 +731,21 @@ async function pushResultsToUploader(
   const url = "http://localhost:33399/admin/cases/submit";
 
   try {
+    const payload = results.map((docket) => ({
+      docket,
+      jurisdiction: {
+        country: "usa",
+        name: "ny_puc",
+        state: "ny",
+      },
+    }));
     const response = await fetch(url, {
       method: "POST",
       headers: {
         accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(results),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
