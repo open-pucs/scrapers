@@ -191,10 +191,17 @@ class NyPucScraper implements Scraper {
     const $ = await this.getPage(url);
 
     console.log("Extracting industry affected...");
-    const industry_affected = $("#GridPlaceHolder_lblSearchCriteriaValue")
+    let industry_affected = $("#GridPlaceHolder_lblSearchCriteriaValue")
       .text()
-      .replace("Industry Affected:", "");
-    console.log(`Industry affected: ${industry_affected}`);
+      .trim();
+
+    if (industry_affected.startsWith("Industry Affected:")) {
+      industry_affected = industry_affected
+        .replace("Industry Affected:", "")
+        .trim();
+    } else {
+      industry_affected = "Unknown";
+    }
 
     console.log("Extracting rows from the table...");
     const rows = await this.getRows($);
@@ -217,7 +224,8 @@ class NyPucScraper implements Scraper {
           case_url,
           case_name,
           opened_date: new Date(opened_date).toISOString(),
-          case_type: `${matter_type} - ${matter_subtype}`,
+          case_type: matter_type,
+          case_subtype: matter_subtype,
           petitioner,
           industry: industry_affected,
         };
@@ -848,4 +856,3 @@ async function main() {
 }
 
 main();
-
