@@ -236,6 +236,37 @@ class NyPucScraper implements Scraper {
     return cases;
   }
 
+  async filterOutExisting(
+    cases: RawGenericDocket[],
+  ): Promise<RawGenericDocket[]> {
+    const caseDiffUrl =
+      "http://localhost:33399/public/caselist/ny/ny_puc/casedata_differential";
+
+    try {
+      const response = await fetch(caseDiffUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cases),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data || !Array.isArray(data.to_process)) {
+        throw new Error("Invalid response format: missing 'to_process' array");
+      }
+
+      // Assume the backend returns objects in the correct RawGenericDocket shape
+      return data.to_process as RawGenericDocket[];
+    } catch (err) {
+      console.error("filterOutExisting failed:", err);
+      return [];
+    }
+  }
+
   // gets ALL cases
   async getCaseList(): Promise<Partial<RawGenericDocket>[]> {
     const cases: Partial<RawGenericDocket>[] = [];
