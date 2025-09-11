@@ -19,6 +19,7 @@ enum ScrapingMode {
   DATES = "dates",
   FULL_EXTRACTION = "full-extraction",
   FILINGS_BETWEEN_DATES = "filings-between-dates",
+  CASE_LIST = "case-list",
 }
 
 interface ScrapingOptions {
@@ -38,14 +39,22 @@ class NyPucScraper implements Scraper {
   browser: Browser;
   rootPage: Page;
   max_tabs: number = 10;
-  max_concurrent_browsers: number = 4;
-  pageCache: Record<string, any> = {};
+  max_concurrent_browsers: number = 10;
+  pageCache: Map<string, any> = new Map();
   urlTable: Record<string, string> = {};
+  pageFetchPromises: Record<string, Promise<any>> = {};
+  private maxCacheSize = 100;
 
   constructor(page: Page, context: any, browser: Browser) {
     this.rootPage = page;
     this.context = context;
     this.browser = browser;
+  }
+
+  clearCache() {
+    this.pageCache.clear();
+    this.urlTable = {};
+    console.log("Cleared page cache and URL table");
   }
 
   pages(): any {
@@ -127,21 +136,46 @@ class NyPucScraper implements Scraper {
 
   async getPage(url: string): Promise<any> {
     this.urlTable[url] = url;
-    const cached = this.pageCache[url];
+    const cached = this.pageCache.get(url);
     if (cached !== undefined) {
       return cached;
     }
-    const { context, page } = await this.newWindow();
-    await page.goto(url);
-    await page.waitForLoadState("networkidle");
-    console.log(`Getting page content at ${url}...`);
-    const html = await page.content();
 
-    const $ = cheerio.load(html);
-    this.pageCache[url] = $;
-    page.url();
-    await context.close();
-    return $;
+    // Check if we're already fetching this page
+    if (this.pageFetchPromises[url]) {
+      return await this.pageFetchPromises[url];
+    }
+
+    // Start fetching and cache the promise
+    this.pageFetchPromises[url] = this.fetchPageContent(url);
+    const result = await this.pageFetchPromises[url];
+
+    // Clean up the promise cache
+    delete this.pageFetchPromises[url];
+
+    return result;
+  }
+
+  private async fetchPageContent(url: string): Promise<any> {
+    const { context, page } = await this.newWindow();
+    try {
+      await page.goto(url);
+      await page.waitForLoadState("networkidle");
+      console.log(`Getting page content at ${url}...`);
+      const html = await page.content();
+
+      const $ = cheerio.load(html);
+      
+      // Implement LRU cache with size limit
+      if (this.pageCache.size >= this.maxCacheSize) {
+        const firstKey = this.pageCache.keys().next().value;
+        this.pageCache.delete(firstKey);
+      }
+      this.pageCache.set(url, $);
+      return $;
+    } finally {
+      await context.close();
+    }
   }
   async getCaseTitle(matter_seq: string): Promise<string> {
     const url = `https://documents.dps.ny.gov/public/MatterManagement/ExpandTitle.aspx?MatterSeq=${matter_seq}`;
@@ -269,14 +303,22 @@ class NyPucScraper implements Scraper {
 
   // gets ALL cases
   async getCaseList(): Promise<Partial<RawGenericDocket>[]> {
-    const cases: Partial<RawGenericDocket>[] = [];
-    for (const industry_number of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+    const industryNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+    const scrapeIndustry = async (industry_number: number): Promise<Partial<RawGenericDocket>[]> => {
       console.log(`Processing industry index: ${industry_number}`);
       const industry_url = `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA=${industry_number}`;
-      const c = await this.getCasesAt(industry_url);
-      cases.push(...c);
-    }
-    return cases;
+      return await this.getCasesAt(industry_url);
+    };
+
+    console.log(`Scraping ${industryNumbers.length} industries with max 10 concurrent windows`);
+    const industryResults = await this.processTasksWithQueue(
+      industryNumbers,
+      scrapeIndustry,
+      10
+    );
+
+    return industryResults.flat();
   }
 
   async getCaseMeta(
@@ -355,7 +397,7 @@ class NyPucScraper implements Scraper {
       //
       try {
         await context.close();
-      } catch {}
+      } catch { }
     }
   }
 
@@ -412,56 +454,75 @@ class NyPucScraper implements Scraper {
 
     console.log(`Found ${docRows.length} document rows.`);
 
-    docRows.each((i, docRow) => {
-      const docCells = $(docRow).find("td");
-      if (docCells.length > 6) {
-        const filingNo = $(docCells[5]).text().trim();
-        if (!filingNo) return;
+    // Convert cheerio objects to array for better processing
+    const rowsArray = docRows.toArray();
 
-        const documentTitle = $(docCells[3]).find("a").text().trim();
-        const attachmentUrl = $(docCells[3]).find("a").attr("href");
-        const fileName = $(docCells[6]).text().trim();
+    // Process rows in smaller chunks to prevent memory buildup
+    const chunkSize = 50;
+    const chunks = [];
+    for (let i = 0; i < rowsArray.length; i += chunkSize) {
+      chunks.push(rowsArray.slice(i, i + chunkSize));
+    }
 
-        if (!filingsMap.has(filingNo)) {
-          const documentType = $(docCells[2]).text().trim();
-          const dateFiled = $(docCells[1]).text().trim();
-          const authors = $(docCells[4]).text().trim();
+    // Process chunks sequentially to control memory usage
+    for (const chunk of chunks) {
+      chunk.forEach(docRow => {
+          const docCells = $(docRow).find("td");
+          if (docCells.length > 6) {
+            const filingNo = $(docCells[5]).text().trim();
+            if (!filingNo) return;
 
-          filingsMap.set(filingNo, {
-            name: documentTitle,
-            filed_date: new Date(dateFiled).toISOString(),
-            organization_authors: [],
-            individual_authors: [],
-            organization_authors_blob: authors,
-            individual_authors_blob: "",
-            filing_type: documentType,
-            description: "",
-            attachments: [],
-            extra_metadata: { fileName },
-            filling_govid: filingNo,
-          });
-        }
+            const documentTitle = $(docCells[3]).find("a").text().trim();
+            const attachmentUrl = $(docCells[3]).find("a").attr("href");
+            const fileName = $(docCells[6]).text().trim();
 
-        const filing = filingsMap.get(filingNo);
-        if (filing && attachmentUrl) {
-          filing.attachments.push({
-            name: documentTitle,
-            document_extension: fileName.split(".").pop() || "",
-            url: new URL(
-              attachmentUrl.replace(
-                "../",
-                "https://documents.dps.ny.gov/public/",
-              ),
-              url,
-            ).toString(),
-            attachment_type: "primary",
-            attachment_subtype: "",
-            extra_metadata: { fileName },
-            attachment_govid: "",
-          });
-        }
+            if (!filingsMap.has(filingNo)) {
+              const documentType = $(docCells[2]).text().trim();
+              const dateFiled = $(docCells[1]).text().trim();
+              const authors = $(docCells[4]).text().trim();
+
+              filingsMap.set(filingNo, {
+                name: documentTitle,
+                filed_date: new Date(dateFiled).toISOString(),
+                organization_authors: [],
+                individual_authors: [],
+                organization_authors_blob: authors,
+                individual_authors_blob: "",
+                filing_type: documentType,
+                description: "",
+                attachments: [],
+                extra_metadata: { fileName },
+                filling_govid: filingNo,
+              });
+            }
+
+            const filing = filingsMap.get(filingNo);
+            if (filing && attachmentUrl) {
+              filing.attachments.push({
+                name: documentTitle,
+                document_extension: fileName.split(".").pop() || "",
+                url: new URL(
+                  attachmentUrl.replace(
+                    "../",
+                    "https://documents.dps.ny.gov/public/",
+                  ),
+                  url,
+                ).toString(),
+                attachment_type: "primary",
+                attachment_subtype: "",
+                extra_metadata: { fileName },
+                attachment_govid: "",
+              });
+            }
+          }
+      });
+      
+      // Allow garbage collection between chunks
+      if (global.gc) {
+        global.gc();
       }
-    });
+      await new Promise(resolve => setImmediate(resolve));
+    }
 
     console.log("Finished document extraction.");
     return Array.from(filingsMap.values());
@@ -488,7 +549,7 @@ class NyPucScraper implements Scraper {
         const docsTableSelector = "#tblPubDoc > tbody";
         try {
           await page.waitForSelector(docsTableSelector, { timeout: 30_000 });
-        } catch {} // Ignore timeout, just means no documents table
+        } catch { } // Ignore timeout, just means no documents table
 
         const documentsHtml = await page.content();
         const documents = await this.scrapeDocumentsFromHtml(
@@ -496,7 +557,13 @@ class NyPucScraper implements Scraper {
           docsTableSelector,
           page.url(),
         );
+        // Associate documents with case ID for easier batching
+        documents.forEach(doc => {
+          if (!doc.extra_metadata) doc.extra_metadata = {};
+          doc.extra_metadata.case_govid = govId;
+        });
         await windowContext.close();
+        windowContext = null;
         return documents;
       } catch (error) {
         console.error(`Error scraping documents for ${govId}:`, error);
@@ -542,7 +609,13 @@ class NyPucScraper implements Scraper {
 
         const partiesHtml = await page.content();
         const parties = await this.scrapePartiesFromHtml(partiesHtml);
+        // Associate parties with case ID for easier batching
+        parties.forEach(party => {
+          if (!party.extra_metadata) party.extra_metadata = {};
+          party.extra_metadata.case_govid = govId;
+        });
         await windowContext.close();
+        windowContext = null;
         return parties;
       } catch (error) {
         console.error(`Error scraping parties for ${govId}:`, error);
@@ -617,6 +690,9 @@ class NyPucScraper implements Scraper {
           govIds,
           scrapeFullForId,
         );
+        
+        // Clear cache after full processing to free memory
+        this.clearCache();
         return fullResults.filter((result) => result !== null);
 
       case ScrapingMode.METADATA:
@@ -628,36 +704,79 @@ class NyPucScraper implements Scraper {
       case ScrapingMode.PARTIES:
         return await this.scrapePartiesOnly(govIds);
 
+      case ScrapingMode.CASE_LIST:
+        throw new Error("CASE_LIST mode should not be used with scrapeByGovIds - use getCaseList() directly");
+
       case ScrapingMode.FULL_EXTRACTION:
         console.log(
-          `Running full extraction for ${govIds.length} cases with max ${this.max_concurrent_browsers} concurrent browsers`,
+          `Running enhanced full extraction for ${govIds.length} cases with max ${this.max_concurrent_browsers} concurrent browsers`,
         );
-        const scrapeExtractionForId = async (govId: string) => {
-          try {
-            // Run all three operations in parallel for each ID
-            const [metadata, documents, parties] = await Promise.all([
-              this.getCaseMeta(govId),
-              this.scrapeDocumentsOnly([govId]),
-              this.scrapePartiesOnly([govId]),
-            ]);
 
-            if (metadata) {
-              metadata.filings = documents;
-              metadata.case_parties = parties;
+        // Enhanced approach: batch operations by type first, then combine
+        if (govIds.length > 10) {
+          console.log("Using batch optimization for large dataset");
+
+          // Run all metadata, documents, and parties operations in parallel batches
+          const [metadataResults, documentsResults, partiesResults] = await Promise.all([
+            this.scrapeMetadataOnly(govIds),
+            this.scrapeDocumentsOnly(govIds),
+            this.scrapePartiesOnly(govIds)
+          ]);
+
+          // Combine results efficiently
+          const extractionResults = metadataResults.map(metadata => {
+            if (metadata && metadata.case_govid) {
+              const caseDocuments = documentsResults.filter(doc =>
+                doc.extra_metadata?.case_govid === metadata.case_govid
+              );
+              const caseParties = partiesResults.filter(party =>
+                party.extra_metadata?.case_govid === metadata.case_govid
+              );
+
+              metadata.filings = caseDocuments;
+              metadata.case_parties = caseParties;
               return metadata;
             }
             return null;
-          } catch (error) {
-            console.error(`Error in full extraction for ${govId}:`, error);
-            return null;
-          }
-        };
+          });
 
-        const extractionResults = await this.processTasksWithQueue(
-          govIds,
-          scrapeExtractionForId,
-        );
-        return extractionResults.filter((result) => result !== null);
+          const filteredResults = extractionResults.filter((result) => result !== null);
+          
+          // Clear large intermediate arrays to free memory
+          metadataResults.length = 0;
+          documentsResults.length = 0;
+          partiesResults.length = 0;
+          
+          return filteredResults;
+        } else {
+          // Original approach for smaller datasets
+          const scrapeExtractionForId = async (govId: string) => {
+            try {
+              // Run all three operations in parallel for each ID
+              const [metadata, documents, parties] = await Promise.all([
+                this.getCaseMeta(govId),
+                this.scrapeDocumentsOnly([govId]),
+                this.scrapePartiesOnly([govId]),
+              ]);
+
+              if (metadata) {
+                metadata.filings = documents;
+                metadata.case_parties = parties;
+                return metadata;
+              }
+              return null;
+            } catch (error) {
+              console.error(`Error in full extraction for ${govId}:`, error);
+              return null;
+            }
+          };
+
+          const extractionResults = await this.processTasksWithQueue(
+            govIds,
+            scrapeExtractionForId,
+          );
+          return extractionResults.filter((result) => result !== null);
+        }
 
       default:
         throw new Error(`Unsupported scraping mode: ${mode}`);
@@ -681,6 +800,15 @@ class NyPucScraper implements Scraper {
     beginDate: Date,
     endDate: Date,
   ): Promise<string[]> {
+    // For large date ranges, split into smaller chunks and process in parallel
+    const daysDifference = Math.ceil((endDate.getTime() - beginDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysDifference > 30) {
+      console.log(`Large date range detected (${daysDifference} days). Using parallel chunked processing.`);
+      return await this.getFilingsBetweenDatesParallel(beginDate, endDate);
+    }
+
+    // Original single request approach for smaller ranges
     const url = this.createSearchUrl(beginDate, endDate);
     const $ = await this.getPage(url);
     const docketGovIds: string[] = [];
@@ -694,7 +822,78 @@ class NyPucScraper implements Scraper {
     });
     const govid_set = new Set(docketGovIds);
 
-    return [...govid_set]; // Return unique values
+    return Array.from(govid_set); // Return unique values
+  }
+
+  async getFilingsBetweenDatesParallel(
+    beginDate: Date,
+    endDate: Date,
+  ): Promise<string[]> {
+    // Calculate total days in range
+    const totalDays = Math.ceil((endDate.getTime() - beginDate.getTime()) / (1000 * 60 * 60 * 24));
+    const chunkSizeDays = Math.min(7, totalDays); // Use smaller of 7 days or total range
+    const chunks: { start: Date; end: Date }[] = [];
+
+    let currentDate = new Date(beginDate);
+    while (currentDate <= endDate) {
+      const chunkEnd = new Date(currentDate);
+      chunkEnd.setDate(chunkEnd.getDate() + chunkSizeDays - 1);
+
+      // Don't exceed the end date
+      if (chunkEnd > endDate) {
+        chunkEnd.setTime(endDate.getTime());
+      }
+
+      chunks.push({
+        start: new Date(currentDate),
+        end: new Date(chunkEnd)
+      });
+
+      // Move to next chunk
+      currentDate.setDate(currentDate.getDate() + chunkSizeDays);
+
+      // Break if we've covered the entire range
+      if (chunkEnd.getTime() === endDate.getTime()) {
+        break;
+      }
+    }
+
+    console.log(`Processing ${chunks.length} date chunks in parallel (${totalDays} total days, ${chunkSizeDays} days per chunk)`);
+
+    const scrapeChunk = async (chunk: { start: Date; end: Date }): Promise<string[]> => {
+      try {
+        const url = this.createSearchUrl(chunk.start, chunk.end);
+        const $ = await this.getPage(url);
+        const docketGovIds: string[] = [];
+
+        $("#tblSearchedDocumentExternal > tbody:nth-child(3) tr").each((i, row) => {
+          const cells = $(row).find("td");
+          const docketGovId = $(cells[4]).find("a").text().trim();
+          if (docketGovId) {
+            docketGovIds.push(docketGovId);
+          }
+        });
+
+        console.log(`Found ${docketGovIds.length} dockets in chunk ${this.formatDate(chunk.start)} to ${this.formatDate(chunk.end)}`);
+        return docketGovIds;
+      } catch (error) {
+        console.error(`Error processing date chunk ${this.formatDate(chunk.start)} to ${this.formatDate(chunk.end)}:`, error);
+        return [];
+      }
+    };
+
+    const chunkResults = await this.processTasksWithQueue(
+      chunks,
+      scrapeChunk,
+      3 // Max 3 concurrent date range requests
+    );
+
+    // Combine and deduplicate results
+    const allDocketIds = chunkResults.flat();
+    const govid_set = new Set(allDocketIds);
+
+    console.log(`Found ${govid_set.size} unique dockets across ${chunks.length} date chunks`);
+    return Array.from(govid_set);
   }
 }
 
@@ -807,6 +1006,19 @@ async function runCustomScraping(
 ) {
   console.log(`Running custom scraping with options:`, options);
 
+  if (options.mode === ScrapingMode.CASE_LIST) {
+    console.log("Scraping all cases from all industries...");
+    const cases = await scraper.getCaseList();
+    console.log(`Found ${cases.length} total cases across all industries`);
+
+    if (options.outFile) {
+      await saveResultsToFile(cases, options.outFile, options.mode);
+    } else {
+      console.log(JSON.stringify(cases, null, 2));
+    }
+    return;
+  }
+
   if (options.mode === ScrapingMode.DATES && options.dateString) {
     console.log(`Scraping cases for date: ${options.dateString}`);
     const cases = await scraper.getDateCases(options.dateString);
@@ -862,6 +1074,10 @@ async function runCustomScraping(
 async function main() {
   let browser: Browser | null = null;
   try {
+    // Log memory usage at start
+    const memUsage = process.memoryUsage();
+    console.log(`Initial memory usage: ${Math.round(memUsage.heapUsed / 1024 / 1024)} MB heap, ${Math.round(memUsage.rss / 1024 / 1024)} MB RSS`);
+    
     browser = await chromium.launch({ headless: false });
     const context = await browser.newContext();
     const rootpage = await context.newPage();
