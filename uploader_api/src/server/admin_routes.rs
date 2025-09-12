@@ -12,7 +12,7 @@ pub fn create_admin_router() -> ApiRouter {
         .api_route(
             "/cases/submit",
             post_with(
-                queue_routes::submit_case_to_queue_without_download,
+                queue_routes::submit_cases_to_queue_without_download,
                 queue_routes::submit_case_to_queue_docs,
             ),
         )
