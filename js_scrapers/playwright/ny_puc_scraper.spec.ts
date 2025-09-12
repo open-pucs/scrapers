@@ -735,7 +735,7 @@ async function pushResultsToUploader(
       docket,
       jurisdiction: {
         country: "usa",
-        name: "ny_puc",
+        jurisdiction: "ny_puc",
         state: "ny",
       },
     }));
