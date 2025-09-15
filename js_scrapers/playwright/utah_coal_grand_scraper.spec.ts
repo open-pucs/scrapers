@@ -1,7 +1,21 @@
-import { test, expect, chromium, Page, Browser } from "@playwright/test";
+import { test, expect, chromium, Page, Browser } from "@playwright";
 import * as fs from "fs";
 
 const out_directory = "outputs/utah_coal_mines";
+// So we have a problem, the selectedPermitName of a mine doesnt actually change what id that mine extracts from.
+// secret iteration patterns, take the url:
+// https://ogm.utah.gov/coal-files/?tabType=Specific+Project&selectedRowId=a0B8z000000iHHiEAM&selectedPermitName=
+// Specifically this selectedRoaId and iterate the middle number i through z
+// a0B8z000000iHH{i...z}EAM
+// then take this id
+// a0B8z000000iHI{0...9}EAM
+//
+//
+// a0B8z000000iHIAEA2
+// and
+// a0B8z000000iHIBEA2
+//
+// So what you should do is scrape the files for these urls first. Then scrape all the mines. Then associate each of the mines with the list of permits for each mine, then save it to disk. (This should be done as soon as the fillings for each well are finished being downloaded.) Also I dont think parallelism for this thing is fully working. It should spawn a seperate new browser tab for each of the filling operations that need to happen.
 
 async function scrapeMines(page: Page): Promise<any[]> {
   await page.goto("https://utahdnr.my.site.com/s/coal-document-display");
@@ -63,18 +77,17 @@ async function scrapeMines(page: Page): Promise<any[]> {
 
 async function scrapeFilings(
   browser: Browser,
-  permitID: string,
+  permitURL: string,
 ): Promise<any[]> {
   const page = await browser.newPage();
   const filings = [];
+  let permitIDGlobal = "";
   try {
-    const permitURL = `https://utahdnr.my.site.com/s/coal-document-display?tabType=Specific%20Project&selectedRowId=a0B8z000000iHHiEAM&selectedPermitName=${permitID}`;
-
     await page.goto(permitURL);
     await page.waitForLoadState("networkidle");
 
     console.log(
-      `Beginning the process of scraping filings for permit ${permitID}...`,
+      `Beginning the process of scraping filings for permit ${permitURL}...`,
     );
     let total_pages_so_far = 0;
     while (true) {
@@ -83,10 +96,16 @@ async function scrapeFilings(
         .locator(".slds-table > tbody:nth-child(2) tr")
         .all();
       console.log(
-        `Found ${rows.length} filings on the ${total_pages_so_far} page of fillings for ${permitID}`,
+        `Found ${rows.length} filings on the ${total_pages_so_far} page of fillings for ${permitURL}`,
       );
 
       for (const row of rows) {
+        const permitIDLocal = await row
+          .locator('td[data-label="Permit"]')
+          .innerText();
+        if (!permitIDGlobal) {
+          permitIDGlobal = permitIDLocal;
+        }
         const docDate = await row
           .locator('td[data-label="Document Date"]')
           .innerText();
@@ -122,14 +141,14 @@ async function scrapeFilings(
               attachment_type: docLocation,
               attachment_subtype: "",
               extra_metadata: {
-                permitID: permitID,
+                permitID: permitIDLocal,
               },
               hash: null,
             },
           ],
           extra_metadata: {
             doc_location: docLocation,
-            permitID: permitID,
+            permitID: permitIDLocal,
           },
         };
 
@@ -142,18 +161,18 @@ async function scrapeFilings(
           .first()
           .click({ timeout: 5000 });
       } catch (e) {
-        console.log(`No more filings pages for permit ${permitID}.`);
+        console.log(`No more filings pages for permit ${permitIDGlobal}.`);
         break;
       }
       total_pages_so_far += 1;
     }
   } catch (error) {
     console.error(
-      `An error occurred while scraping filings for permit ${permitID}:`,
+      `An error occurred while scraping filings for permit ${permitIDGlobal}:`,
       error,
     );
   } finally {
-    console.log(`Finally finished processing fillings for ${permitID}`);
+    console.log(`Finally finished processing fillings for ${permitIDGlobal}`);
     await page.close();
     return filings;
   }
@@ -212,3 +231,4 @@ test("Grand Utah Coal Scraper", async ({ page }) => {
   }
   console.log("All done!");
 });
+
