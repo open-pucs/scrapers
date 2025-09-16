@@ -1,4 +1,4 @@
-import { test, expect, chromium, Page, Browser } from "@playwright";
+import { chromium, Page, Browser, BrowserContext } from "playwright";
 import * as fs from "fs";
 
 const out_directory = "outputs/utah_coal_mines";
@@ -76,10 +76,10 @@ async function scrapeMines(page: Page): Promise<any[]> {
 }
 
 async function scrapeFilings(
-  browser: Browser,
+  context: BrowserContext,
   permitURL: string,
 ): Promise<any[]> {
-  const page = await browser.newPage();
+  const page = await context.newPage();
   const filings = [];
   let permitIDGlobal = "";
   try {
@@ -178,39 +178,73 @@ async function scrapeFilings(
   }
 }
 
-test("Grand Utah Coal Scraper", async ({ page }) => {
-  test.setTimeout(0);
+function generateUtahUrls(): string[] {
+  const urls: string[] = [];
+  const baseUrl =
+    "https://utahdnr.my.site.com/s/coal-document-display?tabType=Specific+Project&selectedRowId=";
+  const permitName = "&selectedPermitName=";
+
+  // a0B8z000000iHH{i...z}EAM
+  for (let i = "i".charCodeAt(0); i <= "z".charCodeAt(0); i++) {
+    const middleChar = String.fromCharCode(i);
+    const rowId = `a0B8z000000iHH${middleChar}EAM`;
+    urls.push(baseUrl + rowId + permitName);
+  }
+
+  // a0B8z000000iHI{0...9}EAM
+  for (let i = 0; i <= 9; i++) {
+    const rowId = `a0B8z000000iHI${i}EAM`;
+    urls.push(baseUrl + rowId + permitName);
+  }
+
+  // a0B8z000000iHIAEA2 and a0B8z000000iHIBEA2
+  urls.push(baseUrl + "a0B8z000000iHIAEA2" + permitName);
+  urls.push(baseUrl + "a0B8z000000iHIBEA2" + permitName);
+
+  return urls;
+}
+
+async function main() {
   fs.mkdirSync(out_directory, { recursive: true });
+
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
 
   console.log("Step 1: Scraping all mines...");
   const allMines = await scrapeMines(page);
   console.log(`Found ${allMines.length} mines in total.`);
+  await page.close();
 
-  console.log("Step 2: Scraping filings for each mine concurrently...");
+  console.log("Step 2: Generating predefined URLs for filings...");
+  const filingUrls = generateUtahUrls();
+  console.log(`Generated ${filingUrls.length} URLs for filings.`);
 
-  const browser = await chromium.launch();
+  console.log("Step 3: Scraping filings from all URLs concurrently...");
+  const allFilings: any[] = [];
+
   const concurrencyLimit = 10;
-  const mineQueue = [...allMines];
+  const urlQueue = [...filingUrls];
 
   async function worker() {
-    while (mineQueue.length > 0) {
-      const mine = mineQueue.shift();
-      if (mine) {
-        try {
-          console.log(`Worker starting on permit ${mine.case_govid}`);
-          const filings = await scrapeFilings(browser, mine.case_govid);
-          mine.filings = filings;
-          console.log(
-            `Finished scraping for permit ${mine.case_govid}. Found ${filings.length} filings.`,
-          );
-        } catch (error) {
-          console.error(
-            `Error scraping filings for permit ${mine.case_govid}:`,
-            error,
-          );
-          mine.filings = [];
+    const context = await browser.newContext();
+    try {
+      while (urlQueue.length > 0) {
+        const url = urlQueue.shift();
+        if (url) {
+          try {
+            console.log(`Worker starting on URL ${url}`);
+            const filings = await scrapeFilings(context, url);
+            allFilings.push(...filings);
+            console.log(
+              `Finished scraping for URL ${url}. Found ${filings.length} filings.`,
+            );
+          } catch (error) {
+            console.error(`Error scraping filings for URL ${url}:`, error);
+          }
         }
       }
+    } finally {
+      await context.close();
     }
   }
 
@@ -220,15 +254,26 @@ test("Grand Utah Coal Scraper", async ({ page }) => {
   }
 
   await Promise.all(workers);
-  await browser.close();
 
-  console.log("Step 3: Saving all data to disk...");
+  console.log(`Scraped a total of ${allFilings.length} filings.`);
+
+  console.log("Step 4: Associating filings with mines...");
+  for (const mine of allMines) {
+    mine.filings = allFilings.filter(
+      (filing) => filing.extra_metadata.permitID === mine.case_govid,
+    );
+  }
+
+  console.log("Step 5: Saving all data to disk...");
   for (const mine of allMines) {
     fs.writeFileSync(
       `${out_directory}/${mine.case_govid}.json`,
       JSON.stringify(mine, null, 2),
     );
   }
-  console.log("All done!");
-});
 
+  await browser.close();
+  console.log("All done!");
+}
+
+main().catch(console.error);
