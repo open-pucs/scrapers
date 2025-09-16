@@ -1,14 +1,18 @@
 use aide::{self, axum::IntoApiResponse, transform::TransformOperation};
 use axum::response::{IntoResponse, Json};
-use openscraper_types::raw::RawDocketWithJurisdiction;
+use openscraper_types::{
+    jurisdictions::JurisdictionInfo,
+    raw::{RawDocketWithJurisdiction, RawGenericDocket},
+};
+use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::case_worker::ProcessCaseWithoutDownload;
+use crate::case_worker::{ProcessCaseWithoutDownload, RawDocketIngestInfo};
 
 use mycorrhiza_common::tasks::{TaskStatusDisplay, workers::add_task_to_queue};
 
 pub async fn submit_cases_to_queue_without_download(
-    Json(cases): Json<Vec<RawDocketWithJurisdiction>>,
+    Json(cases): Json<Vec<RawDocketIngestInfo>>,
 ) -> impl IntoApiResponse {
     let mut return_results = vec![];
     for case in cases {
