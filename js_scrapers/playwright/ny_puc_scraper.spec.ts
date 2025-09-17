@@ -13,7 +13,7 @@ import * as fs from "fs";
 
 enum ScrapingMode {
   METADATA = "meta",
-  DOCUMENTS = "docs",
+  FILLINGS = "fillings",
   PARTIES = "parties",
   DATES = "dates",
   FULL_EXTRACTION = "full-extraction",
@@ -221,6 +221,7 @@ class NyPucScraper {
     return cases;
   }
 
+  // TODO: This should probably get filtered out to the general task running layer.
   async filterOutExisting(
     cases: Partial<RawGenericDocket>[],
   ): Promise<Partial<RawGenericDocket>[]> {
@@ -303,10 +304,24 @@ class NyPucScraper {
       const fullName = nameParts[0];
       const title = nameParts.length > 1 ? nameParts[1] : "";
 
-      const emailPhoneParts = emailPhoneCell.split("\n");
-      const email = emailPhoneParts.find((part) => part.includes("@")) || "";
-      const phone =
-        emailPhoneParts.find((part) => part.startsWith("Ph:")) || "";
+      const emailPhoneCellText = $(cells[4]).text();
+      let email = "";
+      let phone = "";
+
+      const phoneMatch = emailPhoneCellText.match(/Ph:\s*(.*)/);
+      if (phoneMatch) {
+        phone = phoneMatch[1].trim();
+        const emailPart = emailPhoneCellText
+          .substring(0, phoneMatch.index)
+          .trim();
+        if (emailPart.includes("@")) {
+          email = emailPart;
+        }
+      } else if (emailPhoneCellText.includes("@")) {
+        email = emailPhoneCellText.trim();
+      } else {
+        phone = emailPhoneCellText.trim();
+      }
 
       const party: RawGenericParty = {
         name: fullName,
@@ -443,12 +458,13 @@ class NyPucScraper {
 
       await page.goto(caseUrl);
       // Removing this because it tries to wait until all the documents on the page are loaded, instead I am going to set a manual timer to wait 1 second and then try the navigation
-      // await page.waitForLoadState("networkidle");
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("networkidle");
+      await page.waitForTimeout(10000);
 
       const partiesButtonSelector = "#GridPlaceHolder_lbtContact";
       await page.click(partiesButtonSelector);
       await page.waitForLoadState("networkidle");
+      await page.waitForTimeout(1000);
 
       const partiesTableSelector = 'select[name="tblActiveParty_length"]';
       await page.selectOption(partiesTableSelector, "-1");
@@ -521,14 +537,14 @@ class NyPucScraper {
           case ScrapingMode.METADATA:
             return await this.scrapeMetadataOnly(govId);
 
-          case ScrapingMode.DOCUMENTS: {
+          case ScrapingMode.FILLINGS: {
             const filings = await this.scrapeDocumentsOnly(govId);
             return { case_govid: govId, filings };
           }
 
           case ScrapingMode.PARTIES: {
             const parties = await this.scrapePartiesOnly(govId);
-            return { case_govid: govId, case_parties: [] };
+            return { case_govid: govId, case_parties: parties };
           }
 
           default: {
@@ -714,25 +730,28 @@ async function saveResultsToFile(
     throw error;
   }
 }
-
+// TODO: This should 100% be in the task handling layer.
+// (And actually it might be a good idea for the task runner to just save the stuff to s3 directly? Food for thought.)
 async function pushResultsToUploader(
   results: Partial<RawGenericDocket>[],
   mode: ScrapingMode,
 ) {
-  if (mode == ScrapingMode.DOCUMENTS) {
-    return null;
+  let upload_type = "all";
+  if (mode == ScrapingMode.FILLINGS) {
+    upload_type = "only_fillings";
   }
   if (mode == ScrapingMode.PARTIES) {
-    return null;
+    upload_type = "only_parties";
   }
   if (mode == ScrapingMode.METADATA) {
-    return null;
+    upload_type = "only_metadata";
   }
   const url = "http://localhost:33399/admin/cases/submit";
 
   try {
     const payload = results.map((docket) => ({
       docket,
+      upload_type,
       jurisdiction: {
         country: "usa",
         jurisdiction: "ny_puc",
