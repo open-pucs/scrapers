@@ -84,7 +84,7 @@ impl ExecuteUserTask for ProcessCaseWithoutDownload {
             docket_govid: docket.case_govid.clone().to_string(),
             jurisdiction,
         };
-        let joined_docket = upload_type.download_and_compare(&s3_client, docket, docket_addres).await?;
+        let joined_docket = upload_type.download_and_compare(&s3_client, docket, docket_addres).await.map_err(|e| e.to_string().into())?;
         let res = upload_object::<RawGenericDocket>(&s3_client, &docket_address, &joined_docket).await;
 
         match res {
