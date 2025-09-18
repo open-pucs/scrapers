@@ -22,11 +22,6 @@ in
     nodePackages.ts-node
     typescript
     # Rust-specific packages
-    rustc
-    cargo
-    rustfmt
-    rust-analyzer
-    clippy
     pkg-config
     openssl
   ];
@@ -42,10 +37,12 @@ in
   languages.typescript = {
     enable = true;
   };
-  languages.rust = {
-    enable = true;
-    channel = "stable";
-  };
+  # languages.rust = {
+  #   enable = true;
+  #   toolchain = (pkgs.rust-bin.stable.latest.default.override {
+  #     extensions = [ "rust-src" "rust-analyzer" ];
+  #   });
+  # };
 
   # Environment variables
   env = {
@@ -53,7 +50,7 @@ in
     PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = true;
     PLAYWRIGHT_NODEJS_PATH = "${pkgs.nodejs}/bin/node";
     PLAYWRIGHT_LAUNCH_OPTIONS_EXECUTABLE_PATH = "${pkgs-playwright.playwright.browsers}/chromium-${chromium-rev}/chrome-linux/chrome";
-    RUST_LOG = "debug";
+    # RUST_LOG = "debug";
     PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
   };
 
