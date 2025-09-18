@@ -15,10 +15,7 @@ enum ScrapingMode {
   METADATA = "meta",
   FILLINGS = "fillings",
   PARTIES = "parties",
-  DATES = "dates",
-  FULL_EXTRACTION = "full-extraction",
-  FULL_ALL_MISSING = "full-all-missing",
-  FILINGS_BETWEEN_DATES = "filings-between-dates",
+  ALL = "all",
 }
 
 interface ScrapingOptions {
@@ -547,15 +544,11 @@ class NyPucScraper {
             return { case_govid: govId, case_parties: parties };
           }
 
-          default: {
-            console.log("Party scraping disabled on a temporary basis.");
+          case ScrapingMode.ALL: {
             const [metadata, documents, parties] = await Promise.all([
               this.getCaseMeta(govId),
               this.scrapeDocumentsOnly(govId),
-
-              // TODO: Get this working later its to slow right now
-              // this.scrapePartiesOnly(govId),
-              [],
+              this.scrapePartiesOnly(govId),
             ]);
             let return_case: Partial<RawGenericDocket> = { case_govid: govId };
             if (metadata) {
@@ -565,6 +558,7 @@ class NyPucScraper {
 
             return_case.filings = documents;
             return_case.case_parties = parties;
+
             // TODO: Make this an optional paramater that can be set with the CLI TOOL
             const uploadIncremental = true;
             if (uploadIncremental) {
@@ -622,6 +616,20 @@ class NyPucScraper {
 
     return [...govid_set]; // Return unique values
   }
+
+  async getCasesBetweenDates(
+    beginDate: Date,
+    endDate: Date,
+  ): Promise<Partial<RawGenericDocket>[]> {
+    const formattedBeginDate = this.formatDate(beginDate);
+    const formattedEndDate = this.formatDate(endDate);
+    const url = `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA=&MT=&MST=&CN=&SDT=${formattedBeginDate}&SDF=${formattedEndDate}&C=&M=&CO=0`;
+    console.log(
+      `Getting cases between ${formattedBeginDate} and ${formattedEndDate}`,
+    );
+    const cases: Partial<RawGenericDocket>[] = await this.getCasesAt(url);
+    return cases;
+  }
 }
 
 function parseArguments(): ScrapingOptions | null {
@@ -631,7 +639,7 @@ function parseArguments(): ScrapingOptions | null {
     return null; // No arguments, will be handled in main
   }
 
-  let mode = ScrapingMode.FULL_ALL_MISSING;
+  let mode = ScrapingMode.ALL;
   let govIds: string[] = [];
   let dateString: string | undefined;
   let beginDate: string | undefined;
@@ -746,7 +754,10 @@ async function pushResultsToUploader(
   if (mode == ScrapingMode.METADATA) {
     upload_type = "only_metadata";
   }
-  const url = "http://localhost:33399/admin/cases/submit";
+  if (mode == ScrapingMode.ALL) {
+    upload_type = "all";
+  }
+  const url = "http://localhost:33399/admin/cases/upload_raw";
 
   try {
     const payload = results.map((docket) => ({
@@ -788,73 +799,68 @@ async function runCustomScraping(
 ) {
   console.log(`Running custom scraping with options:`, options);
 
-  if (options.mode === ScrapingMode.DATES && options.dateString) {
-    console.log(`Scraping cases for date: ${options.dateString}`);
-    const cases = await scraper.getDateCases(options.dateString);
-    console.log(`Found ${cases.length} cases for date ${options.dateString}`);
+  let casesToScrape: Partial<RawGenericDocket>[] = [];
+  let govIds: string[] = [];
 
-    if (options.outFile) {
-      await saveResultsToFile(cases, options.outFile, options.mode);
-    } else {
-      console.log(JSON.stringify(cases, null, 2));
-    }
-    return;
-  }
-
-  if (
-    options.mode === ScrapingMode.FILINGS_BETWEEN_DATES &&
-    options.beginDate &&
-    options.endDate
-  ) {
+  // Determine which cases to scrape based on provided arguments
+  if (options.govIds && options.govIds.length > 0) {
+    // Explicit gov IDs provided
+    govIds = options.govIds;
+    console.log(`Using ${govIds.length} explicitly provided gov IDs`);
+  } else if (options.dateString) {
+    // Single date provided
+    console.log(`Getting cases for date: ${options.dateString}`);
+    casesToScrape = await scraper.getDateCases(options.dateString);
     console.log(
-      `Scraping filings between ${options.beginDate} and ${options.endDate}`,
+      `Found ${casesToScrape.length} cases for date ${options.dateString}`,
     );
-    const docketGovIds = await scraper.getFilingsBetweenDates(
+  } else if (options.beginDate && options.endDate) {
+    // Date range provided
+    console.log(
+      `Getting cases between ${options.beginDate} and ${options.endDate}`,
+    );
+    casesToScrape = await scraper.getCasesBetweenDates(
       new Date(options.beginDate),
       new Date(options.endDate),
     );
     console.log(
-      `Found ${docketGovIds.length} dockets between ${options.beginDate} and ${options.endDate}`,
+      `Found ${casesToScrape.length} cases between ${options.beginDate} and ${options.endDate}`,
     );
-
-    if (options.outFile) {
-      await saveResultsToFile(docketGovIds, options.outFile, options.mode);
-    } else {
-      console.log(JSON.stringify(docketGovIds, null, 2));
-    }
-    return;
-  }
-  if (options.mode === ScrapingMode.FULL_ALL_MISSING) {
-    const missing_govid_dockets = await scraper.getAllMissingCaseList();
-    const results = await scraper.scrapeByPartialDocket(
-      missing_govid_dockets,
-      options.mode,
-    );
-    await pushResultsToUploader(results, options.mode);
-    console.log(`Scraped ${results.length} results in ${options.mode} mode`);
-
-    if (options.outFile) {
-      await saveResultsToFile(results, options.outFile, options.mode);
-    } else {
-      console.log(JSON.stringify(results, null, 2));
-    }
-    return;
+  } else {
+    // No specific cases provided, get all missing cases
+    console.log("No specific cases provided, getting all missing cases");
+    casesToScrape = await scraper.getAllMissingCaseList();
+    console.log(`Found ${casesToScrape.length} missing cases`);
   }
 
-  if (options.govIds && options.govIds.length > 0) {
-    const results = await scraper.scrapeByGovIds(options.govIds, options.mode);
-
-    console.log(`Scraped ${results.length} results in ${options.mode} mode`);
-
-    if (options.outFile) {
-      await saveResultsToFile(results, options.outFile, options.mode);
-    } else {
-      console.log(JSON.stringify(results, null, 2));
-    }
-    return;
+  // Extract gov IDs from cases if we have partial dockets
+  if (casesToScrape.length > 0) {
+    govIds = casesToScrape
+      .map((c) => c.case_govid)
+      .filter(
+        (id): id is string => typeof id === "string" && id.trim().length > 0,
+      );
   }
 
-  throw new Error("No government IDs provided for scraping");
+  if (govIds.length === 0) {
+    throw new Error("No cases found to scrape");
+  }
+
+  // Now scrape the cases with the specified mode
+  console.log(`Scraping ${govIds.length} cases in ${options.mode} mode`);
+  const results = await scraper.scrapeByGovIds(govIds, options.mode);
+
+  console.log(`Scraped ${results.length} results in ${options.mode} mode`);
+
+  // Save or output results
+  if (options.outFile) {
+    await saveResultsToFile(results, options.outFile, options.mode);
+  } else {
+    console.log(JSON.stringify(results, null, 2));
+  }
+
+  // Upload results if needed (for non-specific modes)
+  await pushResultsToUploader(results, options.mode);
 }
 
 async function main() {
