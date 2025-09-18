@@ -1,5 +1,4 @@
 use crate::s3_stuff::make_s3_client;
-use crate::types::raw::RawDocketWithJurisdiction;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use aws_sdk_s3::Client;
@@ -113,9 +112,9 @@ pub async fn upload_docket_with_info(ingest_info: RawDocketIngestInfo) -> anyhow
         .await;
     let joined_docket = match joined_docket_result {
         Ok(val) => val,
-        Err(e) => return Err(e.into()),
+        Err(e) => return Err(e),
     };
     upload_object::<RawGenericDocket>(&s3_client, &docket_address, &joined_docket)
         .await
-        .map_err(|err| err.into())
+        .map_err(|err| err)
 }

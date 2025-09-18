@@ -3,10 +3,10 @@
     "devenv": {
       "locked": {
         "dir": "src/modules",
-        "lastModified": 1758108840,
+        "lastModified": 1758198228,
         "owner": "cachix",
         "repo": "devenv",
-        "rev": "b14c4690dfceb5a0f86bb0061f5427b137c0c13b",
+        "rev": "dec691c410560fea341939f9872d41eb811c2600",
         "type": "github"
       },
       "original": {
@@ -74,10 +74,25 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1757745802,
+        "lastModified": 1758035966,
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "c23193b943c6c689d70ee98ce3128239ed9e32d1",
+        "rev": "8d4ddb19d03c65a36ad8d189d001dc32ffb0306b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs-playwright": {
+      "locked": {
+        "lastModified": 1758035966,
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "8d4ddb19d03c65a36ad8d189d001dc32ffb0306b",
         "type": "github"
       },
       "original": {
@@ -92,6 +107,7 @@
         "devenv": "devenv",
         "git-hooks": "git-hooks",
         "nixpkgs": "nixpkgs",
+        "nixpkgs-playwright": "nixpkgs-playwright",
         "pre-commit-hooks": [
           "git-hooks"
         ]

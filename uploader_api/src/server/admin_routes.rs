@@ -3,7 +3,7 @@ use aide::axum::{
     routing::{delete, post},
 };
 
-use crate::server::queue_routes::{self, submit_cases_to_queue_without_download};
+use crate::server::queue_routes::submit_cases_to_queue_without_download;
 use crate::server::s3_routes;
 use crate::server::temporary_routes::define_temporary_routes;
 
