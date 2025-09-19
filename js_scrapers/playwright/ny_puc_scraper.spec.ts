@@ -283,19 +283,19 @@ class NyPucScraper {
     const partiesTablebodySelector = "#tblActiveParty > tbody";
     const rows = $(`${partiesTablebodySelector} tr`);
     console.log(`Found ${rows.length} party rows.`);
-    console.log("Parties table HTML:", $(`${partiesTablebodySelector}`).html());
+    // console.log("Parties table HTML:", $(`${partiesTablebodySelector}`).html());
 
     rows.each((i, row) => {
-      console.log(`Row ${i}:`, $(row).html());
+      // console.log(`Row ${i}:`, $(row).html());
       const cells = $(row).find("td");
       const nameCell = $(cells[1]).text();
       const emailPhoneCell = $(cells[4]).text();
       const addressCell = $(cells[3]).text();
       const companyCell = $(cells[2]).text();
-      console.log(`  Name cell: ${nameCell}`);
-      console.log(`  Company cell: ${companyCell}`);
-      console.log(`  Address cell: ${addressCell}`);
-      console.log(`  Email/Phone cell: ${emailPhoneCell}`);
+      // console.log(`  Name cell: ${nameCell}`);
+      // console.log(`  Company cell: ${companyCell}`);
+      // console.log(`  Address cell: ${addressCell}`);
+      // console.log(`  Email/Phone cell: ${emailPhoneCell}`);
 
       const nameParts = nameCell.split("\n");
       const fullName = nameParts[0];
@@ -560,15 +560,6 @@ class NyPucScraper {
             return_case.case_parties = parties;
 
             // TODO: Make this an optional paramater that can be set with the CLI TOOL
-            const uploadIncremental = true;
-            if (uploadIncremental) {
-              try {
-                console.log("trying to push fillings to the uploader.");
-                await pushResultsToUploader([return_case], mode);
-              } catch (e) {
-                console.log(e);
-              }
-            }
             return return_case;
           }
         }
@@ -577,8 +568,27 @@ class NyPucScraper {
         return null;
       }
     };
+    const processIdAndUpload = async (
+      govID: string,
+    ): Promise<Partial<RawGenericDocket> | null> => {
+      try {
+        const result = await processId(govID);
+        console.log(result.case_govid);
+        if (result !== null) {
+          await pushResultsToUploader([result], mode);
+        } else {
+          console.log("Result was equal to null.");
+        }
+      } catch (err) {
+        console.error(err);
+        return null;
+      }
+    };
 
-    const results = await this.processTasksWithQueue(govIds, processId);
+    const results = await this.processTasksWithQueue(
+      govIds,
+      processIdAndUpload,
+    );
     return results.filter(
       (result): result is Partial<RawGenericDocket> => result !== null,
     );
@@ -738,7 +748,7 @@ async function saveResultsToFile(
     throw error;
   }
 }
-// TODO: This should 100% be in the task handling layer.
+// TODO: This should 100% be in the }task handling layer.
 // (And actually it might be a good idea for the task runner to just save the stuff to s3 directly? Food for thought.)
 async function pushResultsToUploader(
   results: Partial<RawGenericDocket>[],
@@ -758,6 +768,8 @@ async function pushResultsToUploader(
     upload_type = "all";
   }
   const url = "http://localhost:33399/admin/cases/upload_raw";
+
+  console.log(`Uploading ${results.length} with mode ${mode} to uploader.`);
 
   try {
     const payload = results.map((docket) => ({
@@ -784,8 +796,10 @@ async function pushResultsToUploader(
         `Upload failed: ${response.status} ${response.statusText} - ${errorText}`,
       );
     }
+    let govid_list = results.map((x) => x.case_govid);
+    console.log(`Successfully uploaded dockets to s3: ${govid_list}`);
 
-    return await response.json();
+    return "successfully uploaded docket";
   } catch (err) {
     console.error("Error uploading results:", err);
     // throw err;
@@ -858,9 +872,6 @@ async function runCustomScraping(
   } else {
     console.log(JSON.stringify(results, null, 2));
   }
-
-  // Upload results if needed (for non-specific modes)
-  await pushResultsToUploader(results, options.mode);
 }
 
 async function main() {
