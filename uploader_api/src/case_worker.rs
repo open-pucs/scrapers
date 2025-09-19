@@ -12,6 +12,7 @@ use openscraper_types::raw::RawGenericDocket;
 use openscraper_types::s3_stuff::DocketAddress;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 #[derive(Clone, Deserialize, Serialize, JsonSchema)]
 pub struct RawDocketIngestInfo {
@@ -114,7 +115,9 @@ pub async fn upload_docket_with_info(ingest_info: RawDocketIngestInfo) -> anyhow
         Ok(val) => val,
         Err(e) => return Err(e),
     };
-    upload_object::<RawGenericDocket>(&s3_client, &docket_address, &joined_docket)
-        .await
-        .map_err(|err| err)
+    upload_object::<RawGenericDocket>(&s3_client, &docket_address, &joined_docket).await?;
+    let govid = docket_address.docket_govid.as_str();
+    let jurisdiction_name = &*docket_address.jurisdiction.jurisdiction;
+    info!(%govid, %jurisdiction_name,"Successfully Uploaded Raw Docket");
+    Ok(())
 }
