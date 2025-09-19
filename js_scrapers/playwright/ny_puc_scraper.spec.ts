@@ -27,6 +27,7 @@ interface ScrapingOptions {
   fromFile?: string;
   outFile?: string;
   headed?: boolean;
+  missing?: boolean;
 }
 
 // class NyPucScraper implements Scraper {
@@ -657,6 +658,7 @@ function parseArguments(): ScrapingOptions | null {
   let fromFile: string | undefined;
   let outFile: string | undefined;
   let headed = false; // Default to headless
+  let missing = false; // Default to not checking for missing
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -690,6 +692,8 @@ function parseArguments(): ScrapingOptions | null {
       outFile = args[++i];
     } else if (arg === "--headed") {
       headed = true;
+    } else if (arg === "--missing") {
+      missing = true;
     } else if (!arg.startsWith("--")) {
       // Backward compatibility for JSON array
       try {
@@ -726,6 +730,7 @@ function parseArguments(): ScrapingOptions | null {
     fromFile,
     outFile,
     headed,
+    missing,
   };
 }
 
@@ -841,10 +846,16 @@ async function runCustomScraping(
       `Found ${casesToScrape.length} cases between ${options.beginDate} and ${options.endDate}`,
     );
   } else {
-    // No specific cases provided, get all missing cases
-    console.log("No specific cases provided, getting all missing cases");
-    casesToScrape = await scraper.getAllMissingCaseList();
-    console.log(`Found ${casesToScrape.length} missing cases`);
+    // No specific cases provided
+    if (options.missing) {
+      console.log("No specific cases provided, getting all missing cases");
+      casesToScrape = await scraper.getAllMissingCaseList();
+      console.log(`Found ${casesToScrape.length} missing cases`);
+    } else {
+      console.log("No specific cases provided, getting all cases");
+      casesToScrape = await scraper.getAllCaseList();
+      console.log(`Found ${casesToScrape.length} cases`);
+    }
   }
 
   // Extract gov IDs from cases if we have partial dockets
