@@ -2,9 +2,7 @@ use aide::{self, axum::IntoApiResponse};
 use axum::response::Json;
 use tracing::info;
 
-use crate::case_worker::{
-    ProcessCaseWithoutDownload, RawDocketIngestInfo,
-};
+use crate::case_worker::{ProcessCaseWithoutDownload, RawDocketIngestInfo};
 
 use mycorrhiza_common::tasks::{TaskStatusDisplay, workers::add_task_to_queue};
 
@@ -13,6 +11,10 @@ pub async fn submit_cases_to_queue_without_download(
 ) -> impl IntoApiResponse {
     let mut return_results = vec![];
     for case_upload_info in cases {
+        let govid = case_upload_info.docket.case_govid.as_str();
+        let jurisdiction_name = &*case_upload_info.jurisdiction.jurisdiction;
+        let upload_type = case_upload_info.upload_type;
+        info!(%govid,%jurisdiction_name,?upload_type,"Uploading raw docket");
         let priority = 0;
         // let caseid = case_upload_info.docket.case_govid.clone();
         info!(case_number = %case_upload_info.docket.case_govid, %priority, "Request received to submit case to queue");

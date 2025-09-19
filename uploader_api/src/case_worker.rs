@@ -24,7 +24,7 @@ pub struct RawDocketIngestInfo {
 #[repr(transparent)]
 pub struct ProcessCaseWithoutDownload(pub RawDocketIngestInfo);
 
-#[derive(Clone, Default, Copy, Deserialize, Serialize, JsonSchema)]
+#[derive(Clone, Default, Copy, Deserialize, Serialize, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum RawDocketUploadType {
     #[default]
