@@ -1,3 +1,5 @@
+outputs/**
+**/outputs
 wireguard-configs
 **/*.db
 js_scrapers/raw_data

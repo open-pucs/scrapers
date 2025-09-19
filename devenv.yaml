@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://devenv.sh/devenv.schema.json
+inputs:
+  nixpkgs:
+    url: github:NixOS/nixpkgs/nixos-unstable
+
+  nixpkgs-playwright:
+    url: github:NixOS/nixpkgs/nixos-unstable
+  # Currently pinned to: playwright@1.52.0
+  # See https://search.nixos.org/packages?channel=unstable&from=0&size=50&sort=relevance&type=packages&query=playwright
+  # inputs:
+  #   flake: false
+  # rust-overlay:
+  #   url: github:oxalica/rust-overlay
+  #   inputs:
+  #     nixpkgs:
+  #       follows: nixpkgs
+  #
+  #   # url: github:NixOS/nixpkgs/979daf34c8cacebcd917d540070b52a3c2b9b16e
