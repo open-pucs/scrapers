@@ -6,8 +6,7 @@ edition = "2024"
 [dependencies]
 
 non-empty-string = {git = "https://github.com/mycorrhiza-inc/non-empty-string.git", branch="add-schemars-support", features = ["serde", "schemars09", "macros"]}
-mycorrhiza_common = {path = "../../common-rs", features = ["all"]}
-# mycorrhiza_common = {git = "https://github.com/mycorrhiza-inc/common-rs.git", features = ["all"]}
+mycorrhiza_common = {git = "https://github.com/mycorrhiza-inc/common-rs/", tag="v0.1.0",features = ["all"]}
 
 reqwest = { version = "0.12.5", features = ["json"] }
 blake2 = "0.10.6"
