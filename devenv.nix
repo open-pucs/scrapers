@@ -11,6 +11,10 @@ in
   dotenv.disableHint = true;
   cachix.enable = false;
 
+  languages.rust = {
+    enable= true;
+  };
+
   # Common packages available to all projects
   packages = with pkgs; [
     just
@@ -37,12 +41,6 @@ in
   languages.typescript = {
     enable = true;
   };
-  # languages.rust = {
-  #   enable = true;
-  #   toolchain = (pkgs.rust-bin.stable.latest.default.override {
-  #     extensions = [ "rust-src" "rust-analyzer" ];
-  #   });
-  # };
 
   # Environment variables
   env = {
@@ -93,21 +91,6 @@ in
     env | grep ^PLAYWRIGHT
   '';
 
-  scripts.rust-intro.exec = ''
-    echo "🦀 Uploader API Development Environment"
-    echo "======================================"
-    echo
-    echo "🦀 Rust version: $(rustc --version)"
-    echo "📦 Cargo version: $(cargo --version)"
-    echo
-    echo "Available commands for Uploader API:"
-    echo "  (cd uploader_api && cargo run)          - Start the API server"
-    echo "  (cd uploader_api && cargo test)         - Run tests"
-    echo "  (cd uploader_api && cargo build)        - Build the project"
-    echo "  (cd uploader_api && cargo clippy)       - Run linter"
-    echo "  (cd uploader_api && cargo fmt)          - Format code"
-    echo
-  '';
 
   scripts.dev.exec = ''
     echo "🚀 Starting uploader API in development mode..."

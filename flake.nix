@@ -1,24 +1,102 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    devenv.url = "github:cachix/devenv";
-    devenv.inputs.nixpkgs.follows = "nixpkgs";
+    naersk = {
+      url = "github:nix-community/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nix2container = {
+      url = "github:nlewo/nix2container";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = inputs@{ flake-parts, ... }:
-    flake-parts.lib.mkFlake { inherit inputs; } {
-      imports = [
-        inputs.devenv.flakeModule
-      ];
-      systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin" ];
+  outputs = { self, nixpkgs, naersk, nix2container }:
+    let
+      system = "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
+      naersk' = pkgs.callPackage naersk {};
+      nix2containerPkgs = nix2container.packages.${system};
 
-      perSystem = { config, self', inputs', pkgs, system, ... }: {
-        nixpkgs.overlays = [ inputs.rust-overlay.overlays.default ];
-        devenv.shells.default = {
-          imports = [
-            ./devenv.nix
+      # Build the Rust application from uploader_api directory
+      uploader-api = naersk'.buildPackage {
+        src = ./uploader_api;
+        name = "openscraper_uploader";
+
+        # Add any additional build inputs if needed
+        nativeBuildInputs = with pkgs; [
+          pkg-config
+        ];
+
+        buildInputs = with pkgs; [
+          openssl
+        ];
+
+        # Set environment variables for OpenSSL
+        OPENSSL_NO_VENDOR = 1;
+        PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+      };
+
+      # Create the OCI container using dockerTools
+      container = pkgs.dockerTools.buildImage {
+        name = "uploader-api";
+        tag = "latest";
+
+        copyToRoot = pkgs.buildEnv {
+          name = "image-root";
+          paths = [ uploader-api pkgs.coreutils pkgs.bash ];
+          pathsToLink = [ "/bin" ];
+        };
+
+        config = {
+          Cmd = [ "${uploader-api}/bin/openscraper_uploader" ];
+          Env = [
+            "PATH=/bin"
           ];
-          devenv.root = "/home/nicole/Documents/mycorrhiza/scrapers";
+        };
+      };
+
+    in {
+      packages.${system} = {
+        default = uploader-api;
+        uploader-api = uploader-api;
+        container = container;
+      };
+
+      # Development shell
+      devShells.${system}.default = pkgs.mkShell {
+        nativeBuildInputs = with pkgs; [
+          cargo
+          rustc
+          rust-analyzer
+          pkg-config
+        ];
+
+        buildInputs = with pkgs; [
+          openssl
+        ];
+
+        OPENSSL_NO_VENDOR = 1;
+        PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+      };
+
+      # Apps for easy running
+      apps.${system} = {
+        default = {
+          type = "app";
+          program = "${uploader-api}/bin/openscraper_uploader";
+        };
+
+        build-container = {
+          type = "app";
+          program = "${pkgs.writeShellScript "build-container" ''
+            echo "Building container..."
+            nix build .#container
+            echo "Container built successfully!"
+            echo "Loading into Docker..."
+            docker load < result
+            echo "Container loaded into Docker as uploader-api:latest"
+          ''}";
         };
       };
     };
