@@ -1,13 +1,12 @@
 use aide::{self, axum::IntoApiResponse};
 use axum::response::Json;
-use futures_util::{future::join_all, join};
+use futures_util::future::join_all;
 use tracing::info;
 
 use crate::case_worker::{
-    ProcessCaseWithoutDownload, RawDocketIngestInfo, upload_docket_with_info,
+    RawDocketIngestInfo, upload_docket_with_info,
 };
 
-use mycorrhiza_common::tasks::{TaskStatusDisplay, workers::add_task_to_queue};
 
 pub async fn submit_cases_to_queue_without_download(
     Json(cases): Json<Vec<RawDocketIngestInfo>>,

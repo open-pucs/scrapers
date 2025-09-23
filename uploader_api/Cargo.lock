@@ -2064,47 +2064,6 @@ dependencies = [
 [[package]]
 name = "mycorrhiza_common"
 version = "0.1.0"
-dependencies = [
- "aide",
- "anyhow",
- "async-trait",
- "aws-config",
- "aws-sdk-s3",
- "axum",
- "axum-tracing-opentelemetry",
- "base64 0.22.1",
- "blake2",
- "chrono",
- "futures-util",
- "hex",
- "hostname",
- "hyper 1.7.0",
- "init-tracing-opentelemetry",
- "opentelemetry",
- "opentelemetry-otlp",
- "opentelemetry-stdout",
- "opentelemetry_sdk",
- "rand",
- "rand_core 0.9.3",
- "reqwest",
- "rkyv",
- "schemars 0.9.0",
- "serde",
- "serde_json",
- "serde_with",
- "thiserror",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-opentelemetry",
- "tracing-subscriber",
- "url",
- "urlencoding",
-]
-
-[[package]]
-name = "mycorrhiza_common"
-version = "0.1.0"
 source = "git+https://github.com/mycorrhiza-inc/common-rs/?tag=v0.1.0#57d740b3da8d02601d06b860dfefe17e4936bb18"
 dependencies = [
  "aide",
@@ -2248,7 +2207,7 @@ dependencies = [
  "hostname",
  "hyper 1.7.0",
  "init-tracing-opentelemetry",
- "mycorrhiza_common 0.1.0",
+ "mycorrhiza_common",
  "non-empty-string",
  "opentelemetry",
  "opentelemetry-otlp",
@@ -2291,7 +2250,7 @@ dependencies = [
  "hostname",
  "hyper 1.7.0",
  "init-tracing-opentelemetry",
- "mycorrhiza_common 0.1.0 (git+https://github.com/mycorrhiza-inc/common-rs/?tag=v0.1.0)",
+ "mycorrhiza_common",
  "non-empty-string",
  "openscraper_types",
  "opentelemetry",

@@ -3,8 +3,8 @@ use chrono::{DateTime, NaiveDate, Utc};
 use non_empty_string::NonEmptyString;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_with::{DefaultOnError, serde_as};
-use std::collections::HashMap;
+use serde_with::serde_as;
+use std::collections::BTreeMap;
 
 use crate::jurisdictions::JurisdictionInfo;
 
@@ -16,7 +16,7 @@ pub struct RawDocketWithJurisdiction {
     pub jurisdiction: JurisdictionInfo,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Copy, Default)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum RawArtificalPersonType {
     #[default]
@@ -25,7 +25,7 @@ pub enum RawArtificalPersonType {
     Organization,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, PartialEq, Eq, Hash)]
 pub struct RawGenericParty {
     #[serde(default)]
     pub name: String,
@@ -46,10 +46,10 @@ pub struct RawGenericParty {
     #[serde(default)]
     pub contact_address: String,
     #[serde(default)]
-    pub extra_metadata: HashMap<String, serde_json::Value>,
+    pub extra_metadata: BTreeMap<String, serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, PartialEq, Eq, Hash)]
 pub struct RawGenericAttachment {
     pub name: String,
     pub document_extension: FileExtension,
@@ -62,7 +62,7 @@ pub struct RawGenericAttachment {
     #[serde(default)]
     pub attachment_subtype: String,
     #[serde(default)]
-    pub extra_metadata: HashMap<String, serde_json::Value>,
+    pub extra_metadata: BTreeMap<String, serde_json::Value>,
     #[serde(default)]
     pub hash: Option<Blake2bHash>,
 }
@@ -89,7 +89,7 @@ where
     Ok(None)
 }
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, PartialEq, Eq, Hash)]
 pub struct RawGenericFiling {
     #[serde(default, deserialize_with = "deserialize_date_only")]
     pub filed_date: Option<NaiveDate>,
@@ -114,11 +114,11 @@ pub struct RawGenericFiling {
     #[serde(default)]
     pub attachments: Vec<RawGenericAttachment>,
     #[serde(default)]
-    pub extra_metadata: HashMap<String, serde_json::Value>,
+    pub extra_metadata: BTreeMap<String, serde_json::Value>,
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, PartialEq, Eq, Hash)]
 pub struct RawGenericDocket {
     pub case_govid: NonEmptyString,
     // This shouldnt be an optional field in the final submission, since it can be calculated from
@@ -148,7 +148,7 @@ pub struct RawGenericDocket {
     #[serde(default)]
     pub case_parties: Vec<RawGenericParty>,
     #[serde(default)]
-    pub extra_metadata: HashMap<String, serde_json::Value>,
+    pub extra_metadata: BTreeMap<String, serde_json::Value>,
     #[serde(default = "Utc::now")]
     pub indexed_at: DateTime<Utc>,
 }
