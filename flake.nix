@@ -38,7 +38,7 @@
       };
 
       # Create the OCI container using dockerTools
-      container = pkgs.dockerTools.buildImage {
+      uploader-api-container = pkgs.dockerTools.buildImage {
         name = "uploader-api";
         tag = "latest";
 
@@ -87,14 +87,21 @@
           program = "${uploader-api}/bin/openscraper_uploader";
         };
 
-        build-container = {
+        build-uploader-api-container = {
           type = "app";
           program = "${pkgs.writeShellScript "build-container" ''
-            echo "Building container..."
-            nix build .#container
+            set -euo pipefail
+            echo "Building uploader api container..."
+            if ! nix build .#uploader-api-container; then
+              echo "Container build failed!" >&2
+              exit 1
+            fi
             echo "Container built successfully!"
             echo "Loading into Docker..."
-            docker load < result
+            if ! docker load < result; then
+              echo "Failed to load container into Docker!" >&2
+              exit 1
+            fi
             echo "Container loaded into Docker as uploader-api:latest"
           ''}";
         };
