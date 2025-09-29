@@ -2,34 +2,41 @@ import { chromium, Page, Browser, BrowserContext } from "playwright";
 import * as fs from "fs";
 
 const out_directory = "outputs/utah_coal_mines";
-// So we have a problem, the selectedPermitName of a mine doesnt actually change what id that mine extracts from.
-// secret iteration patterns, take the url:
-// https://ogm.utah.gov/coal-files/?tabType=Specific+Project&selectedRowId=a0B8z000000iHHiEAM&selectedPermitName=
-// Specifically this selectedRoaId and iterate the middle number i through z
-// a0B8z000000iHH{i...z}EAM
-// then take this id
-// a0B8z000000iHI{0...9}EAM
+// New instructions:
 //
+// So this old method isnt working great. I think the best method would be to restructure everything using an index system. So:
+// Step 1: Go ahead and scrape the list of mines page.
+// Step 2: For each mine go ahead and generate an index for each mine, specifically what page its on and what position its on the page.
+// Step 3: Then spawn a new task that reloads the mine page, clikcs through until it encounters the page the mine is on, goes down to the row the mine is on, then clicks the view button that will navigate the website to the mine page:
 //
-// a0B8z000000iHIAEA2
-// and
-// a0B8z000000iHIBEA2
+//<th lwc-392cvb27u8q="" class="private-ssr-placeholder-class" role="rowheader" aria-readonly="true" scope="row" tabindex="0" data-label="View" data-col-key-value="0-button-icon-0"><lightning-primitive-cell-factory lwc-392cvb27u8q="" data-label="View" lwc-f1qthpifoh-host=""><span lwc-f1qthpifoh="" class="slds-grid slds-grid_align-center"><div lwc-f1qthpifoh="" class="private-ssr-placeholder-class"><lightning-primitive-cell-button lwc-f1qthpifoh="" data-navigation="enable" data-action-triggers="enter,space" tabindex="-1"><lightning-button-icon variant="border-filled" lwc-485vfn4rmof-host=""><button lwc-485vfn4rmof="" class="slds-button slds-button_icon slds-button_icon-border-filled" title="Preview" type="button" part="button button-icon"><lightning-primitive-icon lwc-485vfn4rmof="" exportparts="icon" variant="bare" lwc-1of0md8cufd-host=""><svg focusable="false" aria-hidden="true" viewBox="0 0 520 520" part="icon" lwc-1of0md8cufd="" data-key="enter" class="slds-button__icon"><g lwc-1of0md8cufd=""><path d="M440 305s1 16-15 16H152c-9 0-13-12-7-18l56-56c6-6 6-15 0-21l-21-21c-6-6-15-6-21 0L24 340c-6 6-6 15 0 21l136 135c6 6 15 6 21 0l21-21c6-6 6-15 0-21l-56-56c-6-7-2-17 7-17h332c7 0 15-8 15-16V35c0-7-7-15-15-15h-30c-8 0-15 8-15 15v270z" lwc-1of0md8cufd=""></path></g></svg></lightning-primitive-icon><span class="slds-assistive-text" lwc-485vfn4rmof="">SELECT</span></button></lightning-button-icon></lightning-primitive-cell-button></div></span></lightning-primitive-cell-factory></th>
 //
-// So what you should do is scrape the files for these urls first. Then scrape all the mines. Then associate each of the mines with the list of permits for each mine, then save it to disk. (This should be done as soon as the fillings for each well are finished being downloaded.) Also I dont think parallelism for this thing is fully working. It should spawn a seperate new browser tab for each of the filling operations that need to happen.
+// Step 4: Go ahead and scrape the mine page as normal having navigated to it successfully.
 
-async function scrapeMines(page: Page): Promise<any[]> {
+interface MineIndex {
+  case_govid: string;
+  case_name: string;
+  petitioner: string;
+  county: string;
+  pageNumber: number;
+  rowPosition: number;
+}
+
+async function scrapeMinesWithIndex(page: Page): Promise<MineIndex[]> {
   await page.goto("https://utahdnr.my.site.com/s/coal-document-display");
   await page.waitForLoadState("networkidle");
 
-  const cases = [];
+  const mineIndexes: MineIndex[] = [];
+  let pageNumber = 0;
 
   while (true) {
-    console.log("Scraping a page of mines...");
+    console.log(`Scraping page ${pageNumber} of mines for indexing...`);
     await page.waitForLoadState("networkidle");
     const rows = await page.locator("tbody tr").all();
-    console.log(`Found ${rows.length} mines on the page`);
+    console.log(`Found ${rows.length} mines on page ${pageNumber}`);
 
-    for (const row of rows) {
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+      const row = rows[rowIndex];
       const permitId = await row
         .locator('td[data-label="Permit ID"]')
         .innerText();
@@ -41,25 +48,15 @@ async function scrapeMines(page: Page): Promise<any[]> {
         .innerText();
       const county = await row.locator('td[data-label="County"]').innerText();
 
-      const caseData = {
+      const mineIndex: MineIndex = {
         case_govid: permitId,
-        opened_date: null,
         case_name: mineName,
-        case_url: `https://ogm.utah.gov/coal-files/?tabType=Specific+Project&selectedRowId=a0B8z000000iHHjEAM&selectedPermitName=${permitId}`,
-        case_type: "",
-        case_subtype: "",
-        description: "",
-        industry: "Coal",
         petitioner: mineOperator,
-        hearing_officer: "",
-        closed_date: null,
-        filings: [],
-        case_parties: [],
-        extra_metadata: {
-          county: county,
-        },
+        county: county,
+        pageNumber: pageNumber,
+        rowPosition: rowIndex,
       };
-      cases.push(caseData);
+      mineIndexes.push(mineIndex);
     }
 
     try {
@@ -67,142 +64,155 @@ async function scrapeMines(page: Page): Promise<any[]> {
         .locator("lightning-button.slds-p-horizontal_x-small:nth-child(4)")
         .first()
         .click({ timeout: 5000 });
+      pageNumber++;
     } catch (e) {
-      console.log("No more mine pages. Finished scraping mines.");
+      console.log("No more mine pages. Finished indexing mines.");
       break;
     }
   }
-  return cases;
+  return mineIndexes;
 }
 
-async function scrapeFilings(
+async function navigateToMineAndScrape(
   context: BrowserContext,
-  permitURL: string,
-): Promise<any[]> {
+  mineIndex: MineIndex,
+): Promise<any> {
   const page = await context.newPage();
-  const filings = [];
-  let permitIDGlobal = "";
   try {
-    await page.goto(permitURL);
+    console.log(`Navigating to mine ${mineIndex.case_govid} on page ${mineIndex.pageNumber}, row ${mineIndex.rowPosition}`);
+
+    await page.goto("https://utahdnr.my.site.com/s/coal-document-display");
     await page.waitForLoadState("networkidle");
 
-    console.log(
-      `Beginning the process of scraping filings for permit ${permitURL}...`,
-    );
-    let total_pages_so_far = 0;
-    while (true) {
+    for (let currentPage = 0; currentPage < mineIndex.pageNumber; currentPage++) {
+      console.log(`Clicking to page ${currentPage + 1} to reach target page ${mineIndex.pageNumber}`);
+      await page
+        .locator("lightning-button.slds-p-horizontal_x-small:nth-child(4)")
+        .first()
+        .click({ timeout: 5000 });
       await page.waitForLoadState("networkidle");
-      const rows = await page
-        .locator(".slds-table > tbody:nth-child(2) tr")
-        .all();
-      console.log(
-        `Found ${rows.length} filings on the ${total_pages_so_far} page of fillings for ${permitURL}`,
-      );
-
-      for (const row of rows) {
-        const permitIDLocal = await row
-          .locator('td[data-label="Permit"]')
-          .innerText();
-        if (!permitIDGlobal) {
-          permitIDGlobal = permitIDLocal;
-        }
-        const docDate = await row
-          .locator('td[data-label="Document Date"]')
-          .innerText();
-        const docFrom = await row
-          .locator('td[data-label="Doc From"]')
-          .innerText();
-        const docTo = await row.locator('td[data-label="Doc To"]').innerText();
-        const docRegarding = await row
-          .locator('td[data-label="Doc Regarding"]')
-          .innerText();
-        // These dont work, ignoring.
-        // const docLocation = await row
-        //   .locator('td[data-label="Doc Location"]')
-        //   .innerText();
-        // const viewLink = await row.locator("a").first().getAttribute("href");
-        const docLocation = "Incoming";
-        const viewLink = "unknown";
-
-        const filing = {
-          filed_date: docDate,
-          filling_govid: "",
-          name: docRegarding,
-          organization_author_blob: [docTo],
-          individual_author_blob: [docFrom],
-          filing_type: "",
-          description: "",
-          attachments: [
-            {
-              name: docRegarding,
-              document_extension: "pdf",
-              attachment_govid: "",
-              url: viewLink,
-              attachment_type: docLocation,
-              attachment_subtype: "",
-              extra_metadata: {
-                permitID: permitIDLocal,
-              },
-              hash: null,
-            },
-          ],
-          extra_metadata: {
-            doc_location: docLocation,
-            permitID: permitIDLocal,
-          },
-        };
-
-        filings.push(filing);
-      }
-
-      try {
-        await page
-          .locator("lightning-button.slds-p-horizontal_x-small:nth-child(4)")
-          .first()
-          .click({ timeout: 5000 });
-      } catch (e) {
-        console.log(`No more filings pages for permit ${permitIDGlobal}.`);
-        break;
-      }
-      total_pages_so_far += 1;
     }
+
+    console.log(`Reached target page ${mineIndex.pageNumber}, looking for row ${mineIndex.rowPosition}`);
+    const rows = await page.locator("tbody tr").all();
+
+    if (mineIndex.rowPosition >= rows.length) {
+      throw new Error(`Row ${mineIndex.rowPosition} not found on page ${mineIndex.pageNumber}`);
+    }
+
+    const targetRow = rows[mineIndex.rowPosition];
+    const viewButton = targetRow.locator('th[data-label="View"] button');
+
+    console.log(`Clicking view button for mine ${mineIndex.case_govid}`);
+    await viewButton.click();
+    await page.waitForLoadState("networkidle");
+
+    const filings = await scrapeFilingsFromCurrentPage(page, mineIndex.case_govid);
+
+    const caseData = {
+      case_govid: mineIndex.case_govid,
+      opened_date: null,
+      case_name: mineIndex.case_name,
+      case_url: page.url(),
+      case_type: "",
+      case_subtype: "",
+      description: "",
+      industry: "Coal",
+      petitioner: mineIndex.petitioner,
+      hearing_officer: "",
+      closed_date: null,
+      filings: filings,
+      case_parties: [],
+      extra_metadata: {
+        county: mineIndex.county,
+      },
+    };
+
+    return caseData;
   } catch (error) {
-    console.error(
-      `An error occurred while scraping filings for permit ${permitIDGlobal}:`,
-      error,
-    );
+    console.error(`Error navigating to mine ${mineIndex.case_govid}:`, error);
+    return null;
   } finally {
-    console.log(`Finally finished processing fillings for ${permitIDGlobal}`);
     await page.close();
-    return filings;
   }
 }
 
-function generateUtahUrls(): string[] {
-  const urls: string[] = [];
-  const baseUrl =
-    "https://utahdnr.my.site.com/s/coal-document-display?tabType=Specific+Project&selectedRowId=";
-  const permitName = "&selectedPermitName=";
+async function scrapeFilingsFromCurrentPage(page: Page, permitId: string): Promise<any[]> {
+  const filings = [];
+  let total_pages_so_far = 0;
 
-  // a0B8z000000iHH{i...z}EAM
-  for (let i = "i".charCodeAt(0); i <= "z".charCodeAt(0); i++) {
-    const middleChar = String.fromCharCode(i);
-    const rowId = `a0B8z000000iHH${middleChar}EAM`;
-    urls.push(baseUrl + rowId + permitName);
+  console.log(`Beginning the process of scraping filings for permit ${permitId}...`);
+
+  while (true) {
+    await page.waitForLoadState("networkidle");
+    const rows = await page
+      .locator(".slds-table > tbody:nth-child(2) tr")
+      .all();
+    console.log(
+      `Found ${rows.length} filings on page ${total_pages_so_far} for ${permitId}`,
+    );
+
+    for (const row of rows) {
+      const docDate = await row
+        .locator('td[data-label="Document Date"]')
+        .innerText();
+      const docFrom = await row
+        .locator('td[data-label="Doc From"]')
+        .innerText();
+      const docTo = await row.locator('td[data-label="Doc To"]').innerText();
+      const docRegarding = await row
+        .locator('td[data-label="Doc Regarding"]')
+        .innerText();
+
+      const docLocation = "Incoming";
+      const viewLink = "unknown";
+
+      const filing = {
+        filed_date: docDate,
+        filling_govid: "",
+        name: docRegarding,
+        organization_author_blob: [docTo],
+        individual_author_blob: [docFrom],
+        filing_type: "",
+        description: "",
+        attachments: [
+          {
+            name: docRegarding,
+            document_extension: "pdf",
+            attachment_govid: "",
+            url: viewLink,
+            attachment_type: docLocation,
+            attachment_subtype: "",
+            extra_metadata: {
+              permitID: permitId,
+            },
+            hash: null,
+          },
+        ],
+        extra_metadata: {
+          doc_location: docLocation,
+          permitID: permitId,
+        },
+      };
+
+      filings.push(filing);
+    }
+
+    try {
+      await page
+        .locator("lightning-button.slds-p-horizontal_x-small:nth-child(4)")
+        .first()
+        .click({ timeout: 5000 });
+      total_pages_so_far += 1;
+    } catch (e) {
+      console.log(`No more filings pages for permit ${permitId}.`);
+      break;
+    }
   }
 
-  // a0B8z000000iHI{0...9}EAM
-  for (let i = 0; i <= 9; i++) {
-    const rowId = `a0B8z000000iHI${i}EAM`;
-    urls.push(baseUrl + rowId + permitName);
-  }
-
-  // a0B8z000000iHIAEA2 and a0B8z000000iHIBEA2
-  urls.push(baseUrl + "a0B8z000000iHIAEA2" + permitName);
-  urls.push(baseUrl + "a0B8z000000iHIBEA2" + permitName);
-
-  return urls;
+  return filings;
 }
+
 
 async function main() {
   fs.mkdirSync(out_directory, { recursive: true });
@@ -210,36 +220,34 @@ async function main() {
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
-  console.log("Step 1: Scraping all mines...");
-  const allMines = await scrapeMines(page);
-  console.log(`Found ${allMines.length} mines in total.`);
+  console.log("Step 1: Scraping mines list to generate index...");
+  const mineIndexes = await scrapeMinesWithIndex(page);
+  console.log(`Found ${mineIndexes.length} mines in total.`);
   await page.close();
 
-  console.log("Step 2: Generating predefined URLs for filings...");
-  const filingUrls = generateUtahUrls();
-  console.log(`Generated ${filingUrls.length} URLs for filings.`);
+  console.log("Step 2: Navigating to each mine and scraping detailed data concurrently...");
+  const allMines: any[] = [];
 
-  console.log("Step 3: Scraping filings from all URLs concurrently...");
-  const allFilings: any[] = [];
-
-  const concurrencyLimit = 10;
-  const urlQueue = [...filingUrls];
+  const concurrencyLimit = 5;
+  const mineQueue = [...mineIndexes];
 
   async function worker() {
     const context = await browser.newContext();
     try {
-      while (urlQueue.length > 0) {
-        const url = urlQueue.shift();
-        if (url) {
+      while (mineQueue.length > 0) {
+        const mineIndex = mineQueue.shift();
+        if (mineIndex) {
           try {
-            console.log(`Worker starting on URL ${url}`);
-            const filings = await scrapeFilings(context, url);
-            allFilings.push(...filings);
-            console.log(
-              `Finished scraping for URL ${url}. Found ${filings.length} filings.`,
-            );
+            console.log(`Worker starting on mine ${mineIndex.case_govid}`);
+            const mineData = await navigateToMineAndScrape(context, mineIndex);
+            if (mineData) {
+              allMines.push(mineData);
+              console.log(
+                `Finished scraping mine ${mineIndex.case_govid}. Found ${mineData.filings.length} filings.`,
+              );
+            }
           } catch (error) {
-            console.error(`Error scraping filings for URL ${url}:`, error);
+            console.error(`Error scraping mine ${mineIndex.case_govid}:`, error);
           }
         }
       }
@@ -255,16 +263,9 @@ async function main() {
 
   await Promise.all(workers);
 
-  console.log(`Scraped a total of ${allFilings.length} filings.`);
+  console.log(`Successfully scraped ${allMines.length} mines with their filings.`);
 
-  console.log("Step 4: Associating filings with mines...");
-  for (const mine of allMines) {
-    mine.filings = allFilings.filter(
-      (filing) => filing.extra_metadata.permitID === mine.case_govid,
-    );
-  }
-
-  console.log("Step 5: Saving all data to disk...");
+  console.log("Step 3: Saving all data to disk...");
   for (const mine of allMines) {
     fs.writeFileSync(
       `${out_directory}/${mine.case_govid}.json`,
