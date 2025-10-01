@@ -79,13 +79,22 @@ async function navigateToMineAndScrape(
 ): Promise<any> {
   const page = await context.newPage();
   try {
-    console.log(`Navigating to mine ${mineIndex.case_govid} on page ${mineIndex.pageNumber}, row ${mineIndex.rowPosition}`);
+    console.log(
+      `Navigating to mine ${mineIndex.case_govid} on page ${mineIndex.pageNumber}, row ${mineIndex.rowPosition}`,
+    );
 
     await page.goto("https://utahdnr.my.site.com/s/coal-document-display");
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(500);
 
-    for (let currentPage = 0; currentPage < mineIndex.pageNumber; currentPage++) {
-      console.log(`Clicking to page ${currentPage + 1} to reach target page ${mineIndex.pageNumber}`);
+    for (
+      let currentPage = 0;
+      currentPage < mineIndex.pageNumber;
+      currentPage++
+    ) {
+      console.log(
+        `Clicking to page ${currentPage + 1} to reach target page ${mineIndex.pageNumber}`,
+      );
       await page
         .locator("lightning-button.slds-p-horizontal_x-small:nth-child(4)")
         .first()
@@ -93,11 +102,15 @@ async function navigateToMineAndScrape(
       await page.waitForLoadState("networkidle");
     }
 
-    console.log(`Reached target page ${mineIndex.pageNumber}, looking for row ${mineIndex.rowPosition}`);
+    console.log(
+      `Reached target page ${mineIndex.pageNumber}, looking for row ${mineIndex.rowPosition}`,
+    );
     const rows = await page.locator("tbody tr").all();
 
     if (mineIndex.rowPosition >= rows.length) {
-      throw new Error(`Row ${mineIndex.rowPosition} not found on page ${mineIndex.pageNumber}`);
+      throw new Error(
+        `Row ${mineIndex.rowPosition} not found on page ${mineIndex.pageNumber}`,
+      );
     }
 
     const targetRow = rows[mineIndex.rowPosition];
@@ -106,20 +119,29 @@ async function navigateToMineAndScrape(
     console.log(`Clicking view button for mine ${mineIndex.case_govid}`);
     await viewButton.click();
     await page.waitForLoadState("networkidle");
+    // Wait an extra half a second to just make sure everything works.
+    await page.waitForTimeout(500);
 
-    const filings = await scrapeFilingsFromCurrentPage(page, mineIndex.case_govid);
+    const filings = await scrapeFilingsFromCurrentPage(
+      page,
+      mineIndex.case_govid,
+    );
 
     // Validate that all filings have the correct permit ID
-    const validFilings = filings.filter(filing => {
+    const validFilings = filings.filter((filing) => {
       const filingPermitId = filing.extra_metadata?.permitID;
       if (filingPermitId !== mineIndex.case_govid) {
-        console.warn(`Filtering out filing with mismatched permit ID. Expected: ${mineIndex.case_govid}, Found: ${filingPermitId}`);
+        console.warn(
+          `Filtering out filing with mismatched permit ID. Expected: ${mineIndex.case_govid}, Found: ${filingPermitId}`,
+        );
         return false;
       }
       return true;
     });
 
-    console.log(`Mine ${mineIndex.case_govid}: ${validFilings.length}/${filings.length} filings passed permit ID validation`);
+    console.log(
+      `Mine ${mineIndex.case_govid}: ${validFilings.length}/${filings.length} filings passed permit ID validation`,
+    );
 
     const caseData = {
       case_govid: mineIndex.case_govid,
@@ -149,11 +171,16 @@ async function navigateToMineAndScrape(
   }
 }
 
-async function scrapeFilingsFromCurrentPage(page: Page, permitId: string): Promise<any[]> {
+async function scrapeFilingsFromCurrentPage(
+  page: Page,
+  permitId: string,
+): Promise<any[]> {
   const filings = [];
   let total_pages_so_far = 0;
 
-  console.log(`Beginning the process of scraping filings for permit ${permitId}...`);
+  console.log(
+    `Beginning the process of scraping filings for permit ${permitId}...`,
+  );
 
   while (true) {
     await page.waitForLoadState("networkidle");
@@ -177,14 +204,28 @@ async function scrapeFilingsFromCurrentPage(page: Page, permitId: string): Promi
         .innerText();
 
       // Validate that the filing has a valid date
-      if (!docDate || docDate.trim() === "" || docDate === "undefined" || docDate === "null") {
-        console.warn(`Skipping filing for permit ${permitId} - no valid document date found`);
+      if (
+        !docDate ||
+        docDate.trim() === "" ||
+        docDate === "undefined" ||
+        docDate === "null"
+      ) {
+        console.warn(
+          `Skipping filing for permit ${permitId} - no valid document date found`,
+        );
         continue;
       }
 
       // Validate that the filing has a valid name/regarding
-      if (!docRegarding || docRegarding.trim() === "" || docRegarding === "undefined" || docRegarding === "null") {
-        console.warn(`Skipping filing for permit ${permitId} - no valid document regarding found`);
+      if (
+        !docRegarding ||
+        docRegarding.trim() === "" ||
+        docRegarding === "undefined" ||
+        docRegarding === "null"
+      ) {
+        console.warn(
+          `Skipping filing for permit ${permitId} - no valid document regarding found`,
+        );
         continue;
       }
 
@@ -237,8 +278,51 @@ async function scrapeFilingsFromCurrentPage(page: Page, permitId: string): Promi
   return filings;
 }
 
+async function runTestingMode() {
+  fs.mkdirSync(out_directory, { recursive: true });
 
-async function main() {
+  console.log("TESTING MODE: Running with headed browser...");
+  const browser = await chromium.launch({ headless: false, slowMo: 500 });
+  const page = await browser.newPage();
+
+  console.log("Step 1: Scraping mines list to get random mine...");
+  const mineIndexes = await scrapeMinesWithIndex(page);
+  console.log(`Found ${mineIndexes.length} mines in total.`);
+  await page.close();
+
+  const randomIndex = Math.floor(Math.random() * mineIndexes.length);
+  const selectedMine = mineIndexes[randomIndex];
+  console.log(
+    `TESTING MODE: Randomly selected mine ${selectedMine.case_govid} (${selectedMine.case_name}) from position ${randomIndex}`,
+  );
+
+  console.log("Step 2: Scraping the selected mine...");
+  const context = await browser.newContext();
+  const mineData = await navigateToMineAndScrape(context, selectedMine);
+  await context.close();
+
+  if (mineData) {
+    console.log(
+      `TESTING MODE: Successfully scraped mine ${mineData.case_govid}. Found ${mineData.filings.length} filings.`,
+    );
+
+    console.log("Step 3: Saving test data to disk...");
+    fs.writeFileSync(
+      `${out_directory}/test_${mineData.case_govid}.json`,
+      JSON.stringify(mineData, null, 2),
+    );
+    console.log(
+      `TESTING MODE: Saved test data to ${out_directory}/test_${mineData.case_govid}.json`,
+    );
+  } else {
+    console.log("TESTING MODE: Failed to scrape the selected mine.");
+  }
+
+  await browser.close();
+  console.log("TESTING MODE: Complete!");
+}
+
+async function runFullMode() {
   fs.mkdirSync(out_directory, { recursive: true });
 
   const browser = await chromium.launch();
@@ -249,10 +333,12 @@ async function main() {
   console.log(`Found ${mineIndexes.length} mines in total.`);
   await page.close();
 
-  console.log("Step 2: Navigating to each mine and scraping detailed data concurrently...");
+  console.log(
+    "Step 2: Navigating to each mine and scraping detailed data concurrently...",
+  );
   const allMines: any[] = [];
 
-  const concurrencyLimit = 2;
+  const concurrencyLimit = 6;
   const mineQueue = [...mineIndexes];
 
   async function worker() {
@@ -271,7 +357,10 @@ async function main() {
               );
             }
           } catch (error) {
-            console.error(`Error scraping mine ${mineIndex.case_govid}:`, error);
+            console.error(
+              `Error scraping mine ${mineIndex.case_govid}:`,
+              error,
+            );
           }
         }
       }
@@ -287,7 +376,9 @@ async function main() {
 
   await Promise.all(workers);
 
-  console.log(`Successfully scraped ${allMines.length} mines with their filings.`);
+  console.log(
+    `Successfully scraped ${allMines.length} mines with their filings.`,
+  );
 
   console.log("Step 3: Saving all data to disk...");
   for (const mine of allMines) {
@@ -299,6 +390,17 @@ async function main() {
 
   await browser.close();
   console.log("All done!");
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const isTestingMode = args.includes("--testing");
+
+  if (isTestingMode) {
+    await runTestingMode();
+  } else {
+    await runFullMode();
+  }
 }
 
 main().catch(console.error);
