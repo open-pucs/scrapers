@@ -11,6 +11,70 @@ import { runCli } from "../cli_runner";
 import * as cheerio from "cheerio";
 import * as fs from "fs";
 
+// Create a new function that handles going to a specific page for the filling url: then goes to this table with the filling information.
+//
+//
+// Selector: #filing_info
+//
+// HTML:
+// <div class="middleborder_bg" id="filing_info">
+// 	<table cellspacing="0" cellpadding="0" width="100%" border="0">
+// 		<tbody><tr>
+// 			<td class="form_field" valign="top"><span id="lblItemNo" for="lblItemNoval">Filing No.:</span></td>
+//             <td class="form_element" valign="top"><span id="lblItemNoval" tabindex="4">997</span></td>
+//             <td class="form_field" valign="top"><span id="lblDateFiled">Date Filed:</span></td>
+//             <td class="form_element" valign="top"><span id="lblDateFiledval" tabindex="5">9/29/2025</span></td>
+// 		</tr>
+// 		<tr>
+// 			<td class="form_field" valign="top"><span id="lblFilingonbehalfof" for="lblFilingonbehalfofval">Filing on behalf of:</span></td>
+// 			<td class="form_element" valign="top"><span id="lblFilingonbehalfofval" tabindex="6">New York State Electric &amp; Gas Corporation, Rochester Gas and Electric Corporation</span></td>
+// 			<td class="form_field" valign="top"><span id="lblResponceTo" style="display:;"><label for="lstResponceTo">Response To:</label></span>
+//                 <br>&nbsp;
+//
+// 			</td>
+// 			<td class="form_element" rowspan="2" valign="top"><select size="4" name="lstResponceTo" multiple="multiple" id="lstResponceTo" tabindex="7" class="form_select" ondblclick="javascript:return OpenRelatedFiling();" style="display:;">
+//
+// </select>
+// 			<input type="hidden" name="HdnResponseToFilings" id="HdnResponseToFilings"></td>
+// 		</tr>
+// 		<tr>
+// 		    <td class="form_field" valign="top"><span id="lblDescriptionofFiling">Description of Filing:</span></td>
+// 		    <td class="form_element" colspan="2" valign="top"><span id="lblDescriptionofFilingval" tabindex="8">NYSEG-RGE SEEP Quarterly Update - Appendix A - NYSEG &amp; RGE Elec &amp; Gas Spend &amp; Savings</span></td>
+// 		</tr>
+// 		<tr>
+// 		    <td class="form_field" valign="top"><span id="lblFiledBy">Filed By:</span></td>
+// 		    <td class="form_element" valign="top"><span id="lblFiledByval" tabindex="6">Buyck,Kaytlynn</span></td>
+// 		    <td class="form_field" valign="top"><span id="lblComplianceType" style="display:none;">
+//               <label for="lstComplianceType">Compliance Type:</label></span>
+//               <br>&nbsp;
+//             </td>
+//             <td class="form_element" rowspan="2" valign="top">
+//                <select size="4" name="lstComplianceType" multiple="multiple" id="lstComplianceType" tabindex="7" class="form_select" style="display:none;">
+//
+// </select>
+//                <input type="hidden" name="HdnResponseToCompliance" id="HdnResponseToCompliance">
+//             </td>
+//         </tr>
+// 	</tbody></table>
+// </div>
+//
+//
+// Then goes ahead and returns a list of important filing metadata that cannot be aquuired elsewhere, specifically:
+// "Description of Filing:" which then would get assigned to the name of the filling.
+// "Filed By: Buyck,Kaytlynn" which would get assigned to the individual author field, probably as an item ["Kaytlynn Buyck"] just because the filed by names are more regular than organizations.
+//
+// Other info it would be really helpful to cross check would be:
+//
+// "Date Filed:"
+// "Filing No.:"
+//
+// "Filing on behalf of" Also known as the organization author blob.
+//
+//
+//
+// Visit this page and extract its metadata in the standard 2 step fashion, then go ahead and fetch this data using the filling url for a standard filling, and merge the fetched metadata into the filling metadata.
+//
+// Try to make it a small single line addition to the code for processing dockets/fillings, so I can disable it quickly if needed.
 enum ScrapingMode {
   METADATA = "meta",
   FILLINGS = "fillings",
@@ -284,24 +348,57 @@ class NyPucScraper {
     const partiesTablebodySelector = "#tblActiveParty > tbody";
     const rows = $(`${partiesTablebodySelector} tr`);
     console.log(`Found ${rows.length} party rows.`);
-    // console.log("Parties table HTML:", $(`${partiesTablebodySelector}`).html());
 
     rows.each((i, row) => {
-      // console.log(`Row ${i}:`, $(row).html());
       const cells = $(row).find("td");
-      const nameCell = $(cells[1]).text();
+      const nameCellHtml = $(cells[1]).html() || "";
       const emailPhoneCell = $(cells[4]).text();
       const addressCell = $(cells[3]).text();
       const companyCell = $(cells[2]).text();
-      // console.log(`  Name cell: ${nameCell}`);
-      // console.log(`  Company cell: ${companyCell}`);
-      // console.log(`  Address cell: ${addressCell}`);
-      // console.log(`  Email/Phone cell: ${emailPhoneCell}`);
 
-      const nameParts = nameCell.split("\n");
-      const fullName = nameParts[0];
-      const title = nameParts.length > 1 ? nameParts[1] : "";
+      // Parse HTML content by splitting on <br> tags to properly handle the structure:
+      // <td>Yates, William<br>Director of Research<br>Public Utility Law Project of New York, Inc.</td>
+      const nameCellParts = nameCellHtml
+        .split(/<br\s*\/?>/i)
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0);
 
+      console.log(`Row ${i} name cell parts:`, nameCellParts);
+
+      let fullName = "";
+      let title = "";
+      let firstName = "";
+      let lastName = "";
+
+      if (nameCellParts.length > 0) {
+        const rawName = nameCellParts[0].trim();
+
+        // Check if name is in "Last, First" format
+        if (rawName.includes(",")) {
+          const nameComponents = rawName.split(",").map((part) => part.trim());
+          lastName = nameComponents[0] || "";
+          firstName = nameComponents[1] || "";
+          fullName = `${firstName} ${lastName}`.trim();
+        } else {
+          // Assume it's already in "First Last" format or single name
+          fullName = rawName;
+          const nameWords = rawName.split(" ");
+          if (nameWords.length >= 2) {
+            firstName = nameWords.slice(0, -1).join(" ");
+            lastName = nameWords[nameWords.length - 1];
+          } else {
+            firstName = rawName;
+            lastName = "";
+          }
+        }
+
+        // Extract title from second part if available
+        if (nameCellParts.length > 1) {
+          title = nameCellParts[1].trim();
+        }
+      }
+
+      // Parse email and phone
       const emailPhoneCellText = $(cells[4]).text();
       let email = "";
       let phone = "";
@@ -324,14 +421,31 @@ class NyPucScraper {
       const party: RawGenericParty = {
         name: fullName,
         artifical_person_type: RawArtificalPersonType.Human,
-        western_human_last_name: fullName.split(" ")[0] || "",
-        western_human_first_name: fullName.split(" ").slice(1).join(" ") || "",
+        western_human_last_name: lastName,
+        western_human_first_name: firstName,
         human_title: title,
         human_associated_company: companyCell,
         contact_email: email,
         contact_phone: phone,
         contact_address: addressCell,
+        extra_metadata: {
+          name_cell_html: nameCellHtml,
+          name_cell_parts: nameCellParts,
+          raw_name_input: nameCellParts[0] || "",
+          parsed_name_format: fullName.includes(",")
+            ? "last_first"
+            : "first_last",
+        },
       };
+
+      console.log(`Parsed party ${i}:`, {
+        raw_input: nameCellParts[0] || "",
+        full_name: fullName,
+        first_name: firstName,
+        last_name: lastName,
+        title: title,
+      });
+
       parties.push(party);
     });
 
@@ -608,7 +722,7 @@ class NyPucScraper {
     return `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=0&IA=&MT=&MST=&CN=&C=&M=&CO=0&DFF=${formattedBeginDate}&DFT=${formattedEndDate}&DT=&CI=0&FC=`;
   }
 
-  async getFilingsBetweenDates(
+  async getDocketIdsWithFilingsBetweenDates(
     beginDate: Date,
     endDate: Date,
   ): Promise<string[]> {
@@ -632,14 +746,14 @@ class NyPucScraper {
     beginDate: Date,
     endDate: Date,
   ): Promise<Partial<RawGenericDocket>[]> {
-    const formattedBeginDate = this.formatDate(beginDate);
-    const formattedEndDate = this.formatDate(endDate);
-    const url = `https://documents.dps.ny.gov/public/Common/SearchResults.aspx?MC=1&IA=&MT=&MST=&CN=&SDT=${formattedBeginDate}&SDF=${formattedEndDate}&C=&M=&CO=0`;
-    console.log(
-      `Getting cases between ${formattedBeginDate} and ${formattedEndDate}`,
+    let docket_ids = await this.getDocketIdsWithFilingsBetweenDates(
+      beginDate,
+      endDate,
     );
-    const cases: Partial<RawGenericDocket>[] = await this.getCasesAt(url);
-    return cases;
+    let dockets = docket_ids.map((id) => {
+      return { case_govid: id };
+    });
+    return dockets;
   }
 }
 
