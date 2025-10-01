@@ -109,6 +109,18 @@ async function navigateToMineAndScrape(
 
     const filings = await scrapeFilingsFromCurrentPage(page, mineIndex.case_govid);
 
+    // Validate that all filings have the correct permit ID
+    const validFilings = filings.filter(filing => {
+      const filingPermitId = filing.extra_metadata?.permitID;
+      if (filingPermitId !== mineIndex.case_govid) {
+        console.warn(`Filtering out filing with mismatched permit ID. Expected: ${mineIndex.case_govid}, Found: ${filingPermitId}`);
+        return false;
+      }
+      return true;
+    });
+
+    console.log(`Mine ${mineIndex.case_govid}: ${validFilings.length}/${filings.length} filings passed permit ID validation`);
+
     const caseData = {
       case_govid: mineIndex.case_govid,
       opened_date: null,
@@ -121,7 +133,7 @@ async function navigateToMineAndScrape(
       petitioner: mineIndex.petitioner,
       hearing_officer: "",
       closed_date: null,
-      filings: filings,
+      filings: validFilings,
       case_parties: [],
       extra_metadata: {
         county: mineIndex.county,
@@ -164,20 +176,32 @@ async function scrapeFilingsFromCurrentPage(page: Page, permitId: string): Promi
         .locator('td[data-label="Doc Regarding"]')
         .innerText();
 
+      // Validate that the filing has a valid date
+      if (!docDate || docDate.trim() === "" || docDate === "undefined" || docDate === "null") {
+        console.warn(`Skipping filing for permit ${permitId} - no valid document date found`);
+        continue;
+      }
+
+      // Validate that the filing has a valid name/regarding
+      if (!docRegarding || docRegarding.trim() === "" || docRegarding === "undefined" || docRegarding === "null") {
+        console.warn(`Skipping filing for permit ${permitId} - no valid document regarding found`);
+        continue;
+      }
+
       const docLocation = "Incoming";
       const viewLink = "unknown";
 
       const filing = {
-        filed_date: docDate,
+        filed_date: docDate.trim(),
         filling_govid: "",
-        name: docRegarding,
+        name: docRegarding.trim(),
         organization_author_blob: [docTo],
         individual_author_blob: [docFrom],
         filing_type: "",
         description: "",
         attachments: [
           {
-            name: docRegarding,
+            name: docRegarding.trim(),
             document_extension: "pdf",
             attachment_govid: "",
             url: viewLink,
@@ -228,7 +252,7 @@ async function main() {
   console.log("Step 2: Navigating to each mine and scraping detailed data concurrently...");
   const allMines: any[] = [];
 
-  const concurrencyLimit = 5;
+  const concurrencyLimit = 2;
   const mineQueue = [...mineIndexes];
 
   async function worker() {
