@@ -11,70 +11,6 @@ import { runCli } from "../cli_runner";
 import * as cheerio from "cheerio";
 import * as fs from "fs";
 
-// Create a new function that handles going to a specific page for the filling url: then goes to this table with the filling information.
-//
-//
-// Selector: #filing_info
-//
-// HTML:
-// <div class="middleborder_bg" id="filing_info">
-// 	<table cellspacing="0" cellpadding="0" width="100%" border="0">
-// 		<tbody><tr>
-// 			<td class="form_field" valign="top"><span id="lblItemNo" for="lblItemNoval">Filing No.:</span></td>
-//             <td class="form_element" valign="top"><span id="lblItemNoval" tabindex="4">997</span></td>
-//             <td class="form_field" valign="top"><span id="lblDateFiled">Date Filed:</span></td>
-//             <td class="form_element" valign="top"><span id="lblDateFiledval" tabindex="5">9/29/2025</span></td>
-// 		</tr>
-// 		<tr>
-// 			<td class="form_field" valign="top"><span id="lblFilingonbehalfof" for="lblFilingonbehalfofval">Filing on behalf of:</span></td>
-// 			<td class="form_element" valign="top"><span id="lblFilingonbehalfofval" tabindex="6">New York State Electric &amp; Gas Corporation, Rochester Gas and Electric Corporation</span></td>
-// 			<td class="form_field" valign="top"><span id="lblResponceTo" style="display:;"><label for="lstResponceTo">Response To:</label></span>
-//                 <br>&nbsp;
-//
-// 			</td>
-// 			<td class="form_element" rowspan="2" valign="top"><select size="4" name="lstResponceTo" multiple="multiple" id="lstResponceTo" tabindex="7" class="form_select" ondblclick="javascript:return OpenRelatedFiling();" style="display:;">
-//
-// </select>
-// 			<input type="hidden" name="HdnResponseToFilings" id="HdnResponseToFilings"></td>
-// 		</tr>
-// 		<tr>
-// 		    <td class="form_field" valign="top"><span id="lblDescriptionofFiling">Description of Filing:</span></td>
-// 		    <td class="form_element" colspan="2" valign="top"><span id="lblDescriptionofFilingval" tabindex="8">NYSEG-RGE SEEP Quarterly Update - Appendix A - NYSEG &amp; RGE Elec &amp; Gas Spend &amp; Savings</span></td>
-// 		</tr>
-// 		<tr>
-// 		    <td class="form_field" valign="top"><span id="lblFiledBy">Filed By:</span></td>
-// 		    <td class="form_element" valign="top"><span id="lblFiledByval" tabindex="6">Buyck,Kaytlynn</span></td>
-// 		    <td class="form_field" valign="top"><span id="lblComplianceType" style="display:none;">
-//               <label for="lstComplianceType">Compliance Type:</label></span>
-//               <br>&nbsp;
-//             </td>
-//             <td class="form_element" rowspan="2" valign="top">
-//                <select size="4" name="lstComplianceType" multiple="multiple" id="lstComplianceType" tabindex="7" class="form_select" style="display:none;">
-//
-// </select>
-//                <input type="hidden" name="HdnResponseToCompliance" id="HdnResponseToCompliance">
-//             </td>
-//         </tr>
-// 	</tbody></table>
-// </div>
-//
-//
-// Then goes ahead and returns a list of important filing metadata that cannot be aquuired elsewhere, specifically:
-// "Description of Filing:" which then would get assigned to the name of the filling.
-// "Filed By: Buyck,Kaytlynn" which would get assigned to the individual author field, probably as an item ["Kaytlynn Buyck"] just because the filed by names are more regular than organizations.
-//
-// Other info it would be really helpful to cross check would be:
-//
-// "Date Filed:"
-// "Filing No.:"
-//
-// "Filing on behalf of" Also known as the organization author blob.
-//
-//
-//
-// Visit this page and extract its metadata in the standard 2 step fashion, then go ahead and fetch this data using the filling url for a standard filling, and merge the fetched metadata into the filling metadata.
-//
-// Try to make it a small single line addition to the code for processing dockets/fillings, so I can disable it quickly if needed.
 enum ScrapingMode {
   METADATA = "meta",
   FILLINGS = "fillings",
@@ -452,6 +388,101 @@ class NyPucScraper {
     return parties;
   }
 
+  async fetchFilingMetadata(fillingUrl: string): Promise<{
+    description?: string;
+    filedBy?: string;
+    dateFiled?: string;
+    filingNo?: string;
+    filingOnBehalfOf?: string;
+  } | null> {
+    try {
+      console.log(`Fetching filing metadata from: ${fillingUrl}`);
+      const $ = await this.getPage(fillingUrl);
+
+      const filingInfo = $("#filing_info");
+      if (filingInfo.length === 0) {
+        console.log("No filing_info section found on page");
+        return null;
+      }
+
+      const metadata: any = {};
+
+      // Extract Description of Filing
+      const descriptionElement = filingInfo.find("#lblDescriptionofFilingval");
+      if (descriptionElement.length > 0) {
+        metadata.description = descriptionElement.text().trim();
+      }
+
+      // Extract Filed By
+      const filedByElement = filingInfo.find("#lblFiledByval");
+      if (filedByElement.length > 0) {
+        metadata.filedBy = filedByElement.text().trim();
+      }
+
+      // Extract Date Filed
+      const dateFiledElement = filingInfo.find("#lblDateFiledval");
+      if (dateFiledElement.length > 0) {
+        metadata.dateFiled = dateFiledElement.text().trim();
+      }
+
+      // Extract Filing No.
+      const filingNoElement = filingInfo.find("#lblItemNoval");
+      if (filingNoElement.length > 0) {
+        metadata.filingNo = filingNoElement.text().trim();
+      }
+
+      // Extract Filing on behalf of
+      const filingOnBehalfOfElement = filingInfo.find("#lblFilingonbehalfofval");
+      if (filingOnBehalfOfElement.length > 0) {
+        metadata.filingOnBehalfOf = filingOnBehalfOfElement.text().trim();
+      }
+
+      console.log(`Extracted filing metadata:`, metadata);
+      return metadata;
+    } catch (error) {
+      console.error(`Error fetching filing metadata from ${fillingUrl}:`, error);
+      return null;
+    }
+  }
+
+  private async enhanceFilingWithMetadata(filing: RawGenericFiling): Promise<void> {
+    try {
+      const metadata = await this.fetchFilingMetadata(filing.filling_url);
+      if (metadata) {
+        // Merge the metadata into the filing object
+        if (metadata.description) {
+          filing.description = metadata.description;
+        }
+        if (metadata.filedBy) {
+          // Convert "Last,First" format to "[First Last]"
+          const filedByFormatted = metadata.filedBy.includes(',')
+            ? metadata.filedBy.split(',').reverse().map(n => n.trim()).join(' ')
+            : metadata.filedBy;
+          filing.individual_authors = [filedByFormatted];
+          filing.individual_authors_blob = metadata.filedBy;
+        }
+        if (metadata.filingOnBehalfOf) {
+          filing.organization_authors_blob = metadata.filingOnBehalfOf;
+        }
+        // Store original metadata in extra_metadata for cross-checking
+        filing.extra_metadata = {
+          ...filing.extra_metadata,
+          fetched_metadata: metadata
+        };
+      }
+    } catch (error) {
+      console.error(`Failed to fetch metadata for filing ${filing.filling_govid}:`, error);
+    }
+  }
+
+  private async enhanceFilingsWithMetadata(filings: RawGenericFiling[]): Promise<RawGenericFiling[]> {
+    console.log("Enhancing filings with additional metadata...");
+    for (const filing of filings) {
+      await this.enhanceFilingWithMetadata(filing);
+    }
+    return filings;
+  }
+
   private async scrapeDocumentsFromHtml(
     html: string,
     tableSelector: string,
@@ -527,7 +558,8 @@ class NyPucScraper {
     return Array.from(filingsMap.values());
   }
 
-  async scrapeDocumentsOnly(govId: string): Promise<RawGenericFiling[]> {
+  // To enable enhanced filing metadata, call with: scrapeDocumentsOnly(govId, true)
+  async scrapeDocumentsOnly(govId: string, enhanceWithMetadata: boolean = false): Promise<RawGenericFiling[]> {
     let windowContext = null;
     try {
       console.log(`Scraping documents for case: ${govId} (new window)`);
@@ -544,12 +576,18 @@ class NyPucScraper {
       } catch {} // Ignore timeout, just means no documents table
 
       const documentsHtml = await page.content();
-      const documents = await this.scrapeDocumentsFromHtml(
+      let documents = await this.scrapeDocumentsFromHtml(
         documentsHtml,
         docsTableSelector,
         page.url(),
       );
       await windowContext.close();
+
+      // Enhance with metadata if requested
+      if (enhanceWithMetadata) {
+        documents = await this.enhanceFilingsWithMetadata(documents);
+      }
+
       return documents;
     } catch (error) {
       console.error(`Error scraping documents for ${govId}:`, error);
