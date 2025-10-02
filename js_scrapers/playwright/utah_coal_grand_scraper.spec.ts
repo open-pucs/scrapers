@@ -322,7 +322,7 @@ async function runTestingMode() {
   console.log("TESTING MODE: Complete!");
 }
 
-async function runFullMode() {
+async function runFullMode(concurrencyOverride: number | null = null) {
   fs.mkdirSync(out_directory, { recursive: true });
 
   const browser = await chromium.launch();
@@ -338,7 +338,8 @@ async function runFullMode() {
   );
   const allMines: any[] = [];
 
-  const concurrencyLimit = 6;
+  const concurrencyLimit = concurrencyOverride || 6;
+  console.log(`Using concurrency limit: ${concurrencyLimit}`);
   const mineQueue = [...mineIndexes];
 
   async function worker() {
@@ -351,10 +352,13 @@ async function runFullMode() {
             console.log(`Worker starting on mine ${mineIndex.case_govid}`);
             const mineData = await navigateToMineAndScrape(context, mineIndex);
             if (mineData) {
-              allMines.push(mineData);
+              // Save the mine data immediately after scraping
+              const filename = `${out_directory}/${mineData.case_govid}.json`;
+              fs.writeFileSync(filename, JSON.stringify(mineData, null, 2));
               console.log(
-                `Finished scraping mine ${mineIndex.case_govid}. Found ${mineData.filings.length} filings.`,
+                `Finished scraping mine ${mineIndex.case_govid}. Found ${mineData.filings.length} filings. Saved to ${filename}`,
               );
+              allMines.push(mineData);
             }
           } catch (error) {
             console.error(
@@ -380,14 +384,6 @@ async function runFullMode() {
     `Successfully scraped ${allMines.length} mines with their filings.`,
   );
 
-  console.log("Step 3: Saving all data to disk...");
-  for (const mine of allMines) {
-    fs.writeFileSync(
-      `${out_directory}/${mine.case_govid}.json`,
-      JSON.stringify(mine, null, 2),
-    );
-  }
-
   await browser.close();
   console.log("All done!");
 }
@@ -396,10 +392,23 @@ async function main() {
   const args = process.argv.slice(2);
   const isTestingMode = args.includes("--testing");
 
+  // Parse concurrency override flag
+  let concurrencyOverride = null;
+  const concurrencyFlagIndex = args.indexOf("--concurrency");
+  if (concurrencyFlagIndex !== -1 && concurrencyFlagIndex + 1 < args.length) {
+    const concurrencyValue = parseInt(args[concurrencyFlagIndex + 1], 10);
+    if (!isNaN(concurrencyValue) && concurrencyValue > 0) {
+      concurrencyOverride = concurrencyValue;
+    } else {
+      console.error("Invalid concurrency value. Must be a positive integer.");
+      process.exit(1);
+    }
+  }
+
   if (isTestingMode) {
     await runTestingMode();
   } else {
-    await runFullMode();
+    await runFullMode(concurrencyOverride);
   }
 }
 
