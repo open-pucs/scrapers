@@ -20,6 +20,7 @@ export interface RawGenericParty {
   contact_email: string;
   contact_phone: string;
   contact_address: string;
+  extra_metadata: any;
 }
 
 export interface RawGenericAttachment {

@@ -1,108 +1,106 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    naersk = {
-      url = "github:nix-community/naersk";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    nix2container = {
-      url = "github:nlewo/nix2container";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    nixpkgs-playwright.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = { self, nixpkgs, naersk, nix2container }:
+  outputs = { self, nixpkgs, nixpkgs-playwright }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-      naersk' = pkgs.callPackage naersk {};
-      nix2containerPkgs = nix2container.packages.${system};
+      pkgs-playwright = nixpkgs-playwright.legacyPackages.${system};
 
-      # Build the Rust application from uploader_api directory
-      uploader-api = naersk'.buildPackage {
-        src = ./uploader_api;
-        name = "openscraper_uploader";
-
-        # Add any additional build inputs if needed
-        nativeBuildInputs = with pkgs; [
-          pkg-config
-        ];
-
-        buildInputs = with pkgs; [
-          openssl
-        ];
-
-        # Set environment variables for OpenSSL
-        OPENSSL_NO_VENDOR = 1;
-        PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
-      };
-
-      # Create the OCI container using dockerTools
-      uploader-api-container = pkgs.dockerTools.buildImage {
-        name = "uploader-api";
-        tag = "latest";
-
-        copyToRoot = pkgs.buildEnv {
-          name = "image-root";
-          paths = [ uploader-api pkgs.coreutils pkgs.bash ];
-          pathsToLink = [ "/bin" ];
-        };
-
-        config = {
-          Cmd = [ "${uploader-api}/bin/openscraper_uploader" ];
-          Env = [
-            "PATH=/bin"
-          ];
-        };
+      # Import the node2nix generated packages
+      nodePackages = import ./js_scrapers/default.nix {
+        inherit pkgs system;
+        nodejs = pkgs.nodejs_20;  # Use Node.js 20 instead of default 14
       };
 
     in {
       packages.${system} = {
-        default = uploader-api;
-        uploader-api = uploader-api;
-        container = container;
+        # Add the node packages as a package
+        js-scrapers = nodePackages.package;
+        default = nodePackages.package;
       };
 
-      # Development shell
-      devShells.${system}.default = pkgs.mkShell {
-        nativeBuildInputs = with pkgs; [
-          cargo
-          rustc
-          rust-analyzer
-          pkg-config
-        ];
+      # Development shells
+      devShells.${system} = {
+        default = pkgs.mkShell {
+          nativeBuildInputs = with pkgs; [
+            # Node.js toolchain
+            nodejs_20
+            nodePackages.pnpm
+            nodePackages.typescript
+            nodePackages.ts-node
 
-        buildInputs = with pkgs; [
-          openssl
-        ];
+            # Playwright
+            pkgs-playwright.playwright-driver
 
-        OPENSSL_NO_VENDOR = 1;
-        PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+            # Additional tools
+            git
+          ];
+
+          # Environment variables (matching devenv.nix setup)
+          PLAYWRIGHT_BROWSERS_PATH = "${pkgs-playwright.playwright.browsers}";
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = 1;
+          PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = true;
+          PLAYWRIGHT_NODEJS_PATH = "${pkgs.nodejs_20}/bin/node";
+
+          shellHook = ''
+            echo "🎭 JavaScript Scrapers Environment"
+            echo "📍 Working directory: $(pwd)"
+            echo "🎭 Playwright browsers: $PLAYWRIGHT_BROWSERS_PATH"
+            echo ""
+            echo "Available commands:"
+            echo "  cd js_scrapers && pnpm install"
+            echo "  ts-node playwright/ny_puc_scraper.spec.ts --mode all --begin-date 2025-01-01 --end 2025-01-05 --outfile test.json"
+            echo ""
+          '';
+        };
       };
 
       # Apps for easy running
       apps.${system} = {
+        # NY PUC Scraper app - callable from other binaries
         default = {
           type = "app";
-          program = "${uploader-api}/bin/openscraper_uploader";
+          program = "${pkgs.writeShellScript "ny-puc-scraper" ''
+            set -euo pipefail
+
+            # Set up environment
+            export PLAYWRIGHT_BROWSERS_PATH="${pkgs-playwright.playwright.browsers}"
+            export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+            export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
+            export PLAYWRIGHT_NODEJS_PATH="${pkgs.nodejs_20}/bin/node"
+
+            # Use the built node_modules from node2nix
+            export NODE_PATH="${nodePackages.package}/lib/node_modules/js_scrapers/node_modules"
+            cd "${nodePackages.package}/lib/node_modules/js_scrapers"
+
+            # Run the scraper with all arguments passed through
+            echo "Running NY PUC scraper..."
+            ${pkgs.nodePackages.ts-node}/bin/ts-node playwright/ny_puc_scraper.spec.ts "$@"
+          ''}";
         };
 
-        build-uploader-api-container = {
+        ny-puc-scraper = {
           type = "app";
-          program = "${pkgs.writeShellScript "build-container" ''
+          program = "${pkgs.writeShellScript "ny-puc-scraper" ''
             set -euo pipefail
-            echo "Building uploader api container..."
-            if ! nix build .#uploader-api-container; then
-              echo "Container build failed!" >&2
-              exit 1
-            fi
-            echo "Container built successfully!"
-            echo "Loading into Docker..."
-            if ! docker load < result; then
-              echo "Failed to load container into Docker!" >&2
-              exit 1
-            fi
-            echo "Container loaded into Docker as uploader-api:latest"
+
+            # Set up environment
+            export PLAYWRIGHT_BROWSERS_PATH="${pkgs-playwright.playwright.browsers}"
+            export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+            export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
+            export PLAYWRIGHT_NODEJS_PATH="${pkgs.nodejs_20}/bin/node"
+
+            # Use the built node_modules from node2nix
+            export NODE_PATH="${nodePackages.package}/lib/node_modules/js_scrapers/node_modules"
+            cd "${nodePackages.package}/lib/node_modules/js_scrapers"
+
+            # Run the scraper with all arguments passed through
+            echo "Running NY PUC scraper..."
+            ${pkgs.nodePackages.ts-node}/bin/ts-node playwright/ny_puc_scraper.spec.ts "$@"
           ''}";
         };
       };
