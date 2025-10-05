@@ -1,6 +1,12 @@
-# NY PUC Scraper
+# Utility Commission Scrapers
 
-A Node.js/TypeScript web scraper for the New York Public Utilities Commission (NY PUC) website that extracts case information, documents, and party details with parallel processing and task queuing.
+A collection of Node.js/TypeScript web scrapers for various utility commission websites that extract case information, documents, and party details with parallel processing and task queuing.
+
+## Available Scrapers
+
+- **NY PUC**: New York Public Utilities Commission scraper
+- **CO PUC**: Colorado Public Utilities Commission scraper
+- **Utah Coal**: Utah coal mine data scraper
 
 ## Features
 
@@ -13,6 +19,23 @@ A Node.js/TypeScript web scraper for the New York Public Utilities Commission (N
 
 ## Installation
 
+You can run these scrapers using Nix flakes for a reproducible environment with all dependencies:
+
+```bash
+# List available scrapers
+nix flake show
+
+# Run NY PUC scraper (default)
+nix run . -- --mode full --gov-ids "14-M-0094,18-M-0084" -o results.json
+
+# Run specific scrapers
+nix run .#ny-puc -- --mode full --gov-ids "14-M-0094,18-M-0084" -o results.json
+nix run .#co-puc -- --mode full --gov-ids "22AL-0530E" -o co_results.json
+nix run .#utah-coal -- --index-only -o utah_results.json
+```
+
+### Alternative: Local Development
+
 ```bash
 npm install
 # or
@@ -21,10 +44,25 @@ pnpm install
 
 ## Usage
 
-### Basic Command Structure
+### Using Nix (Recommended)
+
+```bash
+# NY PUC scraper
+nix run .#ny-puc -- [OPTIONS]
+
+# Colorado PUC scraper
+nix run .#co-puc -- [OPTIONS]
+
+# Utah coal scraper
+nix run .#utah-coal -- [OPTIONS]
+```
+
+### Direct TypeScript Execution
 
 ```bash
 npx ts-node playwright/ny_puc_scraper.spec.ts [OPTIONS]
+npx ts-node playwright/co_puc_scraper.copied-spec.ts [OPTIONS]
+npx ts-node playwright/utah_coal_grand_scraper.spec.ts [OPTIONS]
 ```
 
 ### Command Line Options

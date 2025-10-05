@@ -2,25 +2,46 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-playwright.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nix2container.url = "github:nlewo/nix2container";
+    nix2container.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, nixpkgs-playwright }:
+  outputs = { self, nixpkgs, nixpkgs-playwright, nix2container }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       pkgs-playwright = nixpkgs-playwright.legacyPackages.${system};
 
-      # Import the node2nix generated packages
-      nodePackages = import ./js_scrapers/default.nix {
-        inherit pkgs system;
-        nodejs = pkgs.nodejs_20;  # Use Node.js 20 instead of default 14
+      # Import the scraper derivation from js_scrapers
+      scraperMainDerivation = import ./js_scrapers/main.nix {
+        inherit pkgs pkgs-playwright system;
       };
+
+      # nix2container packages
+      nix2containerPkgs = nix2container.packages.${system};
 
     in {
       packages.${system} = {
         # Add the node packages as a package
-        js-scrapers = nodePackages.package;
-        default = nodePackages.package;
+        js-scrapers = scraperMainDerivation.package;
+        default = scraperMainDerivation.package;
+
+        # Container image
+        container = nix2containerPkgs.nix2container.buildImage {
+          name = "utility-scrapers";
+          config = {
+            entrypoint = [ "${pkgs.nodePackages.ts-node}/bin/ts-node" ];
+            cmd = [ "playwright/ny_puc_scraper.spec.ts" ];
+            env = [
+              "PLAYWRIGHT_BROWSERS_PATH=${pkgs-playwright.playwright.browsers}"
+              "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1"
+              "PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true"
+              "PLAYWRIGHT_NODEJS_PATH=${pkgs.nodejs_20}/bin/node"
+              "NODE_PATH=${scraperMainDerivation.package}/lib/node_modules/js_scrapers/node_modules"
+            ];
+            workingDir = "${scraperMainDerivation.package}/lib/node_modules/js_scrapers";
+          };
+        };
       };
 
       # Development shells
@@ -60,49 +81,6 @@
       };
 
       # Apps for easy running
-      apps.${system} = {
-        # NY PUC Scraper app - callable from other binaries
-        default = {
-          type = "app";
-          program = "${pkgs.writeShellScript "ny-puc-scraper" ''
-            set -euo pipefail
-
-            # Set up environment
-            export PLAYWRIGHT_BROWSERS_PATH="${pkgs-playwright.playwright.browsers}"
-            export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-            export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
-            export PLAYWRIGHT_NODEJS_PATH="${pkgs.nodejs_20}/bin/node"
-
-            # Use the built node_modules from node2nix
-            export NODE_PATH="${nodePackages.package}/lib/node_modules/js_scrapers/node_modules"
-            cd "${nodePackages.package}/lib/node_modules/js_scrapers"
-
-            # Run the scraper with all arguments passed through
-            echo "Running NY PUC scraper..."
-            ${pkgs.nodePackages.ts-node}/bin/ts-node playwright/ny_puc_scraper.spec.ts "$@"
-          ''}";
-        };
-
-        ny-puc-scraper = {
-          type = "app";
-          program = "${pkgs.writeShellScript "ny-puc-scraper" ''
-            set -euo pipefail
-
-            # Set up environment
-            export PLAYWRIGHT_BROWSERS_PATH="${pkgs-playwright.playwright.browsers}"
-            export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-            export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
-            export PLAYWRIGHT_NODEJS_PATH="${pkgs.nodejs_20}/bin/node"
-
-            # Use the built node_modules from node2nix
-            export NODE_PATH="${nodePackages.package}/lib/node_modules/js_scrapers/node_modules"
-            cd "${nodePackages.package}/lib/node_modules/js_scrapers"
-
-            # Run the scraper with all arguments passed through
-            echo "Running NY PUC scraper..."
-            ${pkgs.nodePackages.ts-node}/bin/ts-node playwright/ny_puc_scraper.spec.ts "$@"
-          ''}";
-        };
-      };
+      apps.${system} = scraperMainDerivation.apps;
     };
 }
