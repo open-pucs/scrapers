@@ -11,6 +11,22 @@ import { runCli } from "../cli_runner";
 import * as cheerio from "cheerio";
 import * as fs from "fs";
 
+// Table selector:
+//
+//body > table:nth-child(1) > tbody:nth-child(1)
+//
+//
+//
+//Table row info:
+//<tr>
+// <td class="clsTableText" title="View the document (opens in a new window). " style="vertical-align: top" width="340"><a href="efi_p2_v2_demo.show_document?p_dms_document_id=1050291&amp;p_session_id=" target="_blank" class="clsTableText">22AL-0530E and 22AL-0478E, Notice of Compliance Filing</a></td>
+// <td class="clsTableText" style="vertical-align: top" width="90">Notification</td>
+// <td class="clsTableText" style="vertical-align: top" width="135">Oct 02, 2025 04:32 pm</td>
+// <td class="clsTableText" style="vertical-align: top" width="99"><a href="EFI.Show_Filing?p_session_id=&amp;p_fil=G_828333 " target="_blank">22AL-0478E </a></td>
+// <td class="clsTableText" style="vertical-align: top" width="100">Public Service Company of Colorado</td>
+// <td class="clsTableText" style="vertical-align: top" width="108">Non-confidential</td>
+// </tr>
+
 enum ScrapingMode {
   METADATA = "meta",
   FILLINGS = "fillings",
@@ -432,7 +448,9 @@ class NyPucScraper {
       }
 
       // Extract Filing on behalf of
-      const filingOnBehalfOfElement = filingInfo.find("#lblFilingonbehalfofval");
+      const filingOnBehalfOfElement = filingInfo.find(
+        "#lblFilingonbehalfofval",
+      );
       if (filingOnBehalfOfElement.length > 0) {
         metadata.filingOnBehalfOf = filingOnBehalfOfElement.text().trim();
       }
@@ -440,12 +458,17 @@ class NyPucScraper {
       console.log(`Extracted filing metadata:`, metadata);
       return metadata;
     } catch (error) {
-      console.error(`Error fetching filing metadata from ${fillingUrl}:`, error);
+      console.error(
+        `Error fetching filing metadata from ${fillingUrl}:`,
+        error,
+      );
       return null;
     }
   }
 
-  private async enhanceFilingWithMetadata(filing: RawGenericFiling): Promise<void> {
+  private async enhanceFilingWithMetadata(
+    filing: RawGenericFiling,
+  ): Promise<void> {
     try {
       const metadata = await this.fetchFilingMetadata(filing.filling_url);
       if (metadata) {
@@ -455,8 +478,12 @@ class NyPucScraper {
         }
         if (metadata.filedBy) {
           // Convert "Last,First" format to "[First Last]"
-          const filedByFormatted = metadata.filedBy.includes(',')
-            ? metadata.filedBy.split(',').reverse().map(n => n.trim()).join(' ')
+          const filedByFormatted = metadata.filedBy.includes(",")
+            ? metadata.filedBy
+                .split(",")
+                .reverse()
+                .map((n) => n.trim())
+                .join(" ")
             : metadata.filedBy;
           filing.individual_authors = [filedByFormatted];
           filing.individual_authors_blob = metadata.filedBy;
@@ -467,15 +494,20 @@ class NyPucScraper {
         // Store original metadata in extra_metadata for cross-checking
         filing.extra_metadata = {
           ...filing.extra_metadata,
-          fetched_metadata: metadata
+          fetched_metadata: metadata,
         };
       }
     } catch (error) {
-      console.error(`Failed to fetch metadata for filing ${filing.filling_govid}:`, error);
+      console.error(
+        `Failed to fetch metadata for filing ${filing.filling_govid}:`,
+        error,
+      );
     }
   }
 
-  private async enhanceFilingsWithMetadata(filings: RawGenericFiling[]): Promise<RawGenericFiling[]> {
+  private async enhanceFilingsWithMetadata(
+    filings: RawGenericFiling[],
+  ): Promise<RawGenericFiling[]> {
     console.log("Enhancing filings with additional metadata...");
     for (const filing of filings) {
       await this.enhanceFilingWithMetadata(filing);
@@ -559,7 +591,10 @@ class NyPucScraper {
   }
 
   // To enable enhanced filing metadata, call with: scrapeDocumentsOnly(govId, true)
-  async scrapeDocumentsOnly(govId: string, enhanceWithMetadata: boolean = false): Promise<RawGenericFiling[]> {
+  async scrapeDocumentsOnly(
+    govId: string,
+    enhanceWithMetadata: boolean = false,
+  ): Promise<RawGenericFiling[]> {
     let windowContext = null;
     try {
       console.log(`Scraping documents for case: ${govId} (new window)`);

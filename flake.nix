@@ -1,110 +1,63 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    naersk = {
-      url = "github:nix-community/naersk";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    nix2container = {
-      url = "github:nlewo/nix2container";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    nixpkgs-playwright.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nix2container.url = "github:nlewo/nix2container";
+    nix2container.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, naersk, nix2container }:
+  outputs = { self, nixpkgs, nixpkgs-playwright, nix2container }:
     let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
-      naersk' = pkgs.callPackage naersk {};
-      nix2containerPkgs = nix2container.packages.${system};
+      supportedSystems = [ "x86_64-linux" "x86_64-darwin" ];
 
-      # Build the Rust application from uploader_api directory
-      uploader-api = naersk'.buildPackage {
-        src = ./uploader_api;
-        name = "openscraper_uploader";
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
-        # Add any additional build inputs if needed
-        nativeBuildInputs = with pkgs; [
-          pkg-config
-        ];
-
-        buildInputs = with pkgs; [
-          openssl
-        ];
-
-        # Set environment variables for OpenSSL
-        OPENSSL_NO_VENDOR = 1;
-        PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
-      };
-
-      # Create the OCI container using dockerTools
-      uploader-api-container = pkgs.dockerTools.buildImage {
-        name = "uploader-api";
-        tag = "latest";
-
-        copyToRoot = pkgs.buildEnv {
-          name = "image-root";
-          paths = [ uploader-api pkgs.coreutils pkgs.bash ];
-          pathsToLink = [ "/bin" ];
-        };
-
-        config = {
-          Cmd = [ "${uploader-api}/bin/openscraper_uploader" ];
-          Env = [
-            "PATH=/bin"
-          ];
-        };
-      };
+      pkgsFor = system: nixpkgs.legacyPackages.${system};
+      pkgsPlaywrightFor = system: nixpkgs-playwright.legacyPackages.${system};
 
     in {
-      packages.${system} = {
-        default = uploader-api;
-        uploader-api = uploader-api;
-        container = container;
-      };
+      packages = forAllSystems (system:
+        let
+          pkgs = pkgsFor system;
+          pkgs-playwright = pkgsPlaywrightFor system;
 
-      # Development shell
-      devShells.${system}.default = pkgs.mkShell {
-        nativeBuildInputs = with pkgs; [
-          cargo
-          rustc
-          rust-analyzer
-          pkg-config
-        ];
+          # Import the scraper derivation from js_scrapers
+          scraperMainDerivation = import ./js_scrapers/main.nix {
+            inherit pkgs pkgs-playwright system;
+          };
 
-        buildInputs = with pkgs; [
-          openssl
-        ];
-
-        OPENSSL_NO_VENDOR = 1;
-        PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
-      };
+        in {
+          # Add the node packages as a package
+          js-scrapers = scraperMainDerivation.package;
+          default = scraperMainDerivation.package;
+        } // (nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
+          # Container image (Linux only)
+          container = nix2container.packages.${system}.nix2container.buildImage {
+            name = "utility-scrapers";
+            config = {
+              entrypoint = [ "${pkgs.nodePackages.ts-node}/bin/ts-node" ];
+              cmd = [ "playwright/ny_puc_scraper.spec.ts" ];
+              env = [
+                "PLAYWRIGHT_BROWSERS_PATH=${pkgs-playwright.playwright.browsers}"
+                "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1"
+                "PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true"
+                "PLAYWRIGHT_NODEJS_PATH=${pkgs.nodejs_20}/bin/node"
+                "NODE_PATH=${scraperMainDerivation.package}/lib/node_modules/js_scrapers/node_modules"
+              ];
+              workingDir = "${scraperMainDerivation.package}/lib/node_modules/js_scrapers";
+            };
+          };
+        }));
 
       # Apps for easy running
-      apps.${system} = {
-        default = {
-          type = "app";
-          program = "${uploader-api}/bin/openscraper_uploader";
-        };
+      apps = forAllSystems (system:
+        let
+          pkgs = pkgsFor system;
+          pkgs-playwright = pkgsPlaywrightFor system;
 
-        build-uploader-api-container = {
-          type = "app";
-          program = "${pkgs.writeShellScript "build-container" ''
-            set -euo pipefail
-            echo "Building uploader api container..."
-            if ! nix build .#uploader-api-container; then
-              echo "Container build failed!" >&2
-              exit 1
-            fi
-            echo "Container built successfully!"
-            echo "Loading into Docker..."
-            if ! docker load < result; then
-              echo "Failed to load container into Docker!" >&2
-              exit 1
-            fi
-            echo "Container loaded into Docker as uploader-api:latest"
-          ''}";
-        };
-      };
+          scraperMainDerivation = import ./js_scrapers/main.nix {
+            inherit pkgs pkgs-playwright system;
+          };
+        in scraperMainDerivation.apps);
     };
 }
