@@ -38,7 +38,7 @@ in {
   package = nodePackages.package;
 
   # Apps for easy running - busybox style with multiple scrapers
-  apps = builtins.mapAttrs mkScraperApp scrapers // {
+  apps = builtins.mapAttrs (name: script: mkScraperApp { inherit name script; }) scrapers // {
     # Default maintains backward compatibility with ny-puc
     default = mkScraperApp {
       name = "ny-puc";

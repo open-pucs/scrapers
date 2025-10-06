@@ -17,6 +17,7 @@ in
 
   # Common packages available to all projects
   packages = with pkgs; [
+    node2nix
     just
     curl
     jq
