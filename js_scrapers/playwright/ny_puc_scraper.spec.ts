@@ -432,7 +432,9 @@ class NyPucScraper {
       }
 
       // Extract Filing on behalf of
-      const filingOnBehalfOfElement = filingInfo.find("#lblFilingonbehalfofval");
+      const filingOnBehalfOfElement = filingInfo.find(
+        "#lblFilingonbehalfofval",
+      );
       if (filingOnBehalfOfElement.length > 0) {
         metadata.filingOnBehalfOf = filingOnBehalfOfElement.text().trim();
       }
@@ -440,12 +442,17 @@ class NyPucScraper {
       console.log(`Extracted filing metadata:`, metadata);
       return metadata;
     } catch (error) {
-      console.error(`Error fetching filing metadata from ${fillingUrl}:`, error);
+      console.error(
+        `Error fetching filing metadata from ${fillingUrl}:`,
+        error,
+      );
       return null;
     }
   }
 
-  private async enhanceFilingWithMetadata(filing: RawGenericFiling): Promise<void> {
+  private async enhanceFilingWithMetadata(
+    filing: RawGenericFiling,
+  ): Promise<void> {
     try {
       const metadata = await this.fetchFilingMetadata(filing.filling_url);
       if (metadata) {
@@ -455,8 +462,12 @@ class NyPucScraper {
         }
         if (metadata.filedBy) {
           // Convert "Last,First" format to "[First Last]"
-          const filedByFormatted = metadata.filedBy.includes(',')
-            ? metadata.filedBy.split(',').reverse().map(n => n.trim()).join(' ')
+          const filedByFormatted = metadata.filedBy.includes(",")
+            ? metadata.filedBy
+                .split(",")
+                .reverse()
+                .map((n) => n.trim())
+                .join(" ")
             : metadata.filedBy;
           filing.individual_authors = [filedByFormatted];
           filing.individual_authors_blob = metadata.filedBy;
@@ -467,20 +478,40 @@ class NyPucScraper {
         // Store original metadata in extra_metadata for cross-checking
         filing.extra_metadata = {
           ...filing.extra_metadata,
-          fetched_metadata: metadata
+          fetched_metadata: metadata,
         };
       }
     } catch (error) {
-      console.error(`Failed to fetch metadata for filing ${filing.filling_govid}:`, error);
+      console.error(
+        `Failed to fetch metadata for filing ${filing.filling_govid}:`,
+        error,
+      );
     }
   }
 
-  private async enhanceFilingsWithMetadata(filings: RawGenericFiling[]): Promise<RawGenericFiling[]> {
+  private async enhanceFilingsWithMetadata(
+    filings: RawGenericFiling[],
+  ): Promise<RawGenericFiling[]> {
     console.log("Enhancing filings with additional metadata...");
     for (const filing of filings) {
       await this.enhanceFilingWithMetadata(filing);
     }
     return filings;
+  }
+
+  private extractFilingUrlFromOnclick(onclickAttr: string): string {
+    if (!onclickAttr) return "";
+
+    // Parse the onclick: "javascript:return OpenGridPopupWindow('../MatterManagement/MatterFilingItem.aspx','FilingSeq=360722&amp;MatterSeq=64595');"
+    const match = onclickAttr.match(/OpenGridPopupWindow\('([^']+)','([^']+)'\)/);
+    if (!match) return "";
+
+    const [, relativePath, params] = match;
+    // Convert ../MatterManagement/MatterFilingItem.aspx to full URL
+    const fullPath = relativePath.replace("../", "https://documents.dps.ny.gov/public/");
+    // Decode HTML entities in parameters (&amp; -> &)
+    const decodedParams = params.replace(/&amp;/g, "&");
+    return `${fullPath}?${decodedParams}`;
   }
 
   private async scrapeDocumentsFromHtml(
@@ -501,11 +532,15 @@ class NyPucScraper {
         const filingNo = $(docCells[5]).text().trim();
         if (!filingNo) return;
 
-        const filingUrlRaw = $(docCells[5]).find("a").attr("href");
-        const fillingUrl = new URL(
-          filingUrlRaw.replace("../", "https://documents.dps.ny.gov/public/"),
-          url,
-        ).toString();
+        const onclickAttr = $(docCells[5]).find("a").attr("onclick") || "";
+        const fillingUrl = this.extractFilingUrlFromOnclick(onclickAttr);
+
+        // Skip this filing if we couldn't extract a valid URL
+        if (!fillingUrl) {
+          console.warn(`Skipping filing ${filingNo}: could not extract valid URL from onclick attribute`);
+          return;
+        }
+
         const documentTitle = $(docCells[3]).find("a").text().trim();
         const attachmentUrlRaw = $(docCells[3]).find("a").attr("href");
 
@@ -559,7 +594,10 @@ class NyPucScraper {
   }
 
   // To enable enhanced filing metadata, call with: scrapeDocumentsOnly(govId, true)
-  async scrapeDocumentsOnly(govId: string, enhanceWithMetadata: boolean = false): Promise<RawGenericFiling[]> {
+  async scrapeDocumentsOnly(
+    govId: string,
+    enhanceWithMetadata: boolean = false,
+  ): Promise<RawGenericFiling[]> {
     let windowContext = null;
     try {
       console.log(`Scraping documents for case: ${govId} (new window)`);
@@ -724,17 +762,23 @@ class NyPucScraper {
     const processIdAndUpload = async (
       govID: string,
     ): Promise<Partial<RawGenericDocket> | null> => {
+      let return_result = null;
       try {
-        const result = await processId(govID);
-        console.log(result.case_govid);
-        if (result !== null) {
-          await pushResultsToUploader([result], mode);
+        return_result = await processId(govID);
+        if (return_result !== null) {
+          console.log(return_result.case_govid);
+          try {
+            await pushResultsToUploader([return_result], mode);
+          } catch (e) {
+            console.log(e);
+          }
         } else {
           console.log("Result was equal to null.");
         }
+        return return_result;
       } catch (err) {
         console.error(err);
-        return null;
+        return return_result;
       }
     };
 
