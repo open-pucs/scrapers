@@ -309,24 +309,11 @@ class NyPucScraper {
       if (nameCellParts.length > 0) {
         const rawName = nameCellParts[0].trim();
 
-        // Check if name is in "Last, First" format
-        if (rawName.includes(",")) {
-          const nameComponents = rawName.split(",").map((part) => part.trim());
-          lastName = nameComponents[0] || "";
-          firstName = nameComponents[1] || "";
-          fullName = `${firstName} ${lastName}`.trim();
-        } else {
-          // Assume it's already in "First Last" format or single name
-          fullName = rawName;
-          const nameWords = rawName.split(" ");
-          if (nameWords.length >= 2) {
-            firstName = nameWords.slice(0, -1).join(" ");
-            lastName = nameWords[nameWords.length - 1];
-          } else {
-            firstName = rawName;
-            lastName = "";
-          }
-        }
+        // Use shared name parsing logic
+        const parsedName = this.parsePersonName(rawName);
+        fullName = parsedName.fullName;
+        firstName = parsedName.firstName;
+        lastName = parsedName.lastName;
 
         // Extract title from second part if available
         if (nameCellParts.length > 1) {
@@ -456,25 +443,36 @@ class NyPucScraper {
     try {
       const metadata = await this.fetchFilingMetadata(filing.filling_url);
       if (metadata) {
-        // Merge the metadata into the filing object
+        // Map description to the filing title/name
         if (metadata.description) {
+          filing.name = metadata.description;
           filing.description = metadata.description;
         }
+
+        // Map filedBy to individual_authors_blob
         if (metadata.filedBy) {
-          // Convert "Last,First" format to "[First Last]"
-          const filedByFormatted = metadata.filedBy.includes(",")
-            ? metadata.filedBy
-                .split(",")
-                .reverse()
-                .map((n) => n.trim())
-                .join(" ")
-            : metadata.filedBy;
-          filing.individual_authors = [filedByFormatted];
-          filing.individual_authors_blob = metadata.filedBy;
+          // Format name from "Last,First" to "First Last" format
+          const filedByFormatted = this.formatIndividualName(metadata.filedBy);
+          if (filedByFormatted) {
+            filing.individual_authors_blob = filedByFormatted;
+            filing.individual_authors = [filedByFormatted];
+          }
         }
+
+        // Map dateFiled to filed_date
+        if (metadata.dateFiled) {
+          try {
+            filing.filed_date = new Date(metadata.dateFiled).toISOString();
+          } catch (dateError) {
+            console.warn(`Invalid date format for filing ${filing.filling_govid}: ${metadata.dateFiled}`);
+          }
+        }
+
+        // Keep organization filing on behalf of data
         if (metadata.filingOnBehalfOf) {
           filing.organization_authors_blob = metadata.filingOnBehalfOf;
         }
+
         // Store original metadata in extra_metadata for cross-checking
         filing.extra_metadata = {
           ...filing.extra_metadata,
@@ -489,15 +487,24 @@ class NyPucScraper {
     }
   }
 
-  private async enhanceFilingsWithMetadata(
+  private async enhanceFilingsWithMetadataConcurrent(
     filings: RawGenericFiling[],
-  ): Promise<RawGenericFiling[]> {
-    console.log("Enhancing filings with additional metadata...");
-    for (const filing of filings) {
-      await this.enhanceFilingWithMetadata(filing);
-    }
-    return filings;
+  ): Promise<void> {
+    console.log("Enhancing filings with additional metadata concurrently...");
+
+    // Use the existing processTasksWithQueue method for concurrent processing
+    await this.processTasksWithQueue(
+      filings,
+      async (filing: RawGenericFiling) => {
+        await this.enhanceFilingWithMetadata(filing);
+        return filing;
+      },
+      this.max_concurrent_browsers
+    );
+
+    console.log("Finished enhancing all filings with metadata.");
   }
+
 
   private extractFilingUrlFromOnclick(onclickAttr: string): string {
     if (!onclickAttr) return "";
@@ -514,6 +521,46 @@ class NyPucScraper {
     return `${fullPath}?${decodedParams}`;
   }
 
+  private parsePersonName(rawName: string): {
+    fullName: string;
+    firstName: string;
+    lastName: string;
+  } {
+    if (!rawName || !rawName.trim()) {
+      return { fullName: "", firstName: "", lastName: "" };
+    }
+
+    const trimmedName = rawName.trim();
+    let fullName = "";
+    let firstName = "";
+    let lastName = "";
+
+    // Check if name is in "Last, First" format
+    if (trimmedName.includes(",")) {
+      const nameComponents = trimmedName.split(",").map((part) => part.trim());
+      lastName = nameComponents[0] || "";
+      firstName = nameComponents[1] || "";
+      fullName = `${firstName} ${lastName}`.trim();
+    } else {
+      // Assume it's already in "First Last" format or single name
+      fullName = trimmedName;
+      const nameWords = trimmedName.split(" ");
+      if (nameWords.length >= 2) {
+        firstName = nameWords.slice(0, -1).join(" ");
+        lastName = nameWords[nameWords.length - 1];
+      } else {
+        firstName = trimmedName;
+        lastName = "";
+      }
+    }
+
+    return { fullName, firstName, lastName };
+  }
+
+  private formatIndividualName(name: string): string {
+    return this.parsePersonName(name).fullName;
+  }
+
   private async scrapeDocumentsFromHtml(
     html: string,
     tableSelector: string,
@@ -526,6 +573,7 @@ class NyPucScraper {
 
     console.log(`Found ${docRows.length} document rows.`);
 
+    // First pass: extract basic filing data
     docRows.each((i, docRow) => {
       const docCells = $(docRow).find("td");
       if (docCells.length > 6) {
@@ -589,14 +637,20 @@ class NyPucScraper {
       }
     });
 
-    console.log("Finished document extraction.");
-    return Array.from(filingsMap.values());
+    console.log("Finished basic document extraction.");
+
+    // Second pass: fetch metadata concurrently for all filings
+    const filings = Array.from(filingsMap.values());
+    if (filings.length > 0) {
+      console.log(`Fetching metadata concurrently for ${filings.length} filings...`);
+      await this.enhanceFilingsWithMetadataConcurrent(filings);
+    }
+
+    return filings;
   }
 
-  // To enable enhanced filing metadata, call with: scrapeDocumentsOnly(govId, true)
   async scrapeDocumentsOnly(
     govId: string,
-    enhanceWithMetadata: boolean = false,
   ): Promise<RawGenericFiling[]> {
     let windowContext = null;
     try {
@@ -614,17 +668,12 @@ class NyPucScraper {
       } catch {} // Ignore timeout, just means no documents table
 
       const documentsHtml = await page.content();
-      let documents = await this.scrapeDocumentsFromHtml(
+      const documents = await this.scrapeDocumentsFromHtml(
         documentsHtml,
         docsTableSelector,
         page.url(),
       );
       await windowContext.close();
-
-      // Enhance with metadata if requested
-      if (enhanceWithMetadata) {
-        documents = await this.enhanceFilingsWithMetadata(documents);
-      }
 
       return documents;
     } catch (error) {
