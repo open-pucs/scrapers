@@ -1,4 +1,3 @@
-import { Scraper } from "../pipeline";
 import {
   RawGenericDocket,
   RawGenericFiling,
@@ -7,7 +6,6 @@ import {
 } from "../types";
 import { Page } from "playwright";
 import { Browser, chromium } from "playwright";
-import { runCli } from "../cli_runner";
 import * as cheerio from "cheerio";
 import * as fs from "fs";
 
@@ -464,7 +462,9 @@ class NyPucScraper {
           try {
             filing.filed_date = new Date(metadata.dateFiled).toISOString();
           } catch (dateError) {
-            console.warn(`Invalid date format for filing ${filing.filling_govid}: ${metadata.dateFiled}`);
+            console.warn(
+              `Invalid date format for filing ${filing.filling_govid}: ${metadata.dateFiled}`,
+            );
           }
         }
 
@@ -499,23 +499,27 @@ class NyPucScraper {
         await this.enhanceFilingWithMetadata(filing);
         return filing;
       },
-      this.max_concurrent_browsers
+      this.max_concurrent_browsers,
     );
 
     console.log("Finished enhancing all filings with metadata.");
   }
 
-
   private extractFilingUrlFromOnclick(onclickAttr: string): string {
     if (!onclickAttr) return "";
 
     // Parse the onclick: "javascript:return OpenGridPopupWindow('../MatterManagement/MatterFilingItem.aspx','FilingSeq=360722&amp;MatterSeq=64595');"
-    const match = onclickAttr.match(/OpenGridPopupWindow\('([^']+)','([^']+)'\)/);
+    const match = onclickAttr.match(
+      /OpenGridPopupWindow\('([^']+)','([^']+)'\)/,
+    );
     if (!match) return "";
 
     const [, relativePath, params] = match;
     // Convert ../MatterManagement/MatterFilingItem.aspx to full URL
-    const fullPath = relativePath.replace("../", "https://documents.dps.ny.gov/public/");
+    const fullPath = relativePath.replace(
+      "../",
+      "https://documents.dps.ny.gov/public/",
+    );
     // Decode HTML entities in parameters (&amp; -> &)
     const decodedParams = params.replace(/&amp;/g, "&");
     return `${fullPath}?${decodedParams}`;
@@ -561,6 +565,19 @@ class NyPucScraper {
     return this.parsePersonName(name).fullName;
   }
 
+  private async scrapeIndustryAffectedFromFillingsHtml(
+    html: string,
+  ): Promise<string> {
+    const $ = cheerio.load(html);
+    const industryElement = $("#GridPlaceHolder_MatterControl1_lblIndustryAffectedValue");
+
+    if (industryElement.length > 0) {
+      return industryElement.text().trim();
+    }
+
+    return "Unknown";
+  }
+
   private async scrapeDocumentsFromHtml(
     html: string,
     tableSelector: string,
@@ -585,7 +602,9 @@ class NyPucScraper {
 
         // Skip this filing if we couldn't extract a valid URL
         if (!fillingUrl) {
-          console.warn(`Skipping filing ${filingNo}: could not extract valid URL from onclick attribute`);
+          console.warn(
+            `Skipping filing ${filingNo}: could not extract valid URL from onclick attribute`,
+          );
           return;
         }
 
@@ -642,16 +661,16 @@ class NyPucScraper {
     // Second pass: fetch metadata concurrently for all filings
     const filings = Array.from(filingsMap.values());
     if (filings.length > 0) {
-      console.log(`Fetching metadata concurrently for ${filings.length} filings...`);
+      console.log(
+        `Fetching metadata concurrently for ${filings.length} filings...`,
+      );
       await this.enhanceFilingsWithMetadataConcurrent(filings);
     }
 
     return filings;
   }
 
-  async scrapeDocumentsOnly(
-    govId: string,
-  ): Promise<RawGenericFiling[]> {
+  async scrapeDocumentsOnly(govId: string): Promise<{ documents: RawGenericFiling[]; industry: string }> {
     let windowContext = null;
     try {
       console.log(`Scraping documents for case: ${govId} (new window)`);
@@ -673,15 +692,20 @@ class NyPucScraper {
         docsTableSelector,
         page.url(),
       );
+
+      // Extract industry from the page HTML
+      const industry = await this.scrapeIndustryAffectedFromFillingsHtml(documentsHtml);
+      console.log(`Extracted industry for ${govId}: ${industry}`);
+
       await windowContext.close();
 
-      return documents;
+      return { documents, industry };
     } catch (error) {
       console.error(`Error scraping documents for ${govId}:`, error);
       if (windowContext) {
         await windowContext.close();
       }
-      return [];
+      return { documents: [], industry: "Unknown" };
     }
   }
 
@@ -775,8 +799,8 @@ class NyPucScraper {
             return await this.scrapeMetadataOnly(govId);
 
           case ScrapingMode.FILLINGS: {
-            const filings = await this.scrapeDocumentsOnly(govId);
-            return { case_govid: govId, filings };
+            const { documents: filings, industry } = await this.scrapeDocumentsOnly(govId);
+            return { case_govid: govId, filings, industry };
           }
 
           case ScrapingMode.PARTIES: {
@@ -785,7 +809,7 @@ class NyPucScraper {
           }
 
           case ScrapingMode.ALL: {
-            const [metadata, documents, parties] = await Promise.all([
+            const [metadata, documentsResult, parties] = await Promise.all([
               this.getCaseMeta(govId),
               this.scrapeDocumentsOnly(govId),
               this.scrapePartiesOnly(govId),
@@ -796,8 +820,12 @@ class NyPucScraper {
               return_case.case_govid = govId;
             }
 
-            return_case.filings = documents;
+            return_case.filings = documentsResult.documents;
             return_case.case_parties = parties;
+            // Set the industry from documents if not already set from metadata
+            if (!return_case.industry || return_case.industry === "Unknown") {
+              return_case.industry = documentsResult.industry;
+            }
 
             // TODO: Make this an optional paramater that can be set with the CLI TOOL
             return return_case;
