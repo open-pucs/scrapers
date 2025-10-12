@@ -19,6 +19,7 @@ export interface RawGenericParty {
   human_associated_company: string;
   contact_email: string;
   contact_phone: string;
+  contact_fax: string;
   contact_address: string;
   extra_metadata: any;
 }
