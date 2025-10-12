@@ -323,6 +323,7 @@ class NyPucScraper {
       const emailPhoneCellText = $(cells[4]).text();
       let email = "";
       let phone = "";
+      let fax_phone = "";
 
       const phoneMatch = emailPhoneCellText.match(/Ph:\s*(.*)/);
       if (phoneMatch) {
@@ -336,7 +337,14 @@ class NyPucScraper {
       } else if (emailPhoneCellText.includes("@")) {
         email = emailPhoneCellText.trim();
       } else {
-        phone = emailPhoneCellText.trim();
+        // Handle concatenated phone and fax like "(607) 656-7851Fax: (607) 656-7854"
+        const faxMatch = emailPhoneCellText.match(/(.+?)Fax:\s*(.+)/i);
+        if (faxMatch) {
+          phone = faxMatch[1].trim();
+          fax_phone = faxMatch[2].trim();
+        } else {
+          phone = emailPhoneCellText.trim();
+        }
       }
 
       const party: RawGenericParty = {
@@ -348,8 +356,10 @@ class NyPucScraper {
         human_associated_company: companyCell,
         contact_email: email,
         contact_phone: phone,
+        contact_fax: fax_phone,
         contact_address: addressCell,
         extra_metadata: {
+          contact_fax: fax_phone,
           name_cell_html: nameCellHtml,
           name_cell_parts: nameCellParts,
           raw_name_input: nameCellParts[0] || "",
@@ -569,7 +579,9 @@ class NyPucScraper {
     html: string,
   ): Promise<string> {
     const $ = cheerio.load(html);
-    const industryElement = $("#GridPlaceHolder_MatterControl1_lblIndustryAffectedValue");
+    const industryElement = $(
+      "#GridPlaceHolder_MatterControl1_lblIndustryAffectedValue",
+    );
 
     if (industryElement.length > 0) {
       return industryElement.text().trim();
@@ -670,7 +682,9 @@ class NyPucScraper {
     return filings;
   }
 
-  async scrapeDocumentsOnly(govId: string): Promise<{ documents: RawGenericFiling[]; industry: string }> {
+  async scrapeDocumentsOnly(
+    govId: string,
+  ): Promise<{ documents: RawGenericFiling[]; industry: string }> {
     let windowContext = null;
     try {
       console.log(`Scraping documents for case: ${govId} (new window)`);
@@ -694,7 +708,8 @@ class NyPucScraper {
       );
 
       // Extract industry from the page HTML
-      const industry = await this.scrapeIndustryAffectedFromFillingsHtml(documentsHtml);
+      const industry =
+        await this.scrapeIndustryAffectedFromFillingsHtml(documentsHtml);
       console.log(`Extracted industry for ${govId}: ${industry}`);
 
       await windowContext.close();
@@ -799,7 +814,8 @@ class NyPucScraper {
             return await this.scrapeMetadataOnly(govId);
 
           case ScrapingMode.FILLINGS: {
-            const { documents: filings, industry } = await this.scrapeDocumentsOnly(govId);
+            const { documents: filings, industry } =
+              await this.scrapeDocumentsOnly(govId);
             return { case_govid: govId, filings, industry };
           }
 
