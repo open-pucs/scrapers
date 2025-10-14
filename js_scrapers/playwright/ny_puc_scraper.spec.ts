@@ -221,8 +221,8 @@ class NyPucScraper {
   async filterOutExisting(
     cases: Partial<RawGenericDocket>[],
   ): Promise<Partial<RawGenericDocket>[]> {
-    const caseDiffUrl =
-      "http://localhost:33399/public/caselist/ny/ny_puc/casedata_differential";
+    const rootDokitoUrl = "http://localhost:8123";
+    const caseDiffUrl = `${rootDokitoUrl}/public/caselist/ny/ny_puc/casedata_differential/database`;
 
     try {
       const response = await fetch(caseDiffUrl, {
